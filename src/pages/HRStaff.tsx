@@ -258,7 +258,7 @@ const HRStaff = () => {
   };
 
   const handleMarkAsPaid = () => {
-    const netPay = (payrollForm.basicSalary + payrollForm.bonuses + payrollForm.allowances.transport + payrollForm.allowances.meal - payrollForm.deductions.tax - payrollForm.deductions.loans - payrollForm.deductions.absences);
+    const netPay = (payrollForm.basicSalary + payrollForm.bonuses + payrollForm.allowances.transport + payrollForm.allowances.meal + (payrollForm.allowances.housing || 0) - payrollForm.deductions.tax - payrollForm.deductions.loans - payrollForm.deductions.absences);
     const updatedStaff = staff.map(s => {
       if (s.id === payrollForm.empId) {
         return {
@@ -273,7 +273,8 @@ const HRStaff = () => {
               bonuses: payrollForm.bonuses,
               deductions: payrollForm.deductions,
               netPay: netPay,
-              date: format(new Date(), "yyyy-MM-dd")
+              date: format(new Date(), "yyyy-MM-dd"),
+              status: "paid"
             }
           ]
         };
@@ -290,6 +291,35 @@ const HRStaff = () => {
     setStaff(updatedStaff);
     setShowRightsModal(false);
     toast.success("User rights updated");
+  };
+
+  const handleExportPayroll = () => {
+    const csvContent = [
+      ["Staff Name", "Employee ID", "Month", "Net Salary", "Status"],
+      ...staff.map(s => {
+        const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+        const netSalary = latestPayroll ? latestPayroll.netPay : s.salary;
+        const status = latestPayroll ? "Paid" : "Pending";
+        return [s.name, s.id, latestPayroll ? latestPayroll.month : format(new Date(), 'MMMM yyyy'), netSalary, status];
+      })
+    ].map(e => e.join(",")).join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `payroll_export_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Payroll exported successfully");
+  };
+
+  const handleUpdateAttendance = (id: number, status: string) => {
+    setAttendance(attendance.map(a => a.id === id ? { ...a, status } : a));
+    setEditAttendanceId(null);
+    toast.success("Attendance updated");
   };
 
   const handleDeleteStaff = (id: string) => {
@@ -478,11 +508,27 @@ const HRStaff = () => {
                       <td className="px-4 py-3 font-medium">{a.name}</td>
                       <td className="px-4 py-3 text-muted-foreground">{format(new Date(a.date), 'MMM dd, yyyy')}</td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline" className={statusColor(a.status)}>{a.status}</Badge>
+                        {editAttendanceId === a.id ? (
+                          <Select defaultValue={a.status} onValueChange={(v) => handleUpdateAttendance(a.id, v)}>
+                            <SelectTrigger className="h-8 w-[120px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="present">Present</SelectItem>
+                              <SelectItem value="absent">Absent</SelectItem>
+                              <SelectItem value="late">Late</SelectItem>
+                              <SelectItem value="half-day">Half Day</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant="outline" className={statusColor(a.status)}>{a.status}</Badge>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{a.checkIn} - {a.checkOut}</td>
                       <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditAttendanceId(editAttendanceId === a.id ? null : a.id)}>
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -495,7 +541,7 @@ const HRStaff = () => {
         {/* Payroll System */}
         <TabsContent value="payroll" className="mt-4 space-y-4">
           <div className="flex justify-end">
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={handleExportPayroll}>
               <Download className="h-4 w-4" /> Export Payroll
             </Button>
           </div>
@@ -541,7 +587,18 @@ const HRStaff = () => {
                               });
                               setShowPayrollModal(true);
                             }}>Process</Button>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setLedgerStaff(s); setShowLedgerModal(true); }}><FileText className="h-4 w-4" /></Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-7 w-7 p-0" 
+                              disabled={!latestPayroll}
+                              onClick={() => {
+                                setSelectedPayslip({ staff: s, payroll: latestPayroll });
+                                setShowPayslipModal(true);
+                              }}
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -550,7 +607,7 @@ const HRStaff = () => {
                 </tbody>
                 <tfoot className="bg-muted/20 font-bold">
                   <tr>
-                    <td colSpan={2} className="px-4 py-3 text-sm uppercase tracking-wider">Total Monthly Payroll</td>
+                    <td colSpan={2} className="px-4 py-3 text-sm uppercase tracking-wider text-right">Total Monthly Payroll:</td>
                     <td className="px-4 py-3 text-success text-lg">
                       ₨ {staff.reduce((acc, s) => {
                         const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
@@ -1043,6 +1100,81 @@ const HRStaff = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRightsModal(false)}>Cancel</Button>
             <Button onClick={() => handleUpdateRights(rightsStaff.id, rightsStaff.rights)}>Save Permissions</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payslip Modal */}
+      <Dialog open={showPayslipModal} onOpenChange={setShowPayslipModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" /> Employee Payslip
+            </DialogTitle>
+            <DialogDescription>Monthly salary details for {selectedPayslip?.staff.name}</DialogDescription>
+          </DialogHeader>
+          {selectedPayslip && (
+            <div className="space-y-6 py-4 border-t border-border mt-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Employee Name</Label>
+                  <p className="font-medium">{selectedPayslip.staff.name}</p>
+                </div>
+                <div>
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Employee ID</Label>
+                  <p className="font-medium">{selectedPayslip.staff.id}</p>
+                </div>
+                <div>
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Pay Month</Label>
+                  <p className="font-medium">{selectedPayslip.payroll.month}</p>
+                </div>
+                <div>
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Payment Status</Label>
+                  <Badge variant="outline" className={`capitalize ${statusColor(selectedPayslip.payroll.status)}`}>
+                    {selectedPayslip.payroll.status}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-3 bg-muted/30 p-4 rounded-lg">
+                <div className="flex justify-between text-sm">
+                  <span>Basic Salary</span>
+                  <span>₨ {selectedPayslip.payroll.basic.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Allowances (Transport, Meal, Housing)</span>
+                  <span>₨ {(selectedPayslip.payroll.allowances.transport + selectedPayslip.payroll.allowances.meal + (selectedPayslip.payroll.allowances.housing || 0)).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Bonuses</span>
+                  <span>₨ {selectedPayslip.payroll.bonuses.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm text-destructive">
+                  <span>Deductions (Tax, Loan, Absence)</span>
+                  <span>-₨ {(selectedPayslip.payroll.deductions.tax + selectedPayslip.payroll.deductions.loans + selectedPayslip.payroll.deductions.absences).toLocaleString()}</span>
+                </div>
+                <div className="h-[1px] bg-border my-2" />
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Net Payable</span>
+                  <span className="text-success">₨ {selectedPayslip.payroll.netPay.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowPayslipModal(false)}>Close</Button>
+            <Button className="gap-2" onClick={() => {
+              toast.success("Downloading payslip as PDF...");
+              // Simulated PDF download
+              const content = `Payslip for ${selectedPayslip?.staff.name} - ${selectedPayslip?.payroll.month}\nNet Pay: Rs ${selectedPayslip?.payroll.netPay.toLocaleString()}`;
+              const blob = new Blob([content], { type: 'text/plain' });
+              const link = document.createElement("a");
+              link.href = URL.createObjectURL(blob);
+              link.download = `payslip_${selectedPayslip?.staff.id}_${selectedPayslip?.payroll.month}.txt`;
+              link.click();
+            }}>
+              <Download className="h-4 w-4" /> Download PDF
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
