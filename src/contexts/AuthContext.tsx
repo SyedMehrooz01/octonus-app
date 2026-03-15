@@ -74,13 +74,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message === "Failed to fetch") {
+          return { success: false, error: "Network error: Could not connect to Supabase. Please check your internet connection and Supabase URL." };
+        }
+        throw error;
+      }
+      
       if (data.user) {
         setUser(mapSupabaseUser(data.user));
         return { success: true };
       }
-      return { success: false, error: "Login failed." };
+      return { success: false, error: "Login failed. Please check your credentials." };
     } catch (err: any) {
+      console.error("Login error:", err);
       return { success: false, error: err.message || "Invalid credentials." };
     }
   };
