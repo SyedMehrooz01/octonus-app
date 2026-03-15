@@ -14,6 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 const DUMMY_STAFF = [
   { 
@@ -294,26 +296,38 @@ const HRStaff = () => {
   };
 
   const handleExportPayroll = () => {
-    const csvContent = [
-      ["Staff Name", "Employee ID", "Month", "Net Salary", "Status"],
-      ...staff.map(s => {
-        const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-        const netSalary = latestPayroll ? latestPayroll.netPay : s.salary;
-        const status = latestPayroll ? "Paid" : "Pending";
-        return [s.name, s.id, latestPayroll ? latestPayroll.month : format(new Date(), 'MMMM yyyy'), netSalary, status];
-      })
-    ].map(e => e.join(",")).join("\n");
+    const data = staff.map((s) => {
+      const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+      const netSalary = latestPayroll ? latestPayroll.netPay : s.salary;
+      const status = latestPayroll ? "Paid" : "Pending";
+      const basicSalary = latestPayroll ? latestPayroll.basic : s.salary;
+      const bonus = latestPayroll ? latestPayroll.bonuses : 0;
+      const deductions = latestPayroll ? (latestPayroll.deductions.tax + latestPayroll.deductions.loans + latestPayroll.deductions.absences) : 0;
+      
+      return {
+        'Employee ID': s.id,
+        'Staff Name': s.name,
+        'Month': latestPayroll ? latestPayroll.month : format(new Date(), 'MMMM yyyy'),
+        'Basic Salary': basicSalary,
+        'Bonus': bonus,
+        'Deductions': deductions,
+        'Net Salary': netSalary,
+        'Status': status,
+      };
+    });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `payroll_export_${format(new Date(), 'yyyy-MM-dd')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Payroll exported successfully");
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Payroll');
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: 'xlsx',
+      type: 'array'
+    });
+    const blob = new Blob([excelBuffer], {
+      type: 'application/octet-stream'
+    });
+    saveAs(blob, `Payroll_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast.success("Payroll exported successfully to Excel");
   };
 
   const handleUpdateAttendance = (id: number, status: string) => {
