@@ -91,6 +91,11 @@ const HRStaff = () => {
   const [showPayrollModal, setShowPayrollModal] = useState(false);
   const [showLeaveRequestModal, setShowLeaveRequestModal] = useState(false);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [showRightsModal, setShowRightsModal] = useState(false);
+  const [showPayslipModal, setShowPayslipModal] = useState(false);
+  const [selectedPayslip, setSelectedPayslip] = useState<any>(null);
+  const [editAttendanceId, setEditAttendanceId] = useState<number | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -122,6 +127,9 @@ const HRStaff = () => {
     empId: "", rating: 5, notes: ""
   });
 
+  const [ledgerStaff, setLedgerStaff] = useState<any>(null);
+  const [rightsStaff, setRightsStaff] = useState<any>(null);
+
   const generateEmpId = () => `EMP-${String(staff.length + 1).padStart(3, '0')}`;
 
   const handleAddStaff = () => {
@@ -136,7 +144,9 @@ const HRStaff = () => {
       attendance: 100,
       performance: [],
       leaveBalance: { annual: 15, sick: 10, casual: 10 },
-      statusHistory: [{ status: "active", date: format(new Date(), "yyyy-MM-dd") }]
+      statusHistory: [{ status: "active", date: format(new Date(), "yyyy-MM-dd") }],
+      payrollHistory: [],
+      rights: ["dashboard", "events", "inventory", "expenses"] // Default rights
     };
     setStaff([...staff, emp]);
     setNewStaff({ 
@@ -247,6 +257,41 @@ const HRStaff = () => {
     toast.success("Performance rating added");
   };
 
+  const handleMarkAsPaid = () => {
+    const netPay = (payrollForm.basicSalary + payrollForm.bonuses + payrollForm.allowances.transport + payrollForm.allowances.meal - payrollForm.deductions.tax - payrollForm.deductions.loans - payrollForm.deductions.absences);
+    const updatedStaff = staff.map(s => {
+      if (s.id === payrollForm.empId) {
+        return {
+          ...s,
+          payrollHistory: [
+            ...(s.payrollHistory || []),
+            {
+              id: (s.payrollHistory?.length || 0) + 1,
+              month: payrollForm.month,
+              basic: payrollForm.basicSalary,
+              allowances: payrollForm.allowances,
+              bonuses: payrollForm.bonuses,
+              deductions: payrollForm.deductions,
+              netPay: netPay,
+              date: format(new Date(), "yyyy-MM-dd")
+            }
+          ]
+        };
+      }
+      return s;
+    });
+    setStaff(updatedStaff);
+    setShowPayrollModal(false);
+    toast.success(`Payroll processed for ${payrollForm.month}`);
+  };
+
+  const handleUpdateRights = (id: string, rights: string[]) => {
+    const updatedStaff = staff.map(s => s.id === id ? { ...s, rights } : s);
+    setStaff(updatedStaff);
+    setShowRightsModal(false);
+    toast.success("User rights updated");
+  };
+
   const handleDeleteStaff = (id: string) => {
     setStaff(staff.filter(s => s.id !== id));
     setShowDeleteConfirm(null);
@@ -292,14 +337,33 @@ const HRStaff = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="profiles" className="w-full">
-        <div className="overflow-x-auto pb-1">
-          <TabsList className="w-full justify-start sm:w-auto inline-flex">
-            <TabsTrigger value="profiles" className="text-xs sm:text-sm">Profiles</TabsTrigger>
-            <TabsTrigger value="attendance" className="text-xs sm:text-sm">Attendance</TabsTrigger>
-            <TabsTrigger value="payroll" className="text-xs sm:text-sm">Payroll</TabsTrigger>
-            <TabsTrigger value="leaves" className="text-xs sm:text-sm">Leaves</TabsTrigger>
-            <TabsTrigger value="performance" className="text-xs sm:text-sm">Performance</TabsTrigger>
-          </TabsList>
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-2">
+          <div className="overflow-x-auto pb-1 w-full sm:w-auto">
+            <TabsList className="w-full justify-start sm:w-auto inline-flex">
+              <TabsTrigger value="profiles" className="text-xs sm:text-sm">Profiles</TabsTrigger>
+              <TabsTrigger value="attendance" className="text-xs sm:text-sm">Attendance</TabsTrigger>
+              <TabsTrigger value="payroll" className="text-xs sm:text-sm">Payroll</TabsTrigger>
+              <TabsTrigger value="leaves" className="text-xs sm:text-sm">Leaves</TabsTrigger>
+              <TabsTrigger value="performance" className="text-xs sm:text-sm">Performance</TabsTrigger>
+            </TabsList>
+          </div>
+          
+          <div className="flex items-center gap-4 w-full sm:w-auto bg-card border border-border rounded-lg px-4 py-2">
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground">Monthly Total Payroll</span>
+              <span className="text-sm font-bold text-success">
+                ₨ {staff.reduce((acc, s) => {
+                  const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+                  return acc + (latestPayroll ? latestPayroll.netPay : s.salary);
+                }, 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="h-8 w-[1px] bg-border mx-2" />
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground">Active Staff</span>
+              <span className="text-sm font-bold">{staff.filter(s => s.status === 'active').length}</span>
+            </div>
+          </div>
         </div>
 
         {/* Staff Profiles */}
@@ -360,6 +424,12 @@ const HRStaff = () => {
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditStaff(s); setShowEditModal(true); }}>
                             <Edit className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setLedgerStaff(s); setShowLedgerModal(true); }}>
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setRightsStaff(s); setShowRightsModal(true); }}>
+                            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => setShowDeleteConfirm(s.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -443,17 +513,20 @@ const HRStaff = () => {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {staff.map(s => {
-                    const netSalary = s.salary; // Simplified for UI
+                    const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+                    const netSalary = latestPayroll ? latestPayroll.netPay : s.salary;
                     return (
                       <tr key={s.id} className="text-sm hover:bg-muted/20">
                         <td className="px-4 py-3">
                           <p className="font-medium">{s.name}</p>
                           <p className="text-[10px] text-muted-foreground">{s.id}</p>
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">{format(new Date(), 'MMMM yyyy')}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{latestPayroll ? latestPayroll.month : format(new Date(), 'MMMM yyyy')}</td>
                         <td className="px-4 py-3 font-bold text-success">₨ {netSalary.toLocaleString()}</td>
                         <td className="px-4 py-3">
-                          <Badge variant="outline" className={statusColor("paid")}>Paid</Badge>
+                          <Badge variant="outline" className={statusColor(latestPayroll ? "paid" : "pending")}>
+                            {latestPayroll ? "Paid" : "Pending"}
+                          </Badge>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
@@ -468,13 +541,25 @@ const HRStaff = () => {
                               });
                               setShowPayrollModal(true);
                             }}>Process</Button>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0"><FileText className="h-4 w-4" /></Button>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setLedgerStaff(s); setShowLedgerModal(true); }}><FileText className="h-4 w-4" /></Button>
                           </div>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
+                <tfoot className="bg-muted/20 font-bold">
+                  <tr>
+                    <td colSpan={2} className="px-4 py-3 text-sm uppercase tracking-wider">Total Monthly Payroll</td>
+                    <td className="px-4 py-3 text-success text-lg">
+                      ₨ {staff.reduce((acc, s) => {
+                        const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+                        return acc + (latestPayroll ? latestPayroll.netPay : s.salary);
+                      }, 0).toLocaleString()}
+                    </td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -867,6 +952,97 @@ const HRStaff = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
             <Button onClick={handleUpdateStaff}>Update Profile</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Staff Ledger Modal */}
+      <Dialog open={showLedgerModal} onOpenChange={setShowLedgerModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Staff Ledger - {ledgerStaff?.name}</DialogTitle>
+            <DialogDescription>Complete history of payments, advances, and deductions.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="rounded-lg border border-border">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground uppercase">
+                    <th className="px-4 py-3 text-left">Date</th>
+                    <th className="px-4 py-3 text-left">Month</th>
+                    <th className="px-4 py-3 text-right">Basic</th>
+                    <th className="px-4 py-3 text-right">Allowances</th>
+                    <th className="px-4 py-3 text-right">Bonuses</th>
+                    <th className="px-4 py-3 text-right text-destructive">Deductions</th>
+                    <th className="px-4 py-3 text-right font-bold text-success">Net Paid</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {ledgerStaff?.payrollHistory?.length > 0 ? (
+                    ledgerStaff.payrollHistory.map((h: any) => (
+                      <tr key={h.id} className="text-sm hover:bg-muted/20">
+                        <td className="px-4 py-3 text-muted-foreground">{h.date}</td>
+                        <td className="px-4 py-3 font-medium">{h.month}</td>
+                        <td className="px-4 py-3 text-right">₨ {h.basic.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right">₨ {(h.allowances.transport + h.allowances.meal + h.allowances.housing).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right">₨ {h.bonuses.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right text-destructive">₨ {(h.deductions.tax + h.deductions.loans + h.deductions.absences).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right font-bold text-success">₨ {h.netPay.toLocaleString()}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No payment history found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLedgerModal(false)}>Close Ledger</Button>
+            <Button className="gap-2"><Download className="h-4 w-4" /> Export Ledger</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* User Rights Modal */}
+      <Dialog open={showRightsModal} onOpenChange={setShowRightsModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>User Access Rights - {rightsStaff?.name}</DialogTitle>
+            <DialogDescription>Select which modules this staff member can access.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {[
+              { id: 'dashboard', label: 'Dashboard View' },
+              { id: 'events', label: 'Event Booking' },
+              { id: 'inventory', label: 'Inventory Management' },
+              { id: 'expenses', label: 'Expense Tracking' },
+              { id: 'hr', label: 'HR & Staff Management' },
+              { id: 'finance', label: 'Finance & Accounts' }
+            ].map(module => (
+              <div key={module.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                <Label htmlFor={`right-${module.id}`} className="flex-1 cursor-pointer">{module.label}</Label>
+                <input 
+                  type="checkbox" 
+                  id={`right-${module.id}`}
+                  checked={rightsStaff?.rights?.includes(module.id)}
+                  onChange={(e) => {
+                    const currentRights = rightsStaff?.rights || [];
+                    const newRights = e.target.checked 
+                      ? [...currentRights, module.id]
+                      : currentRights.filter((r: string) => r !== module.id);
+                    setRightsStaff({ ...rightsStaff, rights: newRights });
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRightsModal(false)}>Cancel</Button>
+            <Button onClick={() => handleUpdateRights(rightsStaff.id, rightsStaff.rights)}>Save Permissions</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
