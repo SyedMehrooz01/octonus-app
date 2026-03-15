@@ -73,9 +73,9 @@ const EventBooking = () => {
         <Button onClick={()=>setShowAdd(true)} className="gap-2"><Plus className="h-4 w-4"/>New Booking</Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[{l:"Total",v:bookings.length,c:"text-foreground"},{l:"Confirmed",v:bookings.filter(b=>b.status==="confirmed").length,c:"text-success"},{l:"Tentative",v:bookings.filter(b=>b.status==="tentative").length,c:"text-warning"},{l:"Postponed",v:bookings.filter(b=>b.status==="postponed").length,c:"text-secondary"},{l:"Cancelled",v:bookings.filter(b=>b.status==="cancelled").length,c:"text-destructive"},{l:"3rd Party Profit",v:`₨ ${tp.toLocaleString()}`,c:"text-primary"}].map(c=>(
-          <div key={c.l} className="rounded-lg border border-border bg-card p-3"><p className="text-xs text-muted-foreground">{c.l}</p><p className={`mt-1 text-lg font-bold ${c.c}`}>{c.v}</p></div>
+          <div key={c.l} className="rounded-lg border border-border bg-card p-3"><p className="text-[10px] uppercase font-bold text-muted-foreground">{c.l}</p><p className={`mt-1 text-base sm:text-lg font-bold ${c.c}`}>{c.v}</p></div>
         ))}
       </div>
 
@@ -95,7 +95,7 @@ const EventBooking = () => {
               <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-36"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">All Status</SelectItem><SelectItem value="confirmed">Confirmed</SelectItem><SelectItem value="tentative">Tentative</SelectItem><SelectItem value="postponed">Postponed</SelectItem><SelectItem value="cancelled">Cancelled</SelectItem></SelectContent></Select>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[1000px]">
                 <thead><tr className="border-b border-border bg-muted/40">{["Client","Type","Date","Venue","Guests","Total","Advance","Balance","Status","Actions"].map(h=><th key={h} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}</tr></thead>
                 <tbody>
                   {filtered.map(b=>(
@@ -169,7 +169,7 @@ const EventBooking = () => {
                   <h3 className="font-semibold text-card-foreground">{menu.name}</h3>
                   <Button variant="outline" size="sm">+ Add Item</Button>
                 </div>
-                <table className="w-full">
+                <table className="w-full min-w-[600px]">
                   <thead><tr className="border-b border-border bg-muted/40"><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Item</th><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Unit</th><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Rate (₨)</th><th className="px-4 py-2 text-xs text-muted-foreground">Edit</th></tr></thead>
                   <tbody>{menu.items.map((item,idx)=><tr key={idx} className="border-b border-border last:border-0"><td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item}</td><td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td><td className="px-4 py-2 text-sm">₨ {item.rate}</td><td className="px-4 py-2 text-center"><button className="rounded p-1 hover:bg-muted"><Edit className="h-3.5 w-3.5 text-muted-foreground"/></button></td></tr>)}</tbody>
                 </table>
@@ -192,7 +192,7 @@ const EventBooking = () => {
                   <div><p className="text-xs text-muted-foreground">Date</p><p className="font-medium">{selected.eventDate}</p></div>
                   <div><p className="text-xs text-muted-foreground">Guests</p><p className="font-medium">{selected.guests}</p></div>
                 </div>
-                <table className="w-full">
+                <table className="w-full min-w-[700px]">
                   <thead><tr className="border-b border-border bg-muted/40">{["Item","Unit","Rate/Unit","Qty","Total Cost"].map(h=><th key={h} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                   <tbody>{(MENUS.find(m=>m.name===selected.menu)?.items||[]).map((item,idx)=><tr key={idx} className="border-b border-border last:border-0"><td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item}</td><td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td><td className="px-4 py-2 text-sm">₨ {item.rate}</td><td className="px-4 py-2 text-sm">{selected.guests}</td><td className="px-4 py-2 text-sm font-medium text-primary">₨ {(selected.guests*item.rate).toLocaleString()}</td></tr>)}</tbody>
                   <tfoot><tr className="border-t-2 border-border bg-muted/40"><td colSpan={4} className="px-4 py-2 text-sm font-semibold">Total Kitchen Cost</td><td className="px-4 py-2 text-sm font-bold text-primary">₨ {(MENUS.find(m=>m.name===selected.menu)?.items.reduce((s,i)=>s+selected.guests*i.rate,0)||0).toLocaleString()}</td></tr></tfoot>
@@ -210,7 +210,7 @@ const EventBooking = () => {
           <div className="rounded-lg border border-border bg-card">
             <div className="border-b border-border p-4"><h3 className="font-semibold text-card-foreground">Third-Party Sourcing</h3><p className="text-xs text-muted-foreground mt-1">Supplier rate vs selling rate with auto profit calculation and supplier ledger update</p></div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[900px]">
                 <thead><tr className="border-b border-border bg-muted/40">{["Event","Date","Supplier Cost","Selling Rate","Profit","Margin %","Ledger Updated"].map(h=><th key={h} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}</tr></thead>
                 <tbody>{bookings.filter(b=>b.thirdParty).map(b=>{const profit=b.sellingRate-b.supplierCost;const margin=b.sellingRate>0?Math.round((profit/b.sellingRate)*100):0;return(
                   <tr key={b.id} className="border-b border-border last:border-0 hover:bg-muted/20">

@@ -118,7 +118,7 @@ const Expenses = () => {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[
           { label: "Today's Expenses", value: `₨ ${todayExpenses.toLocaleString()}`, icon: Calendar },
           { label: "This Month", value: `₨ ${monthExpenses.toLocaleString()}`, icon: TrendingDown },
@@ -127,10 +127,10 @@ const Expenses = () => {
           <div key={card.label} className="rounded-lg border border-border bg-card p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div className="min-w-0">
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">{card.label}</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground truncate">{card.label}</p>
                 <p className="mt-1 text-lg sm:text-2xl font-bold text-destructive truncate">{card.value}</p>
               </div>
-              <div className="flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-lg bg-destructive/10">
+              <div className="flex h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-lg bg-destructive/10">
                 <card.icon className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
               </div>
             </div>
@@ -161,7 +161,7 @@ const Expenses = () => {
               </Select>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[900px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
                     {["Date", "Description", "Category", "Event", "Mode", "Amount"].map(h => (

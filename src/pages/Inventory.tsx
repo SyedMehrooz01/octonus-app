@@ -78,20 +78,20 @@ const Inventory = () => {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
           { label: "Total Items", value: items.length, icon: Package, color: "bg-primary" },
           { label: "Low Stock", value: lowStock.length, icon: AlertTriangle, color: "bg-warning" },
           { label: "Stock Value", value: `₨ ${totalValue.toLocaleString()}`, icon: Package, color: "bg-success" },
           { label: "Categories", value: [...new Set(items.map(i => i.category))].length, icon: Package, color: "bg-secondary" },
         ].map(card => (
-          <div key={card.label} className="rounded-lg border border-border bg-card p-4">
+          <div key={card.label} className="rounded-lg border border-border bg-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">{card.label}</p>
-                <p className="mt-1 text-xl font-bold text-card-foreground">{card.value}</p>
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground truncate">{card.label}</p>
+                <p className="mt-1 text-base sm:text-xl font-bold text-card-foreground truncate">{card.value}</p>
               </div>
-              <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${card.color}`}>
+              <div className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg flex-shrink-0 ${card.color}`}>
                 <card.icon className="h-4 w-4 text-white" />
               </div>
             </div>
@@ -132,7 +132,7 @@ const Inventory = () => {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[900px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
                     {["Item Name", "Category", "Unit", "In Stock", "Min Stock", "Value", "Supplier", "Actions"].map(h => (
@@ -177,7 +177,7 @@ const Inventory = () => {
         <TabsContent value="history">
           <div className="rounded-lg border border-border bg-card">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[600px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
                     {["Date", "Item", "Type", "Qty", "Note"].map(h => (

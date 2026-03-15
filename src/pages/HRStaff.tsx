@@ -598,14 +598,14 @@ const HRStaff = () => {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input 
                   placeholder="Search by ID, Name..." 
-                  className="pl-9 h-9" 
+                  className="pl-9 h-9 w-full" 
                   value={search} 
                   onChange={e => setSearch(e.target.value)} 
                 />
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[800px]">
+              <table className="w-full border-collapse min-w-[1000px]">
                 <thead>
                   <tr className="border-y border-border bg-muted/40">
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Staff ID</th>
@@ -686,7 +686,7 @@ const HRStaff = () => {
 
           <div className="rounded-lg border border-border bg-card">
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+              <table className="w-full border-collapse min-w-[800px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     <th className="px-4 py-3 text-left">Employee</th>
@@ -741,7 +741,7 @@ const HRStaff = () => {
           </div>
           <div className="rounded-lg border border-border bg-card">
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+              <table className="w-full border-collapse min-w-[900px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     <th className="px-4 py-3 text-left">Staff</th>
@@ -833,7 +833,7 @@ const HRStaff = () => {
           </div>
           <div className="rounded-lg border border-border bg-card">
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+              <table className="w-full border-collapse min-w-[800px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     <th className="px-4 py-3 text-left">Staff</th>

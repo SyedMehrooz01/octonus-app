@@ -80,12 +80,12 @@ const Finance = () => {
         <Button onClick={()=>setShowAdd(true)} className="gap-2"><Plus className="h-4 w-4"/>Add Entry</Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[{l:"Total Revenue",v:`₨${totalRevenue.toLocaleString()}`,c:"text-success",icon:TrendingUp},{l:"Total Expenses",v:`₨${totalCredit.toLocaleString()}`,c:"text-destructive",icon:TrendingDown},{l:"Net Balance",v:`₨${netBalance.toLocaleString()}`,c:netBalance>=0?"text-success":"text-destructive",icon:Landmark},{l:"Pending Balances",v:`₨${totalPending.toLocaleString()}`,c:"text-warning",icon:Landmark}].map(c=>(
-          <div key={c.l} className="rounded-lg border border-border bg-card p-5">
+          <div key={c.l} className="rounded-lg border border-border bg-card p-4 sm:p-5">
             <div className="flex items-center justify-between">
-              <div><p className="text-sm text-muted-foreground">{c.l}</p><p className={`mt-1 text-xl font-bold ${c.c}`}>{c.v}</p></div>
-              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${c.c==="text-success"?"bg-success":c.c==="text-destructive"?"bg-destructive":c.c==="text-warning"?"bg-warning":"bg-primary"}`}><c.icon className="h-5 w-5 text-white"/></div>
+              <div><p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{c.l}</p><p className={`mt-1 text-lg sm:text-xl font-bold ${c.c}`}>{c.v}</p></div>
+              <div className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg ${c.c==="text-success"?"bg-success":c.c==="text-destructive"?"bg-destructive":c.c==="text-warning"?"bg-warning":"bg-primary"}`}><c.icon className="h-4 w-4 sm:h-5 sm:w-5 text-white"/></div>
             </div>
           </div>
         ))}
@@ -107,7 +107,7 @@ const Finance = () => {
               <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><Input placeholder="Search transactions..." className="pl-9" value={search} onChange={e=>setSearch(e.target.value)}/></div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[800px]">
                 <thead><tr className="border-b border-border bg-muted/40">{["Date","Description","Account","Type","Amount","Balance"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                 <tbody>
                   {filtered.map(l=>(
@@ -135,7 +135,7 @@ const Finance = () => {
           <div className="rounded-lg border border-border bg-card">
             <div className="border-b border-border p-4"><h3 className="text-sm font-semibold text-card-foreground">Event-Based Finance — Track each event's financial status</h3></div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[1000px]">
                 <thead><tr className="border-b border-border bg-muted/40">{["Event","Date","Total","Advance","Balance","Menu Cost","3rd Party","Profit","Status"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}</tr></thead>
                 <tbody>
                   {EVENT_FINANCE.map(e=>(
@@ -166,7 +166,8 @@ const Finance = () => {
               <div className="rounded-lg bg-success/5 border border-success/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Total Revenue</p><p className="text-xl font-bold text-success">₨{totalRevenue.toLocaleString()}</p></div>
               <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Pending Balance</p><p className="text-xl font-bold text-destructive">₨{totalPending.toLocaleString()}</p></div>
             </div>
-            <table className="w-full">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px]">
               <thead><tr className="border-b border-border bg-muted/40">{["Event","Total","Advance","Balance","% Paid"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
               <tbody>
                 {EVENT_FINANCE.map(e=>{
@@ -186,6 +187,7 @@ const Finance = () => {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </TabsContent>
 
@@ -194,7 +196,7 @@ const Finance = () => {
           <div className="rounded-lg border border-border bg-card">
             <div className="border-b border-border p-4"><h3 className="text-sm font-semibold text-card-foreground">Supplier/Vendor Ledger — Auto profit calculation</h3></div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[800px]">
                 <thead><tr className="border-b border-border bg-muted/40">{["Supplier","Contact","Total Bills","Paid","Balance","Action"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                 <tbody>
                   {suppliers.map(s=>(
@@ -221,9 +223,10 @@ const Finance = () => {
         <TabsContent value="pnl">
           <div className="space-y-4">
             {/* Event-wise P&L */}
-            <div className="rounded-lg border border-border bg-card p-6">
+            <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
               <h3 className="mb-4 text-base font-semibold text-card-foreground">Event-Wise Profit & Loss</h3>
-              <table className="w-full">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px]">
                 <thead><tr className="border-b border-border bg-muted/40">{["Event","Revenue","Menu Cost","3rd Party Cost","Net Profit","Margin"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                 <tbody>
                   {EVENT_FINANCE.map(e=>{
@@ -247,10 +250,11 @@ const Finance = () => {
                   <td/>
                 </tr></tfoot>
               </table>
+              </div>
             </div>
 
             {/* Monthly P&L Summary */}
-            <div className="rounded-lg border border-border bg-card p-6">
+            <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
               <h3 className="mb-4 text-base font-semibold text-card-foreground">Monthly P&L Summary — March 2024</h3>
               <div className="space-y-3">
                 <div className="rounded-lg bg-success/5 border border-success/20 p-4">
