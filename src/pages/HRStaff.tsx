@@ -870,7 +870,6 @@ const HRStaff = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      </Tabs>
 
       {/* View Staff Modal - Upgraded with Profile & Tabs */}
       <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
