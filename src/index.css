@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    --background: 0 0% 96%;
+    --foreground: 231 50% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 231 50% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 231 50% 15%;
+
+    --primary: 154 55% 24%;
+    --primary-foreground: 0 0% 100%;
+
+    --primary-light: 154 55% 90%;
+
+    --secondary: 231 76% 30%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 154 55% 34%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 154 55% 24%;
+
+    --radius: 0.5rem;
+
+    --sidebar-bg: 231 76% 18%;
+    --sidebar-fg: 0 0% 90%;
+    --sidebar-active: 154 55% 24%;
+    --sidebar-hover: 231 60% 24%;
+
+    --warning: 40 96% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --success: 154 55% 24%;
+    --success-foreground: 0 0% 100%;
+
+    --sidebar-background: 231 76% 18%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 154 55% 24%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 231 60% 24%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 231 60% 24%;
+    --sidebar-ring: 154 55% 24%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+@layer utilities {
+  .pkr-format {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
