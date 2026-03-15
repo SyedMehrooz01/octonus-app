@@ -354,6 +354,63 @@ const HRStaff = () => {
     toast.success("Attendance exported successfully to Excel");
   };
 
+  const handleExportLedger = () => {
+    if (!ledgerStaff) return;
+    
+    const data = (ledgerStaff.payrollHistory || []).map((h: any, index: number, array: any[]) => {
+      // Calculate running balance
+      const runningBalance = array.slice(0, index + 1).reduce((acc, curr) => acc + curr.netPay, 0);
+      
+      return {
+        'Date': h.date,
+        'Month': h.month,
+        'Basic Salary': h.basic,
+        'Transport': h.allowances.transport,
+        'Meal': h.allowances.meal,
+        'Housing': h.allowances.housing || 0,
+        'Bonuses': h.bonuses,
+        'Tax Deduction': h.deductions.tax,
+        'Loan/Advance': h.deductions.loans,
+        'Absence Deduction': h.deductions.absences,
+        'Net Paid': h.netPay,
+        'Running Total': runningBalance
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Staff_Ledger');
+    
+    // Add header row style if possible (optional)
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+    saveAs(blob, `Ledger_${ledgerStaff.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast.success("Ledger exported to Excel");
+  };
+
+  const handleExportLedgerPDF = () => {
+    if (!ledgerStaff) return;
+    toast.success("Downloading ledger as PDF...");
+    
+    let content = `STAFF PAYROLL LEDGER\n`;
+    content += `Employee: ${ledgerStaff.name} (${ledgerStaff.id})\n`;
+    content += `Date Generated: ${format(new Date(), 'PPP')}\n\n`;
+    content += `Date | Month | Net Paid | Running Total\n`;
+    content += `------------------------------------------\n`;
+    
+    let runningBalance = 0;
+    (ledgerStaff.payrollHistory || []).forEach((h: any) => {
+      runningBalance += h.netPay;
+      content += `${h.date} | ${h.month} | Rs ${h.netPay.toLocaleString()} | Rs ${runningBalance.toLocaleString()}\n`;
+    });
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Ledger_${ledgerStaff.id}_${format(new Date(), 'yyyy-MM-dd')}.txt`;
+    link.click();
+  };
+
   const handleUpdateAttendance = (id: number, status: string) => {
     setAttendance(attendance.map(a => a.id === id ? { ...a, status } : a));
     setEditAttendanceId(null);
@@ -1059,44 +1116,85 @@ const HRStaff = () => {
             <DialogDescription>Complete history of payments, advances, and deductions.</DialogDescription>
           </DialogHeader>
           <div className="py-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+              <div className="p-3 rounded-lg border border-border bg-muted/20">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Paid</p>
+                <p className="text-lg font-bold text-success">
+                  ₨ {(ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + h.netPay, 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 rounded-lg border border-border bg-muted/20">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Advances</p>
+                <p className="text-lg font-bold text-destructive">
+                  ₨ {(ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + h.deductions.loans, 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 rounded-lg border border-border bg-muted/20">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Deductions</p>
+                <p className="text-lg font-bold text-destructive">
+                  ₨ {(ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + (h.deductions.tax + h.deductions.absences), 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 rounded-lg border border-border bg-muted/20">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">Running Balance</p>
+                <p className="text-lg font-bold text-primary">
+                  ₨ {(ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + h.netPay, 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
             <div className="rounded-lg border border-border">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground uppercase">
-                    <th className="px-4 py-3 text-left">Date</th>
-                    <th className="px-4 py-3 text-left">Month</th>
-                    <th className="px-4 py-3 text-right">Basic</th>
-                    <th className="px-4 py-3 text-right">Allowances</th>
-                    <th className="px-4 py-3 text-right">Bonuses</th>
-                    <th className="px-4 py-3 text-right text-destructive">Deductions</th>
-                    <th className="px-4 py-3 text-right font-bold text-success">Net Paid</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {ledgerStaff?.payrollHistory?.length > 0 ? (
-                    ledgerStaff.payrollHistory.map((h: any) => (
-                      <tr key={h.id} className="text-sm hover:bg-muted/20">
-                        <td className="px-4 py-3 text-muted-foreground">{h.date}</td>
-                        <td className="px-4 py-3 font-medium">{h.month}</td>
-                        <td className="px-4 py-3 text-right">₨ {h.basic.toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right">₨ {(h.allowances.transport + h.allowances.meal + h.allowances.housing).toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right">₨ {h.bonuses.toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right text-destructive">₨ {(h.deductions.tax + h.deductions.loans + h.deductions.absences).toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right font-bold text-success">₨ {h.netPay.toLocaleString()}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No payment history found.</td>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground uppercase">
+                      <th className="px-4 py-3 text-left">Date</th>
+                      <th className="px-4 py-3 text-left">Month</th>
+                      <th className="px-4 py-3 text-right">Basic</th>
+                      <th className="px-4 py-3 text-right">Allowances</th>
+                      <th className="px-4 py-3 text-right">Bonuses</th>
+                      <th className="px-4 py-3 text-right text-destructive">Advances</th>
+                      <th className="px-4 py-3 text-right text-destructive">Deductions</th>
+                      <th className="px-4 py-3 text-right font-bold text-success">Net Paid</th>
+                      <th className="px-4 py-3 text-right font-bold text-primary">Running Bal</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {ledgerStaff?.payrollHistory?.length > 0 ? (
+                      (() => {
+                        let runningBalance = 0;
+                        return ledgerStaff.payrollHistory.map((h: any) => {
+                          runningBalance += h.netPay;
+                          return (
+                            <tr key={h.id} className="text-sm hover:bg-muted/20">
+                              <td className="px-4 py-3 text-muted-foreground">{h.date}</td>
+                              <td className="px-4 py-3 font-medium">{h.month}</td>
+                              <td className="px-4 py-3 text-right">₨ {h.basic.toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right">₨ {(h.allowances.transport + h.allowances.meal + (h.allowances.housing || 0)).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right">₨ {h.bonuses.toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right text-destructive">₨ {h.deductions.loans.toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right text-destructive">₨ {(h.deductions.tax + h.deductions.absences).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right font-bold text-success">₨ {h.netPay.toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right font-bold text-primary">₨ {runningBalance.toLocaleString()}</td>
+                            </tr>
+                          );
+                        });
+                      })()
+                    ) : (
+                      <tr>
+                        <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">No payment history found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setShowLedgerModal(false)}>Close Ledger</Button>
-            <Button className="gap-2"><Download className="h-4 w-4" /> Export Ledger</Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="gap-2" onClick={handleExportLedger}><Download className="h-4 w-4" /> Excel</Button>
+              <Button className="gap-2" onClick={handleExportLedgerPDF}><Download className="h-4 w-4" /> PDF</Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
