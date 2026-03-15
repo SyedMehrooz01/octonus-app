@@ -1,13 +1,11 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Mail, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck } from "lucide-react";
+import { Lock, Mail, Eye, EyeOff, Loader2, AlertCircle, UserPlus } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -18,7 +16,6 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,42 +30,6 @@ const Login = () => {
       setError(result.error || "Login failed.");
     }
     setIsLoading(false);
-  };
-
-  const handleInitializeAdmin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError("Please enter an email and password to use for the admin account.");
-      return;
-    }
-
-    setIsInitializing(true);
-    setError("");
-
-    try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            role: "admin",
-            full_name: "System Admin",
-            username: "admin"
-          }
-        }
-      });
-
-      if (signUpError) throw signUpError;
-
-      if (data.user) {
-        toast.success("Admin account initialized! You can now sign in.");
-        // If email confirmation is disabled, we can log them in or just let them sign in normally
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to initialize admin account.");
-      toast.error("Initialization failed");
-    } finally {
-      setIsInitializing(false);
-    }
   };
 
   return (
@@ -145,30 +106,27 @@ const Login = () => {
             <Label htmlFor="remember" className="text-sm text-muted-foreground cursor-pointer">Remember me</Label>
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading || isInitializing}>
+          <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</> : "Sign In"}
           </Button>
 
           <div className="relative flex items-center justify-center py-2">
             <div className="flex-grow border-t border-border"></div>
-            <span className="mx-4 flex-shrink text-xs text-muted-foreground uppercase">New Setup?</span>
+            <span className="mx-4 flex-shrink text-xs text-muted-foreground uppercase">New here?</span>
             <div className="flex-grow border-t border-border"></div>
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full gap-2 text-xs h-9 border-dashed"
-            onClick={handleInitializeAdmin}
-            disabled={isLoading || isInitializing}
-          >
-            {isInitializing ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <ShieldCheck className="h-3 w-3" />
-            )}
-            Initialize Admin with Credentials Above
-          </Button>
+          <Link to="/signup" className="w-full">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2 text-xs h-9 border-dashed"
+              disabled={isLoading}
+            >
+              <UserPlus className="h-3 w-3" />
+              Create New Account
+            </Button>
+          </Link>
         </form>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">

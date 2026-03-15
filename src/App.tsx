@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/layouts/AppLayout";
 
 const Login = lazy(() => import("@/pages/Login"));
+const Signup = lazy(() => import("@/pages/Signup"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const HRStaff = lazy(() => import("@/pages/HRStaff"));
 const EventBooking = lazy(() => import("@/pages/EventBooking"));
@@ -39,6 +40,7 @@ const AppRoutes = () => {
     <Suspense fallback={null}>
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+        <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <Signup />} />
         <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<ProtectedRoute page="dashboard"><Dashboard /></ProtectedRoute>} />
