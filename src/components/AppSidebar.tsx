@@ -20,13 +20,19 @@ interface AppSidebarProps {
 const AppSidebar = ({ onLogout }: AppSidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, hasAccess } = useAuth();
 
   const handleLogout = () => {
     logout();
     navigate("/login");
     if (onLogout) onLogout();
   };
+
+  const filteredNavItems = navItems.filter(item => {
+    // Basic mapping of routes to permission keys
+    const page = item.to.replace("/", "");
+    return hasAccess(page);
+  });
 
   return (
     <aside className="hidden md:flex md:w-52 md:flex-col md:fixed md:inset-y-0 bg-secondary text-sidebar-foreground z-10">
@@ -41,7 +47,7 @@ const AppSidebar = ({ onLogout }: AppSidebarProps) => {
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-        {navItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
           return (
             <NavLink

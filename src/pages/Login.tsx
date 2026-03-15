@@ -112,19 +112,19 @@ const Login = () => {
 
           <div className="relative flex items-center justify-center py-2">
             <div className="flex-grow border-t border-border"></div>
-            <span className="mx-4 flex-shrink text-xs text-muted-foreground uppercase">New here?</span>
+            <span className="mx-4 flex-shrink text-xs text-muted-foreground uppercase font-medium">Regular User?</span>
             <div className="flex-grow border-t border-border"></div>
           </div>
 
-          <Link to="/signup" className="w-full">
+          <Link to="/signup" className="w-full block">
             <Button
               type="button"
               variant="outline"
-              className="w-full gap-2 text-xs h-9 border-dashed"
+              className="w-full gap-2 text-xs h-10 border-dashed hover:border-primary hover:text-primary transition-all"
               disabled={isLoading}
             >
-              <UserPlus className="h-3 w-3" />
-              Create New Account
+              <UserPlus className="h-3.5 w-3.5" />
+              Register Account
             </Button>
           </Link>
         </form>

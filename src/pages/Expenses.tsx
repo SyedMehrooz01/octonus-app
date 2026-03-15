@@ -106,13 +106,13 @@ const Expenses = () => {
   })).filter(h => h.total > 0).sort((a, b) => b.total - a.total);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Expenses Management</h2>
-          <p className="text-sm text-muted-foreground">Track and manage all business expenses</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">Expenses Management</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Track and manage all business expenses</p>
         </div>
-        <Button onClick={() => setShowAddModal(true)} className="gap-2">
+        <Button onClick={() => setShowAddModal(true)} className="gap-2 w-full sm:w-auto justify-center">
           <Plus className="h-4 w-4" /> Add Expense
         </Button>
       </div>
@@ -124,24 +124,24 @@ const Expenses = () => {
           { label: "This Month", value: `₨ ${monthExpenses.toLocaleString()}`, icon: TrendingDown },
           { label: "Total Recorded", value: `₨ ${totalExpenses.toLocaleString()}`, icon: Receipt },
         ].map(card => (
-          <div key={card.label} className="rounded-lg border border-border bg-card p-5">
+          <div key={card.label} className="rounded-lg border border-border bg-card p-4 sm:p-5">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">{card.label}</p>
-                <p className="mt-1 text-2xl font-bold text-destructive">{card.value}</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">{card.label}</p>
+                <p className="mt-1 text-lg sm:text-2xl font-bold text-destructive truncate">{card.value}</p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
-                <card.icon className="h-5 w-5 text-destructive" />
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-lg bg-destructive/10">
+                <card.icon className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      <Tabs defaultValue="entries">
-        <TabsList className="mb-4">
-          <TabsTrigger value="entries">Expense Entries</TabsTrigger>
-          <TabsTrigger value="report">Group Report</TabsTrigger>
+      <Tabs defaultValue="entries" className="w-full">
+        <TabsList className="mb-4 w-full sm:w-auto grid grid-cols-2 sm:flex">
+          <TabsTrigger value="entries">Entries</TabsTrigger>
+          <TabsTrigger value="report">Report</TabsTrigger>
         </TabsList>
 
         {/* Expense Entries */}

@@ -31,13 +31,14 @@ const Signup = () => {
     setIsLoading(true);
 
     try {
+      // SECURITY: Force role to 'staff' (regular user) regardless of what might be sent
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
-            role: role,
+            role: "staff", // Hardcoded to staff for security
             username: email.split('@')[0],
           }
         }
@@ -56,6 +57,7 @@ const Signup = () => {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
@@ -99,7 +101,7 @@ const Signup = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Email Address</Label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -107,27 +109,12 @@ const Signup = () => {
                 type="email"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setError(""); }}
-                placeholder="admin@example.com"
+                placeholder="you@example.com"
                 className="pl-10"
                 disabled={isLoading}
                 autoComplete="email"
               />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="role">Account Type</Label>
-            <Select value={role} onValueChange={setRole} disabled={isLoading}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="manager">Manager</SelectItem>
-                <SelectItem value="staff">Staff</SelectItem>
-                <SelectItem value="accountant">Accountant</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">

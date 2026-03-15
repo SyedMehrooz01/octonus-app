@@ -92,14 +92,14 @@ const Dashboard = () => {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="rounded-lg border border-border bg-card p-5">
+          <div key={stat.label} className="rounded-lg border border-border bg-card p-4 sm:p-5 transition-all hover:shadow-md">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-                <p className="mt-1 text-2xl font-bold text-card-foreground pkr-format">{stat.value}</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">{stat.label}</p>
+                <p className="mt-1 text-xl sm:text-2xl font-bold text-card-foreground pkr-format truncate">{stat.value}</p>
               </div>
-              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.color}`}>
-                <stat.icon className="h-5 w-5 text-primary-foreground" />
+              <div className={`flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-lg ${stat.color}`}>
+                <stat.icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
               </div>
             </div>
           </div>
@@ -108,8 +108,8 @@ const Dashboard = () => {
 
       {/* Main Content Sections */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-4 text-base font-semibold text-card-foreground">Upcoming Events (Next 7 Days)</h3>
+        <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
+          <h3 className="mb-4 text-sm sm:text-base font-semibold text-card-foreground">Upcoming Events (Next 7 Days)</h3>
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3].map(i => <div key={i} className="h-12 w-full animate-pulse rounded-md bg-muted" />)}
@@ -117,14 +117,14 @@ const Dashboard = () => {
           ) : upcomingEvents.length > 0 ? (
             <div className="space-y-4">
               {upcomingEvents.map((event) => (
-                <div key={event.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0">
+                <div key={event.id} className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0 gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-card-foreground">{event.client_name}</p>
                     <p className="text-xs text-muted-foreground">
                       {format(new Date(event.event_date), 'PPP')} • {event.event_type}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="sm:text-right">
                     <p className="text-sm font-bold text-primary">₨ {event.total_amount?.toLocaleString()}</p>
                   </div>
                 </div>
@@ -132,16 +132,16 @@ const Dashboard = () => {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <CalendarDays className="mb-2 h-10 w-10 text-muted-foreground/20" />
+              <CalendarDays className="mb-2 h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/20" />
               <p className="text-sm text-muted-foreground">No upcoming events in the next 7 days.</p>
             </div>
           )}
         </div>
         
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-4 text-base font-semibold text-card-foreground">Monthly Revenue</h3>
-          <div className="flex h-48 flex-col items-center justify-center text-center">
-             <Landmark className="mb-2 h-10 w-10 text-muted-foreground/20" />
+        <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
+          <h3 className="mb-4 text-sm sm:text-base font-semibold text-card-foreground">Monthly Revenue</h3>
+          <div className="flex h-40 sm:h-48 flex-col items-center justify-center text-center">
+             <Landmark className="mb-2 h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/20" />
              <p className="text-sm text-muted-foreground">Revenue charts are being integrated...</p>
              <p className="mt-1 text-xs text-muted-foreground/60">Current Month: {format(new Date(), 'MMMM yyyy')}</p>
           </div>
@@ -149,14 +149,14 @@ const Dashboard = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h3 className="mb-4 text-base font-semibold text-card-foreground">Quick Actions</h3>
-        <div className="flex flex-wrap gap-3">
+      <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
+        <h3 className="mb-4 text-sm sm:text-base font-semibold text-card-foreground">Quick Actions</h3>
+        <div className="flex flex-wrap gap-2 sm:gap-3">
           {["New Event Booking", "Add Expense", "Mark Attendance", "Generate Payroll"].map(
             (action) => (
               <button
                 key={action}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                className="flex-1 sm:flex-none rounded-lg bg-primary px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
               >
                 {action}
               </button>
