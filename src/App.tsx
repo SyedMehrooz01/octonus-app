@@ -21,7 +21,10 @@ const NotFound = lazy(() => import("@/pages/NotFound"));
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children, page }: { children: React.ReactNode; page: string }) => {
-  const { user, hasAccess } = useAuth();
+  const { user, loading, hasAccess } = useAuth();
+  
+  if (loading) return null;
+  
   if (!user) return <Navigate to="/login" replace />;
   if (!hasAccess(page)) return (
     <div className="flex min-h-screen items-center justify-center">
@@ -35,7 +38,10 @@ const ProtectedRoute = ({ children, page }: { children: React.ReactNode; page: s
 };
 
 const AppRoutes = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if (loading) return null;
+  
   return (
     <Suspense fallback={null}>
       <Routes>
