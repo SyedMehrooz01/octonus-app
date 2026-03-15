@@ -330,6 +330,30 @@ const HRStaff = () => {
     toast.success("Payroll exported successfully to Excel");
   };
 
+  const handleExportAttendance = () => {
+    const data = attendance.map((a) => ({
+      'Staff Name': a.name,
+      'Employee ID': a.empId,
+      'Date': a.date,
+      'Check In': a.checkIn,
+      'Check Out': a.checkOut,
+      'Status': a.status,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: 'xlsx',
+      type: 'array'
+    });
+    const blob = new Blob([excelBuffer], {
+      type: 'application/octet-stream'
+    });
+    saveAs(blob, 'Attendance_March_2026.xlsx');
+    toast.success("Attendance exported successfully to Excel");
+  };
+
   const handleUpdateAttendance = (id: number, status: string) => {
     setAttendance(attendance.map(a => a.id === id ? { ...a, status } : a));
     setEditAttendanceId(null);
@@ -499,7 +523,7 @@ const HRStaff = () => {
                 <Users className="h-4 w-4" /> Bulk Mark
               </Button>
             </div>
-            <Button variant="outline" className="gap-2 w-full sm:w-auto">
+            <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={handleExportAttendance}>
               <Download className="h-4 w-4" /> Export Report
             </Button>
           </div>
