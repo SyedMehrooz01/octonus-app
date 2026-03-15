@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { 
   Users, Plus, Search, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, 
   DollarSign, Camera, FileText, Calendar, Phone, Mail, MapPin, 
-  UserPlus, Download, Star, StarOff, Bell, ShieldCheck, ChevronRight
+  UserPlus, Download, Star, StarOff, Bell, ShieldCheck, ChevronRight, BarChart3, PieChart as PieChartIcon, Receipt
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +13,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, subMonths, startOfMonth as dateFnsStartOfMonth } from "date-fns";
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell
+} from 'recharts';
 
 const DUMMY_STAFF = [
   { 
@@ -96,6 +102,7 @@ const HRStaff = () => {
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [showRightsModal, setShowRightsModal] = useState(false);
   const [showPayslipModal, setShowPayslipModal] = useState(false);
+  const [showTotalLedgerModal, setShowTotalLedgerModal] = useState(false);
   const [selectedPayslip, setSelectedPayslip] = useState<any>(null);
   const [editAttendanceId, setEditAttendanceId] = useState<number | null>(null);
   
@@ -417,6 +424,95 @@ const HRStaff = () => {
     toast.success("Attendance updated");
   };
 
+  const handleExportTotalLedgerExcel = () => {
+    const data: any[] = [];
+    let grandTotal = 0;
+
+    staff.forEach(s => {
+      const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+      const status = latestPayroll ? "Paid" : "Pending";
+      const basic = latestPayroll ? latestPayroll.basic : s.salary;
+      const bonus = latestPayroll ? latestPayroll.bonuses : 0;
+      const allowances = latestPayroll ? (latestPayroll.allowances.transport + latestPayroll.allowances.meal + (latestPayroll.allowances.housing || 0)) : 0;
+      const deductions = latestPayroll ? (latestPayroll.deductions.tax + latestPayroll.deductions.loans + latestPayroll.deductions.absences) : 0;
+      const netPay = latestPayroll ? latestPayroll.netPay : s.salary;
+      grandTotal += netPay;
+
+      data.push({
+        'Employee ID': s.id,
+        'Name': s.name,
+        'Department': s.department,
+        'Basic Salary': basic,
+        'Bonus': bonus,
+        'Allowances': allowances,
+        'Deductions': deductions,
+        'Net Pay': netPay,
+        'Status': status,
+        'Date': latestPayroll ? latestPayroll.date : '-'
+      });
+    });
+
+    // Add Grand Total row
+    data.push({});
+    data.push({
+      'Name': 'GRAND TOTAL',
+      'Net Pay': grandTotal
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Total_Payroll_Ledger');
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+    saveAs(blob, `Total_Payroll_Ledger_${format(new Date(), 'MMM_yyyy')}.xlsx`);
+    toast.success("Total payroll ledger exported to Excel");
+  };
+
+  const handleExportTotalLedgerPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+    
+    doc.setFontSize(18);
+    doc.text('Total Payroll Ledger', 14, 22);
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Generated on: ${format(new Date(), 'PPP')}`, 14, 30);
+
+    const tableData = staff.map(s => {
+      const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+      return [
+        s.id,
+        s.name,
+        s.department,
+        `Rs ${ (latestPayroll ? latestPayroll.basic : s.salary).toLocaleString() }`,
+        `Rs ${ (latestPayroll ? latestPayroll.bonuses : 0).toLocaleString() }`,
+        `Rs ${ (latestPayroll ? (latestPayroll.allowances.transport + latestPayroll.allowances.meal + (latestPayroll.allowances.housing || 0)) : 0).toLocaleString() }`,
+        `Rs ${ (latestPayroll ? (latestPayroll.deductions.tax + latestPayroll.deductions.loans + latestPayroll.deductions.absences) : 0).toLocaleString() }`,
+        `Rs ${ (latestPayroll ? latestPayroll.netPay : s.salary).toLocaleString() }`,
+        latestPayroll ? "Paid" : "Pending",
+        latestPayroll ? latestPayroll.date : '-'
+      ];
+    });
+
+    const grandTotal = staff.reduce((acc, s) => {
+      const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+      return acc + (latestPayroll ? latestPayroll.netPay : s.salary);
+    }, 0);
+
+    // @ts-ignore
+    doc.autoTable({
+      startY: 40,
+      head: [['ID', 'Name', 'Dept', 'Basic', 'Bonus', 'Allow.', 'Deduct.', 'Net Pay', 'Status', 'Date']],
+      body: tableData,
+      foot: [['', '', '', '', '', '', 'GRAND TOTAL', `Rs ${grandTotal.toLocaleString()}`, '', '']],
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229] },
+      footStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold' },
+    });
+
+    doc.save(`Total_Payroll_Ledger_${format(new Date(), 'MMM_yyyy')}.pdf`);
+    toast.success("Total payroll ledger exported to PDF");
+  };
+
   const handleDeleteStaff = (id: string) => {
     setStaff(staff.filter(s => s.id !== id));
     setShowDeleteConfirm(null);
@@ -438,6 +534,9 @@ const HRStaff = () => {
           <p className="text-xs sm:text-sm text-muted-foreground text-balance">Comprehensive HR portal for staff, attendance, and payroll</p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={() => setShowTotalLedgerModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none border-primary/20 hover:bg-primary/5 text-primary">
+            <BarChart3 className="h-4 w-4" /> Total Ledger
+          </Button>
           <Button onClick={() => setShowAnnounceModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none">
             <Bell className="h-4 w-4" /> Announce
           </Button>
@@ -1426,6 +1525,231 @@ const HRStaff = () => {
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setShowDeleteConfirm(null)}>Keep Record</Button>
             <Button variant="destructive" onClick={() => showDeleteConfirm && handleDeleteStaff(showDeleteConfirm)}>Yes, Delete Staff</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Total Payroll Ledger Modal */}
+      <Dialog open={showTotalLedgerModal} onOpenChange={setShowTotalLedgerModal}>
+        <DialogContent className="max-w-[95vw] sm:max-w-[90vw] lg:max-w-[85vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center justify-between pr-6">
+              <div>
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                  <BarChart3 className="h-6 w-6 text-primary" /> Total Payroll Ledger Dashboard
+                </DialogTitle>
+                <DialogDescription>
+                  Financial overview of all staff salaries, advances, and deductions.
+                </DialogDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="gap-2" onClick={handleExportTotalLedgerExcel}>
+                  <Download className="h-4 w-4" /> Excel
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2" onClick={handleExportTotalLedgerPDF}>
+                  <FileText className="h-4 w-4" /> PDF
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="py-6 space-y-8">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              {[
+                { 
+                  label: "Total Paid (Month)", 
+                  value: `₨ ${staff.reduce((acc, s) => {
+                    const latestPayroll = s.payrollHistory?.find(h => h.month === format(new Date(), 'MMMM yyyy'));
+                    return acc + (latestPayroll?.status === 'paid' ? latestPayroll.netPay : 0);
+                  }, 0).toLocaleString()}`,
+                  icon: DollarSign,
+                  color: "text-success",
+                  bg: "bg-success/10"
+                },
+                { 
+                  label: "Total Payments", 
+                  value: staff.reduce((acc, s) => acc + (s.payrollHistory?.length || 0), 0),
+                  icon: CheckCircle,
+                  color: "text-primary",
+                  bg: "bg-primary/10"
+                },
+                { 
+                  label: "Pending Payments", 
+                  value: staff.filter(s => !s.payrollHistory?.some(h => h.month === format(new Date(), 'MMMM yyyy'))).length,
+                  icon: Clock,
+                  color: "text-warning",
+                  bg: "bg-warning/10"
+                },
+                { 
+                  label: "Total Advances", 
+                  value: `₨ ${staff.reduce((acc, s) => acc + (s.payrollHistory?.reduce((sum, h) => sum + h.deductions.loans, 0) || 0), 0).toLocaleString()}`,
+                  icon: Receipt,
+                  color: "text-destructive",
+                  bg: "bg-destructive/10"
+                },
+                { 
+                  label: "Total Deductions", 
+                  value: `₨ ${staff.reduce((acc, s) => acc + (s.payrollHistory?.reduce((sum, h) => sum + (h.deductions.tax + h.deductions.absences), 0) || 0), 0).toLocaleString()}`,
+                  icon: TrendingDown,
+                  color: "text-destructive",
+                  bg: "bg-destructive/10"
+                }
+              ].map((card, i) => (
+                <div key={i} className="p-4 rounded-xl border border-border bg-card shadow-sm">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`p-2 rounded-lg ${card.bg}`}>
+                      <card.icon className={`h-4 w-4 ${card.color}`} />
+                    </div>
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{card.label}</p>
+                  </div>
+                  <p className={`text-xl font-bold ${card.color}`}>{card.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="p-6 rounded-xl border border-border bg-card shadow-sm">
+                <h4 className="text-sm font-bold mb-6 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" /> Monthly Payroll Trend (Last 6 Months)
+                </h4>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={
+                      Array.from({ length: 6 }).map((_, i) => {
+                        const date = subMonths(new Date(), 5 - i);
+                        const monthName = format(date, 'MMM yyyy');
+                        const total = staff.reduce((acc, s) => {
+                          const payroll = s.payrollHistory?.find(h => h.month === format(date, 'MMMM yyyy'));
+                          return acc + (payroll?.netPay || 0);
+                        }, 0);
+                        return { month: monthName, total };
+                      })
+                    }>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `₨${v/1000}k`} />
+                      <Tooltip 
+                        formatter={(v: any) => [`₨ ${v.toLocaleString()}`, 'Total Payroll']}
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      />
+                      <Bar dataKey="total" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="p-6 rounded-xl border border-border bg-card shadow-sm">
+                <h4 className="text-sm font-bold mb-6 flex items-center gap-2">
+                  <PieChartIcon className="h-4 w-4 text-primary" /> Salary Distribution by Department
+                </h4>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={
+                          ["Operations", "Kitchen", "Decoration", "Finance", "Logistics", "Admin"].map(dept => ({
+                            name: dept,
+                            value: staff.filter(s => s.department === dept).reduce((acc, s) => acc + s.salary, 0)
+                          })).filter(d => d.value > 0)
+                        }
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {["#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#64748b"].map((color, index) => (
+                          <Cell key={`cell-${index}`} fill={color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: any) => [`₨ ${v.toLocaleString()}`, 'Salary']} />
+                      <Legend verticalAlign="bottom" height={36}/>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Ledger Table */}
+            <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-border bg-muted/20 flex items-center justify-between">
+                <h4 className="text-sm font-bold">Detailed Payroll Ledger</h4>
+                <Badge variant="outline" className="bg-white">Total Employees: {staff.length}</Badge>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse min-w-[1000px]">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      <th className="px-4 py-4 text-left">Employee</th>
+                      <th className="px-4 py-4 text-right">Basic</th>
+                      <th className="px-4 py-4 text-right">Bonus</th>
+                      <th className="px-4 py-4 text-right">Allowances</th>
+                      <th className="px-4 py-4 text-right">Deductions</th>
+                      <th className="px-4 py-4 text-right font-bold text-foreground">Net Pay</th>
+                      <th className="px-4 py-4 text-center">Status</th>
+                      <th className="px-4 py-4 text-right">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {staff.map(s => {
+                      const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+                      const basic = latestPayroll ? latestPayroll.basic : s.salary;
+                      const bonus = latestPayroll ? latestPayroll.bonuses : 0;
+                      const allowances = latestPayroll ? (latestPayroll.allowances.transport + latestPayroll.allowances.meal + (latestPayroll.allowances.housing || 0)) : 0;
+                      const deductions = latestPayroll ? (latestPayroll.deductions.tax + latestPayroll.deductions.loans + latestPayroll.deductions.absences) : 0;
+                      const netPay = latestPayroll ? latestPayroll.netPay : s.salary;
+
+                      return (
+                        <tr key={s.id} className="text-sm hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px]">
+                                {s.name.split(" ").map((n:any) => n[0]).join("").toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-bold text-xs">{s.name}</p>
+                                <p className="text-[10px] text-muted-foreground font-mono">{s.id}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-right text-xs">₨ {basic.toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right text-xs text-success">₨ {bonus.toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right text-xs text-primary">₨ {allowances.toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right text-xs text-destructive">₨ {deductions.toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right font-bold text-success">₨ {netPay.toLocaleString()}</td>
+                          <td className="px-4 py-4 text-center">
+                            <Badge variant="outline" className={`text-[10px] px-2 py-0 ${statusColor(latestPayroll ? "paid" : "pending")}`}>
+                              {latestPayroll ? "Paid" : "Pending"}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-4 text-right text-xs text-muted-foreground">{latestPayroll ? latestPayroll.date : "-"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-muted/40 font-bold border-t-2 border-border">
+                    <tr>
+                      <td className="px-4 py-6 text-sm uppercase tracking-wider">Grand Total</td>
+                      <td colSpan={4}></td>
+                      <td className="px-4 py-6 text-right text-lg text-success">
+                        ₨ {staff.reduce((acc, s) => {
+                          const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+                          return acc + (latestPayroll ? latestPayroll.netPay : s.salary);
+                        }, 0).toLocaleString()}
+                      </td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTotalLedgerModal(false)} className="w-full sm:w-auto">Close Dashboard</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
