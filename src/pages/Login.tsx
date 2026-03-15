@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, User, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { Lock, Mail, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -11,7 +11,7 @@ const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
@@ -20,10 +20,10 @@ const Login = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!username.trim()) { setError("Username is required."); return; }
+    if (!email.trim()) { setError("Email is required."); return; }
     if (!password.trim()) { setError("Password is required."); return; }
     setIsLoading(true);
-    const result = await login(username, password);
+    const result = await login(email, password);
     if (result.success) {
       navigate("/dashboard");
     } else {
@@ -45,13 +45,6 @@ const Login = () => {
         <h2 className="mb-1 text-2xl font-bold text-foreground">Welcome back</h2>
         <p className="mb-6 text-sm text-muted-foreground">Sign in to your account to continue</p>
 
-        {/* Demo credentials hint */}
-        <div className="mb-5 rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground mb-1">Demo Credentials:</p>
-          <p>Admin: <span className="font-mono text-primary">admin / admin123</span></p>
-          <p>Manager: <span className="font-mono text-primary">manager / mgr123</span></p>
-          <p>Accountant: <span className="font-mono text-primary">accountant / acc123</span></p>
-        </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
           {error && (
@@ -62,17 +55,18 @@ const Login = () => {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="email">Email</Label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                id="username"
-                value={username}
-                onChange={(e) => { setUsername(e.target.value); setError(""); }}
-                placeholder="Enter your username"
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                placeholder="Enter your email"
                 className="pl-10"
                 disabled={isLoading}
-                autoComplete="username"
+                autoComplete="email"
               />
             </div>
           </div>
