@@ -3,6 +3,7 @@ import {
   Users, Plus, Search, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, 
   DollarSign, Camera, FileText, Calendar, Phone, Mail, MapPin, 
   UserPlus, Download, Star, StarOff, Bell, ShieldCheck, ChevronRight, BarChart3, PieChart as PieChartIcon, Receipt
+, TrendingDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
