@@ -1,14 +1,49 @@
-import { useState } from "react";
-import { Landmark, TrendingUp, TrendingDown, Plus, Search } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Landmark, TrendingUp, TrendingDown, Plus, Search, FileText, Download, Calendar, Users, History, Wallet, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { format, startOfYear, endOfYear, eachMonthOfInterval, isWithinInterval, parseISO } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { saveAs } from "file-saver";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
-const INIT_LEDGER: any[] = [
+interface LedgerEntry {
+  id: string | number;
+  date: string;
+  description: string;
+  account: string;
+  type: "debit" | "credit";
+  amount: number;
+  balance: number;
+}
+
+interface Vendor {
+  id: string;
+  name: string;
+  contact: string;
+  category: string;
+  total_bills: number;
+  paid: number;
+  balance: number;
+}
+
+interface VendorPayment {
+  id: string;
+  vendor_id: string;
+  date: string;
+  amount: number;
+  method: string;
+  notes?: string;
+}
+
+const INIT_LEDGER: LedgerEntry[] = [
   { id:1, date:"2024-03-01", description:"Wedding Advance - Tariq & Sana", account:"Cash", type:"debit", amount:150000, balance:150000 },
   { id:2, date:"2024-03-02", description:"Decoration Purchase", account:"Cash", type:"credit", amount:25000, balance:125000 },
   { id:3, date:"2024-03-05", description:"Corporate Dinner Advance - Ali Corp", account:"Bank", type:"debit", amount:100000, balance:225000 },
@@ -36,16 +71,69 @@ const ACCOUNTS = ["Cash","Bank","Supplier","Vendor","Other"];
 
 const Finance = () => {
   const { toast } = useToast();
-  const [ledger, setLedger] = useState(INIT_LEDGER);
+  const [ledger, setLedger] = useState<LedgerEntry[]>(INIT_LEDGER);
   const [suppliers, setSuppliers] = useState(INIT_SUPPLIERS);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showPaySupplier, setShowPaySupplier] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
-  const [newEntry, setNewEntry] = useState({ date:"", description:"", account:"Cash", type:"debit", amount:"" });
+  const [newEntry, setNewEntry] = useState({ date: format(new Date(), "yyyy-MM-dd"), description:"", account:"Cash", type:"debit" as const, amount:"" });
   const [payAmount, setPayAmount] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Account Statement States
+  const [accountFilter, setAccountFilter] = useState("all");
+  const [fromDate, setFromDate] = useState(format(startOfYear(new Date()), "yyyy-MM-dd"));
+  const [toDate, setToDate] = useState(format(new Date(), "yyyy-MM-dd"));
 
-  const filtered = ledger.filter(l=>l.description.toLowerCase().includes(search.toLowerCase()));
+  // P&L States
+  const [plView, setPlView] = useState<"monthly" | "yearly">("monthly");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+
+  // Vendor States
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [showVendorHistory, setShowVendorHistory] = useState(false);
+  const [showPayVendor, setShowPayVendor] = useState(false);
+  const [vendorPayForm, setVendorPayForm] = useState({ amount: "", method: "Cash", date: format(new Date(), "yyyy-MM-dd"), notes: "" });
+
+  const fetchVendors = async () => {
+    try {
+      const { data: vData } = await supabase.from('suppliers').select('*');
+      if (vData) {
+        setVendors(vData.map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          contact: v.contact_number,
+          category: v.service_type,
+          total_bills: v.opening_balance || 0,
+          paid: (v.opening_balance || 0) - (v.current_balance || 0),
+          balance: v.current_balance || 0
+        })));
+      }
+      
+      const { data: pData } = await supabase.from('supplier_payments').select('*').order('date', { ascending: false });
+      if (pData) setVendorPayments(pData);
+    } catch (err) {
+      console.error("Error fetching vendors:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchVendors();
+  }, []);
+
+  const filtered = ledger.filter(l => {
+    const matchesSearch = l.description.toLowerCase().includes(search.toLowerCase());
+    const matchesAccount = accountFilter === "all" || l.account === accountFilter;
+    const matchesDate = isWithinInterval(parseISO(l.date), { 
+      start: parseISO(fromDate), 
+      end: parseISO(toDate) 
+    });
+    return matchesSearch && matchesAccount && matchesDate;
+  });
+
   const totalDebit = ledger.filter(l=>l.type==="debit").reduce((s,l)=>s+l.amount,0);
   const totalCredit = ledger.filter(l=>l.type==="credit").reduce((s,l)=>s+l.amount,0);
   const netBalance = totalDebit - totalCredit;
@@ -59,19 +147,106 @@ const Finance = () => {
     const lastBal = ledger[ledger.length-1]?.balance||0;
     const balance = newEntry.type==="debit" ? lastBal+amount : lastBal-amount;
     setLedger([...ledger,{id:Date.now(),...newEntry,amount,balance}]);
-    setNewEntry({date:"",description:"",account:"Cash",type:"debit",amount:""});
+    setNewEntry({date: format(new Date(), "yyyy-MM-dd"),description:"",account:"Cash",type:"debit",amount:""});
     setShowAdd(false); toast({title:"Entry added"});
   };
 
-  const handlePaySupplier = () => {
-    if (!payAmount||!selectedSupplier) return;
-    const amt = Number(payAmount);
-    setSuppliers(suppliers.map(s=>s.id===selectedSupplier.id ? {...s,paid:s.paid+amt,balance:Math.max(0,s.balance-amt)} : s));
-    setPayAmount(""); setShowPaySupplier(false);
-    toast({title:"Supplier payment recorded"});
+  const handlePayVendor = async () => {
+    if (!vendorPayForm.amount || !selectedVendor) return;
+    setIsSaving(true);
+    try {
+      const amt = Number(vendorPayForm.amount);
+      const { error: pErr } = await supabase.from('supplier_payments').insert([{
+        supplier_id: selectedVendor.id,
+        amount: amt,
+        method: vendorPayForm.method,
+        date: vendorPayForm.date,
+        notes: vendorPayForm.notes
+      }]);
+      if (pErr) throw pErr;
+
+      const { error: sErr } = await supabase.from('suppliers').update({
+        current_balance: selectedVendor.balance - amt
+      }).eq('id', selectedVendor.id);
+      if (sErr) throw sErr;
+
+      toast({title:"Vendor payment recorded"});
+      setShowPayVendor(false);
+      fetchVendors();
+    } catch (err: any) {
+      toast({title:"Error", description: err.message, variant: "destructive"});
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Export Logic
+  const exportToExcel = (data: any[], fileName: string) => {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    saveAs(blob, `${fileName}.xlsx`);
+  };
+
+  const exportToPDF = (headers: string[], data: any[][], title: string, fileName: string) => {
+    const doc = new jsPDF();
+    doc.text(title, 14, 15);
+    autoTable(doc, {
+      head: [headers],
+      body: data,
+      startY: 20,
+    });
+    doc.save(`${fileName}.pdf`);
+  };
+
+  const exportPL = (format: 'pdf' | 'excel') => {
+    const data = EVENT_FINANCE.map(e => ({
+      Event: e.event,
+      Date: e.date,
+      Revenue: e.totalAmount,
+      "Menu Cost": e.menuCost,
+      "3rd Party Cost": e.thirdPartyCost,
+      Profit: e.profit,
+      Margin: `${Math.round((e.profit/e.totalAmount)*100)}%`
+    }));
+
+    if (format === 'excel') {
+      exportToExcel(data, `Profit_and_Loss_${selectedYear}`);
+    } else {
+      const headers = ["Event", "Date", "Revenue", "Menu Cost", "3rd Party Cost", "Profit", "Margin"];
+      const rows = data.map(d => Object.values(d));
+      exportToPDF(headers, rows, `Profit & Loss Report - ${selectedYear}`, `Profit_and_Loss_${selectedYear}`);
+    }
+  };
+
+  const exportStatement = (format: 'pdf' | 'excel') => {
+    const data = filtered.map(l => ({
+      Date: l.date,
+      Description: l.description,
+      Account: l.account,
+      Type: l.type,
+      Amount: l.amount,
+      Balance: l.balance
+    }));
+
+    if (format === 'excel') {
+      exportToExcel(data, `Account_Statement_${accountFilter}_${fromDate}_to_${toDate}`);
+    } else {
+      const headers = ["Date", "Description", "Account", "Type", "Amount", "Balance"];
+      const rows = data.map(d => Object.values(d));
+      exportToPDF(headers, rows, `Account Statement: ${accountFilter} (${fromDate} to ${toDate})`, `Account_Statement_${accountFilter}`);
+    }
   };
 
   const totalAdvances = EVENT_FINANCE.reduce((s,e)=>s+e.advance,0);
+  
+  // Yearly Breakdown logic
+  const yearlyMonths = eachMonthOfInterval({
+    start: startOfYear(parseISO(`${selectedYear}-01-01`)),
+    end: endOfYear(parseISO(`${selectedYear}-01-01`))
+  });
 
   return (
     <div className="space-y-6">
@@ -97,14 +272,33 @@ const Finance = () => {
           <TabsTrigger value="event">Event-Based Finance</TabsTrigger>
           <TabsTrigger value="advances">Advance Tracking</TabsTrigger>
           <TabsTrigger value="suppliers">Supplier Ledger</TabsTrigger>
+          <TabsTrigger value="vendors">Vendor Ledger</TabsTrigger>
           <TabsTrigger value="pnl">Profit & Loss</TabsTrigger>
         </TabsList>
 
         {/* GENERAL LEDGER */}
         <TabsContent value="ledger">
           <div className="rounded-lg border border-border bg-card">
-            <div className="flex items-center gap-3 border-b border-border p-4">
-              <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><Input placeholder="Search transactions..." className="pl-9" value={search} onChange={e=>setSearch(e.target.value)}/></div>
+            <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
+              <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><Input placeholder="Search transactions..." className="pl-9" value={search} onChange={e=>setSearch(e.target.value)}/></div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={accountFilter} onValueChange={setAccountFilter}>
+                  <SelectTrigger className="w-32"><SelectValue placeholder="Account"/></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Accounts</SelectItem>
+                    {ACCOUNTS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-1">
+                  <Input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} className="w-36 text-xs h-9" />
+                  <span className="text-muted-foreground">to</span>
+                  <Input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} className="w-36 text-xs h-9" />
+                </div>
+                <div className="flex items-center gap-1 ml-2">
+                  <Button variant="outline" size="sm" onClick={() => exportStatement('pdf')} className="h-9 px-2"><FileText className="h-4 w-4 mr-1"/>PDF</Button>
+                  <Button variant="outline" size="sm" onClick={() => exportStatement('excel')} className="h-9 px-2"><Download className="h-4 w-4 mr-1"/>Excel</Button>
+                </div>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[800px]">
@@ -219,38 +413,133 @@ const Finance = () => {
           </div>
         </TabsContent>
 
+        {/* VENDOR LEDGER */}
+        <TabsContent value="vendors">
+          <div className="rounded-lg border border-border bg-card">
+            <div className="border-b border-border p-4 flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-semibold text-card-foreground">Vendor Ledger</h3>
+                <p className="text-xs text-muted-foreground mt-1">Full transaction history and payment tracking</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={fetchVendors}><History className="h-4 w-4 mr-1"/> Refresh</Button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px]">
+                <thead><tr className="border-b border-border bg-muted/40">{["Vendor","Service","Opening Bal","Paid","Outstanding","Action"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
+                <tbody>
+                  {vendors.map(v=>(
+                    <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-3 text-sm font-medium text-card-foreground flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground"/>
+                        {v.name}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{v.category}</td>
+                      <td className="px-4 py-3 text-sm">₨{v.total_bills.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-success">₨{v.paid.toLocaleString()}</td>
+                      <td className={`px-4 py-3 text-sm font-bold ${v.balance>0?"text-destructive":"text-success"}`}>₨{v.balance.toLocaleString()}</td>
+                      <td className="px-4 py-3 flex gap-2">
+                        <Button size="sm" variant="ghost" onClick={() => { setSelectedVendor(v); setShowVendorHistory(true); }} className="h-8 px-2"><Eye className="h-4 w-4"/></Button>
+                        {v.balance > 0 && <Button size="sm" onClick={() => { setSelectedVendor(v); setVendorPayForm({...vendorPayForm, amount: ""}); setShowPayVendor(true); }} className="h-8 px-2">Pay</Button>}
+                      </td>
+                    </tr>
+                  ))}
+                  {vendors.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No vendors found. Add them in Event Booking - Supplier Ledger.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </TabsContent>
+
         {/* P&L */}
         <TabsContent value="pnl">
           <div className="space-y-4">
             {/* Event-wise P&L */}
             <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
-              <h3 className="mb-4 text-base font-semibold text-card-foreground">Event-Wise Profit & Loss</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px]">
-                <thead><tr className="border-b border-border bg-muted/40">{["Event","Revenue","Menu Cost","3rd Party Cost","Net Profit","Margin"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
-                <tbody>
-                  {EVENT_FINANCE.map(e=>{
-                    const costs = e.menuCost+e.thirdPartyCost;
-                    const margin = Math.round((e.profit/e.totalAmount)*100);
-                    return <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 text-sm font-medium text-card-foreground">{e.event}</td>
-                      <td className="px-4 py-3 text-sm text-success">₨{e.totalAmount.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-destructive">{e.menuCost>0?`₨${e.menuCost.toLocaleString()}`:"-"}</td>
-                      <td className="px-4 py-3 text-sm text-destructive">{e.thirdPartyCost>0?`₨${e.thirdPartyCost.toLocaleString()}`:"-"}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-success">₨{e.profit.toLocaleString()}</td>
-                      <td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${margin>=50?"bg-success/10 text-success border-success/20":margin>=30?"bg-warning/10 text-warning border-warning/20":"bg-destructive/10 text-destructive border-destructive/20"}`}>{margin}%</span></td>
-                    </tr>;
-                  })}
-                </tbody>
-                <tfoot><tr className="bg-muted/40">
-                  <td className="px-4 py-3 text-sm font-semibold">Monthly Total</td>
-                  <td className="px-4 py-3 text-sm font-bold text-success">₨{totalRevenue.toLocaleString()}</td>
-                  <td colSpan={2} className="px-4 py-3 text-sm font-bold text-destructive">₨{EVENT_FINANCE.reduce((s,e)=>s+e.menuCost+e.thirdPartyCost,0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm font-bold text-success">₨{totalProfit.toLocaleString()}</td>
-                  <td/>
-                </tr></tfoot>
-              </table>
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-4">
+                  <h3 className="text-base font-semibold text-card-foreground">Profit & Loss Report</h3>
+                  <div className="flex bg-muted p-1 rounded-lg">
+                    {(["monthly", "yearly"] as const).map(v => (
+                      <button 
+                        key={v} 
+                        onClick={() => setPlView(v)} 
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${plView === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        {v.charAt(0).toUpperCase() + v.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                  {plView === "yearly" && (
+                    <Select value={selectedYear} onValueChange={setSelectedYear}>
+                      <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {["2024", "2025", "2026"].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => exportPL('pdf')}><FileText className="h-4 w-4 mr-2"/>PDF</Button>
+                  <Button variant="outline" size="sm" onClick={() => exportPL('excel')}><Download className="h-4 w-4 mr-2"/>Excel</Button>
+                </div>
               </div>
+
+              {plView === "monthly" ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[900px]">
+                    <thead><tr className="border-b border-border bg-muted/40">{["Event","Revenue","Menu Cost","3rd Party Cost","Net Profit","Margin"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
+                    <tbody>
+                      {EVENT_FINANCE.map(e=>{
+                        const margin = Math.round((e.profit/e.totalAmount)*100);
+                        return <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                          <td className="px-4 py-3 text-sm font-medium text-card-foreground">{e.event}</td>
+                          <td className="px-4 py-3 text-sm text-success">₨{e.totalAmount.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sm text-destructive">{e.menuCost>0?`₨${e.menuCost.toLocaleString()}`:"-"}</td>
+                          <td className="px-4 py-3 text-sm text-destructive">{e.thirdPartyCost>0?`₨${e.thirdPartyCost.toLocaleString()}`:"-"}</td>
+                          <td className="px-4 py-3 text-sm font-bold text-success">₨{e.profit.toLocaleString()}</td>
+                          <td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${margin>=50?"bg-success/10 text-success border-success/20":margin>=30?"bg-warning/10 text-warning border-warning/20":"bg-destructive/10 text-destructive border-destructive/20"}`}>{margin}%</span></td>
+                        </tr>;
+                      })}
+                    </tbody>
+                    <tfoot><tr className="bg-muted/40">
+                      <td className="px-4 py-3 text-sm font-semibold">Monthly Total</td>
+                      <td className="px-4 py-3 text-sm font-bold text-success">₨{totalRevenue.toLocaleString()}</td>
+                      <td colSpan={2} className="px-4 py-3 text-sm font-bold text-destructive">₨{EVENT_FINANCE.reduce((s,e)=>s+e.menuCost+e.thirdPartyCost,0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-success">₨{totalProfit.toLocaleString()}</td>
+                      <td/>
+                    </tr></tfoot>
+                  </table>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[900px]">
+                    <thead><tr className="border-b border-border bg-muted/40">{["Month","Total Income","Total Expenses","Net Profit/Loss"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
+                    <tbody>
+                      {yearlyMonths.map(month => {
+                        const monthStr = format(month, "MM");
+                        const monthEvents = EVENT_FINANCE.filter(e => e.date.startsWith(`${selectedYear}-${monthStr}`));
+                        const mIncome = monthEvents.reduce((s, e) => s + e.totalAmount, 0);
+                        const mExpenses = monthEvents.reduce((s, e) => s + e.menuCost + e.thirdPartyCost, 0);
+                        const mProfit = mIncome - mExpenses;
+                        return (
+                          <tr key={month.toISOString()} className="border-b border-border last:border-0 hover:bg-muted/20">
+                            <td className="px-4 py-3 text-sm font-medium text-card-foreground">{format(month, "MMMM")}</td>
+                            <td className="px-4 py-3 text-sm text-success font-bold">₨{mIncome.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-sm text-destructive font-bold">₨{mExpenses.toLocaleString()}</td>
+                            <td className={`px-4 py-3 text-sm font-black ${mProfit >= 0 ? "text-primary" : "text-destructive"}`}>₨{mProfit.toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot><tr className="bg-muted/40">
+                      <td className="px-4 py-3 text-sm font-bold uppercase tracking-widest">Yearly Totals</td>
+                      <td className="px-4 py-3 text-lg font-black text-success">₨{totalRevenue.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-lg font-black text-destructive">₨{EVENT_FINANCE.reduce((s,e)=>s+e.menuCost+e.thirdPartyCost,0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-xl font-black text-primary">₨{totalProfit.toLocaleString()}</td>
+                    </tr></tfoot>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Monthly P&L Summary */}
@@ -306,6 +595,104 @@ const Finance = () => {
             <div className="space-y-1.5"><Label>Payment Amount (₨)</Label><Input type="number" placeholder="Enter amount" value={payAmount} onChange={e=>setPayAmount(e.target.value)}/></div>
           </div>}
           <DialogFooter><Button variant="outline" onClick={()=>setShowPaySupplier(false)}>Cancel</Button><Button onClick={handlePaySupplier}>Record Payment</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* VENDOR HISTORY MODAL */}
+      <Dialog open={showVendorHistory} onOpenChange={setShowVendorHistory}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Transaction History — {selectedVendor?.name}</DialogTitle>
+            <DialogDescription>Full record of bills and payments</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="rounded-lg bg-muted/40 p-3 text-center">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">Opening Bal</p>
+                <p className="text-sm font-bold">₨{selectedVendor?.total_bills.toLocaleString()}</p>
+              </div>
+              <div className="rounded-lg bg-success/10 p-3 text-center">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Paid</p>
+                <p className="text-sm font-bold text-success">₨{selectedVendor?.paid.toLocaleString()}</p>
+              </div>
+              <div className="rounded-lg bg-destructive/10 p-3 text-center">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">Outstanding</p>
+                <p className="text-sm font-bold text-destructive">₨{selectedVendor?.balance.toLocaleString()}</p>
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40">
+                  <th className="px-3 py-2 text-left">Date</th>
+                  <th className="px-3 py-2 text-left">Description</th>
+                  <th className="px-3 py-2 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vendorPayments.filter(p => p.vendor_id === selectedVendor?.id).map(p => (
+                  <tr key={p.id} className="border-b border-border last:border-0">
+                    <td className="px-3 py-2 text-muted-foreground">{p.date}</td>
+                    <td className="px-3 py-2">Payment via {p.method} {p.notes ? `(${p.notes})` : ""}</td>
+                    <td className="px-3 py-2 text-right text-success font-medium">- ₨{p.amount.toLocaleString()}</td>
+                  </tr>
+                ))}
+                <tr className="bg-muted/20">
+                  <td className="px-3 py-2 text-muted-foreground">Opening</td>
+                  <td className="px-3 py-2">Initial Balance</td>
+                  <td className="px-3 py-2 text-right font-medium">₨{selectedVendor?.total_bills.toLocaleString()}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowVendorHistory(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* PAY VENDOR MODAL */}
+      <Dialog open={showPayVendor} onOpenChange={setShowPayVendor}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Payment — {selectedVendor?.name}</DialogTitle>
+            <DialogDescription>Record a new payment to this vendor</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="rounded-lg bg-destructive/10 p-3 flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Outstanding Balance:</span>
+              <span className="text-lg font-bold text-destructive">₨{selectedVendor?.balance.toLocaleString()}</span>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Payment Amount (₨)</Label>
+              <Input type="number" placeholder="Enter amount" value={vendorPayForm.amount} onChange={e => setVendorPayForm({...vendorPayForm, amount: e.target.value})} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Method</Label>
+                <Select value={vendorPayForm.method} onValueChange={v => setVendorPayForm({...vendorPayForm, method: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Date</Label>
+                <Input type="date" value={vendorPayForm.date} onChange={e => setVendorPayForm({...vendorPayForm, date: e.target.value})} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notes</Label>
+              <Input placeholder="Optional notes" value={vendorPayForm.notes} onChange={e => setVendorPayForm({...vendorPayForm, notes: e.target.value})} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPayVendor(false)}>Cancel</Button>
+            <Button onClick={handlePayVendor} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
+              Save Payment
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

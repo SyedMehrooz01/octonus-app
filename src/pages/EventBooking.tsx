@@ -29,7 +29,7 @@ interface RawMaterialRequirement { material: string; unit: string; ratio_per_gue
 interface KitchenItem { id?: string; event_id: number; item_name: string; unit: string; estimated_qty: number; actual_qty: number; is_adjusted: boolean; }
 interface RawMaterial { id?: string; event_id: number; material_name: string; unit: string; estimated_qty: number; actual_qty: number; }
 
-interface Supplier { id: string; name: string; contact: string; category: string; total_owed: number; paid: number; balance: number; }
+interface Supplier { id: string; name: string; contact_number: string; email: string; service_type: string; opening_balance: number; current_balance: number; created_at?: string; }
 interface SupplierPayment { id: string; supplier_id: string; date: string; amount: number; method: string; notes?: string; }
 interface ClientProfile { clientName: string; phone: string; totalPaid: number; remainingBalance: number; bookings: Booking[]; payments: {date: string, amount: number, method: string}[]; }
 
@@ -150,12 +150,11 @@ const EventBooking = () => {
     try {
       const { error } = await supabase.from('suppliers').insert([{
         name: supplierForm.name,
-        contact: supplierForm.contact,
+        contact_number: supplierForm.contact,
         email: supplierForm.email,
-        category: supplierForm.category,
-        total_owed: supplierForm.opening_balance,
-        paid: 0,
-        balance: supplierForm.opening_balance
+        service_type: supplierForm.category,
+        opening_balance: supplierForm.opening_balance,
+        current_balance: supplierForm.opening_balance
       }]);
       if (error) throw error;
       toast.success("Supplier added successfully");
@@ -185,8 +184,7 @@ const EventBooking = () => {
       if (pErr) throw pErr;
 
       const { error: sErr } = await supabase.from('suppliers').update({
-        paid: selectedSupplier.paid + supplierPaymentForm.amount,
-        balance: selectedSupplier.balance - supplierPaymentForm.amount
+        current_balance: selectedSupplier.current_balance - supplierPaymentForm.amount
       }).eq('id', selectedSupplier.id);
       if (sErr) throw sErr;
 
@@ -785,11 +783,11 @@ const EventBooking = () => {
                 <div className="flex items-center justify-between border-b border-border p-4">
                   <div>
                     <h3 className="font-semibold text-card-foreground">{s.name}</h3>
-                    <p className="text-xs text-muted-foreground">{s.category} | {s.contact}</p>
+                    <p className="text-xs text-muted-foreground">{s.service_type} | {s.contact_number}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Outstanding Balance</p>
-                    <p className="text-lg font-bold text-destructive">₨ {s.balance.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Current Balance</p>
+                    <p className="text-lg font-bold text-destructive">₨ {s.current_balance.toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -808,12 +806,8 @@ const EventBooking = () => {
                   <div className="flex flex-col justify-between">
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Total Owed:</span>
-                        <span className="font-medium">₨ {s.total_owed.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Total Paid:</span>
-                        <span className="font-medium text-success">₨ {s.paid.toLocaleString()}</span>
+                        <span className="text-muted-foreground">Opening Balance:</span>
+                        <span className="font-medium">₨ {s.opening_balance.toLocaleString()}</span>
                       </div>
                     </div>
                     <Button className="mt-4 w-full" onClick={() => { setSelectedSupplier(s); setSupplierPaymentForm({ ...supplierPaymentForm, amount: 0 }); setShowSupplierPaymentModal(true); }}>
