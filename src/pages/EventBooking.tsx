@@ -1,12 +1,14 @@
-import { useState } from "react";
-import { Plus, Search, Eye, Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Edit } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Search, Eye, Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Edit, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 type BookingStatus = "tentative" | "confirmed" | "postponed" | "cancelled";
 interface Booking { id: number; clientName: string; phone: string; eventType: string; eventDate: string; bookingDate: string; venue: string; guests: number; totalAmount: number; advance: number; balanceRemaining: number; status: BookingStatus; paymentMethod: string; menu: string; notes: string; thirdParty: boolean; supplierCost: number; sellingRate: number; }
@@ -20,10 +22,13 @@ const DUMMY_BOOKINGS: Booking[] = [
   { id:6, clientName:"Nikkah Ceremony", phone:"0305-6666666", eventType:"Wedding", eventDate:"2024-04-10", bookingDate:"2024-03-12", venue:"Main Hall", guests:400, totalAmount:280000, advance:140000, balanceRemaining:140000, status:"confirmed", paymentMethod:"Cheque", menu:"Menu A - Desi", notes:"", thirdParty:false, supplierCost:0, sellingRate:0 },
 ];
 
-const MENUS = [
-  { name:"Menu A - Desi", items:[{item:"Biryani",unit:"per plate",rate:250},{item:"Nihari",unit:"per plate",rate:280},{item:"Naan",unit:"per piece",rate:30},{item:"Raita",unit:"per portion",rate:40},{item:"Dessert",unit:"per plate",rate:80}] },
-  { name:"Menu B - Continental", items:[{item:"Grilled Chicken",unit:"per plate",rate:450},{item:"Pasta",unit:"per plate",rate:350},{item:"Garlic Bread",unit:"per piece",rate:60},{item:"Soup",unit:"per bowl",rate:120},{item:"Ice Cream",unit:"per scoop",rate:100}] },
-  { name:"Custom", items:[] },
+interface MenuItem { id?: number | string; item: string; unit: string; rate: number; menu_id?: number | string; }
+interface Menu { id: number | string; name: string; items: MenuItem[]; }
+
+const INITIAL_MENUS: Menu[] = [
+  { id: 1, name:"Menu A - Desi", items:[{id:1, item:"Biryani",unit:"per plate",rate:250},{id:2, item:"Nihari",unit:"per plate",rate:280},{id:3, item:"Naan",unit:"per piece",rate:30},{id:4, item:"Raita",unit:"per portion",rate:40},{id:5, item:"Dessert",unit:"per plate",rate:80}] },
+  { id: 2, name:"Menu B - Continental", items:[{id:6, item:"Grilled Chicken",unit:"per plate",rate:450},{id:7, item:"Pasta",unit:"per plate",rate:350},{id:8, item:"Garlic Bread",unit:"per piece",rate:60},{id:9, item:"Soup",unit:"per bowl",rate:120},{id:10, item:"Ice Cream",unit:"per scoop",rate:100}] },
+  { id: 3, name:"Custom", items:[] },
 ];
 
 const EVENT_TYPES = ["Wedding","Corporate","Birthday","Mehndi","Engagement","Conference","Other"];
@@ -36,6 +41,132 @@ const sd = (s: BookingStatus) => s==="confirmed"?"bg-success":s==="tentative"?"b
 const EMPTY = { clientName:"",phone:"",eventType:"",eventDate:"",bookingDate:new Date().toISOString().split("T")[0],venue:"",guests:"",totalAmount:"",advance:"",paymentMethod:"Cash",status:"tentative" as BookingStatus,menu:"Menu A - Desi",notes:"",thirdParty:false,supplierCost:"",sellingRate:"" };
 
 const EventBooking = () => {
+  const [menus, setMenus] = useState<Menu[]>(INITIAL_MENUS);
+  const [loadingMenus, setLoadingMenus] = useState(false);
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<number | string | null>(null);
+  const [itemForm, setItemForm] = useState<MenuItem>({ item: "", unit: "per plate", rate: 0 });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const fetchMenus = async () => {
+    setLoadingMenus(true);
+    try {
+      // 1. Fetch menus
+      const { data: menusData, error: menusError } = await supabase
+        .from('menus')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (menusError) throw menusError;
+
+      if (menusData && menusData.length > 0) {
+        // 2. Fetch items for each menu
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('menu_items')
+          .select('*')
+          .order('id', { ascending: true });
+
+        if (itemsError) throw itemsError;
+
+        const formattedMenus = menusData.map(m => ({
+          ...m,
+          items: itemsData?.filter(i => i.menu_id === m.id) || []
+        }));
+        setMenus(formattedMenus);
+      } else {
+        // Fallback to initial menus if DB is empty
+        setMenus(INITIAL_MENUS);
+      }
+    } catch (error: any) {
+      console.error("Error fetching menus:", error);
+      toast.error("Failed to load menus from database");
+      setMenus(INITIAL_MENUS); // Fallback
+    } finally {
+      setLoadingMenus(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMenus();
+  }, []);
+
+  const handleEditClick = (item: MenuItem, menuId: number | string) => {
+    setEditingItem(item);
+    setActiveMenuId(menuId);
+    setItemForm({ ...item });
+    setShowItemModal(true);
+  };
+
+  const handleAddClick = (menuId: number | string) => {
+    setEditingItem(null);
+    setActiveMenuId(menuId);
+    setItemForm({ item: "", unit: "per plate", rate: 0 });
+    setShowItemModal(true);
+  };
+
+  const handleSaveItem = async () => {
+    if (!itemForm.item || itemForm.rate <= 0) {
+      toast.error("Please provide item name and a valid rate");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      if (editingItem) {
+        // Update existing item
+        const { error } = await supabase
+          .from('menu_items')
+          .update({
+            item: itemForm.item,
+            unit: itemForm.unit,
+            rate: itemForm.rate
+          })
+          .eq('id', editingItem.id);
+
+        if (error) throw error;
+        toast.success("Item updated successfully");
+      } else {
+        // Add new item
+        const { error } = await supabase
+          .from('menu_items')
+          .insert([{
+            item: itemForm.item,
+            unit: itemForm.unit,
+            rate: itemForm.rate,
+            menu_id: activeMenuId
+          }]);
+
+        if (error) throw error;
+        toast.success("Item added successfully");
+      }
+      
+      setShowItemModal(false);
+      fetchMenus(); // Refresh state
+    } catch (error: any) {
+      console.error("Error saving menu item:", error);
+      toast.error(error.message || "Failed to save item");
+      
+      // Local state update fallback if Supabase fails (e.g. table doesn't exist)
+      if (editingItem) {
+        setMenus(prev => prev.map(m => 
+          m.id === activeMenuId 
+            ? { ...m, items: m.items.map(i => i.id === editingItem.id ? { ...itemForm } : i) }
+            : m
+        ));
+      } else {
+        setMenus(prev => prev.map(m => 
+          m.id === activeMenuId 
+            ? { ...m, items: [...m.items, { ...itemForm, id: Date.now() }] }
+            : m
+        ));
+      }
+      setShowItemModal(false);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const [bookings, setBookings] = useState<Booking[]>(DUMMY_BOOKINGS);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -163,18 +294,24 @@ const EventBooking = () => {
 
         <TabsContent value="menu">
           <div className="space-y-4">
-            {MENUS.filter(m=>m.name!=="Custom").map(menu=>(
-              <div key={menu.name} className="rounded-lg border border-border bg-card">
-                <div className="flex items-center justify-between border-b border-border p-4">
-                  <h3 className="font-semibold text-card-foreground">{menu.name}</h3>
-                  <Button variant="outline" size="sm">+ Add Item</Button>
-                </div>
-                <table className="w-full min-w-[600px]">
-                  <thead><tr className="border-b border-border bg-muted/40"><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Item</th><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Unit</th><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Rate (₨)</th><th className="px-4 py-2 text-xs text-muted-foreground">Edit</th></tr></thead>
-                  <tbody>{menu.items.map((item,idx)=><tr key={idx} className="border-b border-border last:border-0"><td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item}</td><td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td><td className="px-4 py-2 text-sm">₨ {item.rate}</td><td className="px-4 py-2 text-center"><button className="rounded p-1 hover:bg-muted"><Edit className="h-3.5 w-3.5 text-muted-foreground"/></button></td></tr>)}</tbody>
-                </table>
+            {loadingMenus ? (
+              <div className="flex h-40 items-center justify-center rounded-lg border border-border bg-card">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ))}
+            ) : (
+              menus.filter(m=>m.name!=="Custom").map(menu=>(
+                <div key={menu.id} className="rounded-lg border border-border bg-card">
+                  <div className="flex items-center justify-between border-b border-border p-4">
+                    <h3 className="font-semibold text-card-foreground">{menu.name}</h3>
+                    <Button variant="outline" size="sm" onClick={() => handleAddClick(menu.id)}>+ Add Item</Button>
+                  </div>
+                  <table className="w-full min-w-[600px]">
+                    <thead><tr className="border-b border-border bg-muted/40"><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Item</th><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Unit</th><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Rate (₨)</th><th className="px-4 py-2 text-xs text-muted-foreground text-center">Edit</th></tr></thead>
+                    <tbody>{menu.items.map((item,idx)=><tr key={item.id || idx} className="border-b border-border last:border-0"><td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item}</td><td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td><td className="px-4 py-2 text-sm">₨ {item.rate}</td><td className="px-4 py-2 text-center"><button onClick={() => handleEditClick(item, menu.id)} className="rounded p-1 hover:bg-muted"><Edit className="h-3.5 w-3.5 text-muted-foreground"/></button></td></tr>)}</tbody>
+                  </table>
+                </div>
+              ))
+            )}
           </div>
         </TabsContent>
 
@@ -194,8 +331,8 @@ const EventBooking = () => {
                 </div>
                 <table className="w-full min-w-[700px]">
                   <thead><tr className="border-b border-border bg-muted/40">{["Item","Unit","Rate/Unit","Qty","Total Cost"].map(h=><th key={h} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
-                  <tbody>{(MENUS.find(m=>m.name===selected.menu)?.items||[]).map((item,idx)=><tr key={idx} className="border-b border-border last:border-0"><td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item}</td><td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td><td className="px-4 py-2 text-sm">₨ {item.rate}</td><td className="px-4 py-2 text-sm">{selected.guests}</td><td className="px-4 py-2 text-sm font-medium text-primary">₨ {(selected.guests*item.rate).toLocaleString()}</td></tr>)}</tbody>
-                  <tfoot><tr className="border-t-2 border-border bg-muted/40"><td colSpan={4} className="px-4 py-2 text-sm font-semibold">Total Kitchen Cost</td><td className="px-4 py-2 text-sm font-bold text-primary">₨ {(MENUS.find(m=>m.name===selected.menu)?.items.reduce((s,i)=>s+selected.guests*i.rate,0)||0).toLocaleString()}</td></tr></tfoot>
+                  <tbody>{(menus.find(m=>m.name===selected.menu)?.items||[]).map((item,idx)=><tr key={idx} className="border-b border-border last:border-0"><td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item}</td><td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td><td className="px-4 py-2 text-sm">₨ {item.rate}</td><td className="px-4 py-2 text-sm">{selected.guests}</td><td className="px-4 py-2 text-sm font-medium text-primary">₨ {(selected.guests*item.rate).toLocaleString()}</td></tr>)}</tbody>
+                  <tfoot><tr className="border-t-2 border-border bg-muted/40"><td colSpan={4} className="px-4 py-2 text-sm font-semibold">Total Kitchen Cost</td><td className="px-4 py-2 text-sm font-bold text-primary">₨ {(menus.find(m=>m.name===selected.menu)?.items.reduce((s,i)=>s+selected.guests*i.rate,0)||0).toLocaleString()}</td></tr></tfoot>
                 </table>
                 <div className="mt-3 flex justify-end gap-2">
                   <Button variant="outline" size="sm">Print Kitchen Sheet</Button>
@@ -254,7 +391,7 @@ const EventBooking = () => {
             {nb.advance&&nb.totalAmount&&<div className="col-span-2 rounded-lg bg-muted/40 p-2 text-xs text-muted-foreground">Balance Remaining: <strong className="text-destructive">₨ {(Number(nb.totalAmount)-Number(nb.advance)).toLocaleString()}</strong></div>}
             <div className="space-y-1.5"><Label>Payment Method</Label><Select value={nb.paymentMethod} onValueChange={v=>setNb({...nb,paymentMethod:v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{PAYMENT_METHODS.map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1.5"><Label>Status</Label><Select value={nb.status} onValueChange={v=>setNb({...nb,status:v as BookingStatus})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="tentative">Tentative</SelectItem><SelectItem value="confirmed">Confirmed</SelectItem><SelectItem value="postponed">Postponed</SelectItem><SelectItem value="cancelled">Cancelled</SelectItem></SelectContent></Select></div>
-            <div className="space-y-1.5"><Label>Menu</Label><Select value={nb.menu} onValueChange={v=>setNb({...nb,menu:v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{MENUS.map(m=><SelectItem key={m.name} value={m.name}>{m.name}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1.5"><Label>Menu</Label><Select value={nb.menu} onValueChange={v=>setNb({...nb,menu:v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{menus.map(m=><SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}</SelectContent></Select></div>
             <div className="flex items-center gap-2 pt-4"><input type="checkbox" id="tp" checked={nb.thirdParty} onChange={e=>setNb({...nb,thirdParty:e.target.checked})} className="accent-primary"/><Label htmlFor="tp">Third-Party Sourcing</Label></div>
             {nb.thirdParty&&<>
               <div className="space-y-1.5"><Label>Supplier Cost (₨)</Label><Input type="number" value={nb.supplierCost} onChange={e=>setNb({...nb,supplierCost:e.target.value})}/></div>
@@ -285,9 +422,65 @@ const EventBooking = () => {
               <div><p className="text-xs text-muted-foreground">Guests</p><p className="font-medium">{selected.guests}</p></div>
               <div><p className="text-xs text-muted-foreground">Menu</p><p className="font-medium">{selected.menu}</p></div>
             </div>
-            {(MENUS.find(m=>m.name===selected.menu)?.items||[]).map((item,idx)=><div key={idx} className="flex justify-between border-b border-border py-2 text-sm last:border-0"><span className="font-medium text-card-foreground">{item.item}</span><span className="text-muted-foreground">{selected.guests} × ₨{item.rate} = <strong className="text-card-foreground">₨ {(selected.guests*item.rate).toLocaleString()}</strong></span></div>)}
-            <div className="flex justify-between border-t-2 border-border pt-2 text-sm font-bold"><span>Total Kitchen Cost</span><span className="text-primary">₨ {(MENUS.find(m=>m.name===selected.menu)?.items.reduce((s,i)=>s+selected.guests*i.rate,0)||0).toLocaleString()}</span></div>
+            {(menus.find(m=>m.name===selected.menu)?.items||[]).map((item,idx)=><div key={idx} className="flex justify-between border-b border-border py-2 text-sm last:border-0"><span className="font-medium text-card-foreground">{item.item}</span><span className="text-muted-foreground">{selected.guests} × ₨{item.rate} = <strong className="text-card-foreground">₨ {(selected.guests*item.rate).toLocaleString()}</strong></span></div>)}
+            <div className="flex justify-between border-t-2 border-border pt-2 text-sm font-bold"><span>Total Kitchen Cost</span><span className="text-primary">₨ {(menus.find(m=>m.name===selected.menu)?.items.reduce((s,i)=>s+selected.guests*i.rate,0)||0).toLocaleString()}</span></div>
           </>}
+        </DialogContent>
+      </Dialog>
+      {/* MENU ITEM MODAL */}
+      <Dialog open={showItemModal} onOpenChange={setShowItemModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingItem ? "Edit Menu Item" : "Add Menu Item"}</DialogTitle>
+            <DialogDescription>
+              {editingItem ? "Update the name and price of this item." : "Enter the details for the new menu item."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="item-name">Item Name</Label>
+              <Input 
+                id="item-name" 
+                placeholder="e.g. Biryani" 
+                value={itemForm.item} 
+                onChange={e => setItemForm({ ...itemForm, item: e.target.value })} 
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="item-unit">Unit</Label>
+                <Input 
+                  id="item-unit" 
+                  placeholder="e.g. per plate" 
+                  value={itemForm.unit} 
+                  onChange={e => setItemForm({ ...itemForm, unit: e.target.value })} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="item-rate">Rate (₨)</Label>
+                <Input 
+                  id="item-rate" 
+                  type="number" 
+                  placeholder="0" 
+                  value={itemForm.rate} 
+                  onChange={e => setItemForm({ ...itemForm, rate: Number(e.target.value) })} 
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowItemModal(false)}>Cancel</Button>
+            <Button onClick={handleSaveItem} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Item"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
