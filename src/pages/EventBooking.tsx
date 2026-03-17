@@ -84,9 +84,14 @@ const EventBooking = () => {
   const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [showSupplierPaymentModal, setShowSupplierPaymentModal] = useState(false);
+  const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
   const [supplierPaymentForm, setSupplierPaymentForm] = useState({ amount: 0, method: "Cash", date: format(new Date(), "yyyy-MM-dd"), notes: "" });
+  const [supplierForm, setSupplierForm] = useState({ name: "", contact: "", email: "", category: "Food", opening_balance: 0 });
   const [selectedClient, setSelectedClient] = useState<ClientProfile | null>(null);
   const [showClientProfile, setShowClientProfile] = useState(false);
+  const [calView, setCalView] = useState<"day" | "week" | "month">("month");
+  const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null);
+  const [proceedWithBooking, setProceedWithBooking] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   const fetchMenus = async () => {
@@ -136,6 +141,31 @@ const EventBooking = () => {
       if (pData) setSupplierPayments(pData);
     } catch (err) {
       console.error("Error fetching suppliers:", err);
+    }
+  };
+
+  const handleAddSupplier = async () => {
+    if (!supplierForm.name) return;
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('suppliers').insert([{
+        name: supplierForm.name,
+        contact: supplierForm.contact,
+        email: supplierForm.email,
+        category: supplierForm.category,
+        total_owed: supplierForm.opening_balance,
+        paid: 0,
+        balance: supplierForm.opening_balance
+      }]);
+      if (error) throw error;
+      toast.success("Supplier added successfully");
+      setShowAddSupplierModal(false);
+      setSupplierForm({ name: "", contact: "", email: "", category: "Food", opening_balance: 0 });
+      fetchSuppliers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add supplier");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -379,11 +409,31 @@ const EventBooking = () => {
     return ms && mf;
   });
 
+  const checkAvailability = () => {
+    if (!nb.eventDate || !nb.venue) return true;
+    const existing = bookings.find(b => b.eventDate === nb.eventDate && b.venue === nb.venue && b.status !== 'cancelled');
+    if (existing) {
+      setAvailabilityWarning(`This venue is already booked on this date for "${existing.clientName}" (${existing.eventType})`);
+      return false;
+    }
+    setAvailabilityWarning(null);
+    return true;
+  };
+
   const handleAdd = () => {
     if (!nb.clientName || !nb.eventDate) return;
+    
+    if (!proceedWithBooking) {
+      const isAvailable = checkAvailability();
+      if (!isAvailable) {
+        setProceedWithBooking(true);
+        return;
+      }
+    }
+
     const total = Number(nb.totalAmount), adv = Number(nb.advance);
     setBookings([...bookings,{id:bookings.length+1,...nb,guests:Number(nb.guests),totalAmount:total,advance:adv,balanceRemaining:total-adv,supplierCost:Number(nb.supplierCost),sellingRate:Number(nb.sellingRate)}]);
-    setNb(EMPTY); setShowAdd(false);
+    setNb(EMPTY); setShowAdd(false); setAvailabilityWarning(null); setProceedWithBooking(false);
   };
 
   const monthStart = startOfMonth(calMonth);
@@ -464,33 +514,143 @@ const EventBooking = () => {
 
         <TabsContent value="calendar">
           <div className="rounded-lg border border-border bg-card p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <button onClick={()=>setCalMonth(subMonths(calMonth,1))} className="rounded p-1 hover:bg-muted"><ChevronLeft className="h-5 w-5"/></button>
-              <h3 className="text-base font-semibold text-card-foreground">{format(calMonth,"MMMM yyyy")}</h3>
-              <button onClick={()=>setCalMonth(addMonths(calMonth,1))} className="rounded p-1 hover:bg-muted"><ChevronRight className="h-5 w-5"/></button>
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <button onClick={()=>setCalMonth(subMonths(calMonth,1))} className="rounded p-1 hover:bg-muted"><ChevronLeft className="h-5 w-5"/></button>
+                <h3 className="text-lg font-bold text-card-foreground min-w-[140px] text-center">{format(calMonth, calView === 'month' ? "MMMM yyyy" : "MMM d, yyyy")}</h3>
+                <button onClick={()=>setCalMonth(addMonths(calMonth,1))} className="rounded p-1 hover:bg-muted"><ChevronRight className="h-5 w-5"/></button>
+              </div>
+
+              <div className="flex bg-muted p-1 rounded-lg">
+                {(["day", "week", "month"] as const).map(v => (
+                  <button 
+                    key={v} 
+                    onClick={() => setCalView(v)} 
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${calView === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {v.charAt(0).toUpperCase() + v.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-4 px-4 py-2 bg-muted/30 rounded-lg border border-border/50">
+                {(["confirmed", "tentative", "postponed", "cancelled"] as const).map(s => {
+                  const count = bookings.filter(b => b.status === s && b.eventDate.startsWith(format(calMonth, "yyyy-MM"))).length;
+                  return (
+                    <div key={s} className="flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-full ${s === 'confirmed' ? 'bg-success' : s === 'tentative' ? 'bg-warning' : s === 'cancelled' ? 'bg-destructive' : 'bg-orange-500'}`} />
+                      <span className="text-xs font-semibold capitalize">{s}: <span className="text-foreground">{count}</span></span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="mb-3 flex flex-wrap gap-3 text-xs">
-              {[{l:"Confirmed",c:"bg-success"},{l:"Tentative",c:"bg-warning"},{l:"Postponed",c:"bg-secondary"},{l:"Cancelled",c:"bg-destructive"}].map(l=>(
-                <span key={l.l} className="flex items-center gap-1 text-muted-foreground"><span className={`h-2 w-2 rounded-full ${l.c}`}/>{l.l}</span>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div key={d} className="py-2 text-center text-xs font-semibold text-muted-foreground">{d}</div>)}
-              {Array.from({length:startDow}).map((_,i)=><div key={`e${i}`}/>)}
-              {days.map(day=>{
-                const db = getDayB(day);
-                return <div key={day.toISOString()} className={`min-h-14 rounded-lg border p-1 text-xs ${db.length>0?"border-primary/30 bg-primary/5":"border-border hover:bg-muted/30"}`}>
-                  <div className="mb-1 font-medium text-card-foreground">{format(day,"d")}</div>
-                  {db.slice(0,2).map((b,i)=><div key={i} className="mb-0.5 truncate rounded px-1 py-0.5 text-[10px] font-medium" style={{background:b.status==="confirmed"?"#eaf3de":b.status==="tentative"?"#faeeda":"#fcebeb",color:b.status==="confirmed"?"#3b6d11":b.status==="tentative"?"#854f0b":"#a32d2d"}}>{b.name}</div>)}
-                  {db.length>2&&<div className="text-[10px] text-muted-foreground">+{db.length-2} more</div>}
-                </div>;
-              })}
-            </div>
-            <div className="mt-4 grid grid-cols-4 gap-3 border-t border-border pt-4">
-              {(["confirmed","tentative","postponed","cancelled"] as BookingStatus[]).map(s=>(
-                <div key={s} className="text-center"><p className="text-xs text-muted-foreground capitalize">{s}</p><p className={`text-lg font-bold ${s==="confirmed"?"text-success":s==="tentative"?"text-warning":s==="postponed"?"text-secondary":"text-destructive"}`}>{bookings.filter(b=>b.status===s&&b.eventDate.startsWith(format(calMonth,"yyyy-MM"))).length}</p></div>
-              ))}
-            </div>
+
+            {calView === "month" && (
+              <div className="grid grid-cols-7 gap-1">
+                {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div key={d} className="py-2 text-center text-xs font-semibold text-muted-foreground">{d}</div>)}
+                {Array.from({length:startDow}).map((_,i)=><div key={`e${i}`}/>)}
+                {days.map(day=>{
+                  const db = getDayB(day);
+                  return <div key={day.toISOString()} className={`min-h-[100px] rounded-lg border p-1 text-xs ${db.length>0?"border-primary/30 bg-primary/5":"border-border hover:bg-muted/30"}`}>
+                    <div className="mb-1 font-medium text-card-foreground">{format(day,"d")}</div>
+                    <div className="space-y-1">
+                      {db.map((b,i)=>(
+                        <div 
+                          key={i} 
+                          className="truncate rounded px-1.5 py-0.5 text-[10px] font-bold border shadow-sm cursor-pointer hover:brightness-95 transition-all" 
+                          onClick={() => { setSelected(bookings.find(x => x.clientName === b.name) || null); setShowView(true); }}
+                          style={{
+                            backgroundColor: b.status === "confirmed" ? "#dcfce7" : b.status === "tentative" ? "#fef9c3" : b.status === "cancelled" ? "#fee2e2" : "#ffedd5",
+                            color: b.status === "confirmed" ? "#166534" : b.status === "tentative" ? "#854f0b" : b.status === "cancelled" ? "#991b1b" : "#9a3412",
+                            borderColor: b.status === "confirmed" ? "#bbf7d0" : b.status === "tentative" ? "#fef08a" : b.status === "cancelled" ? "#fecaca" : "#fed7aa"
+                          }}
+                        >
+                          {b.name}
+                        </div>
+                      ))}
+                    </div>
+                  </div>;
+                })}
+              </div>
+            )}
+
+            {calView === "week" && (
+              <div className="space-y-4">
+                {Array.from({ length: 7 }).map((_, i) => {
+                  const d = new Date(calMonth);
+                  d.setDate(d.getDate() - d.getDay() + i);
+                  const db = getDayB(d);
+                  return (
+                    <div key={i} className="flex gap-4 p-3 rounded-lg border border-border bg-muted/10 hover:bg-muted/20 transition-colors">
+                      <div className="w-24 flex flex-col items-center justify-center border-r border-border pr-4">
+                        <span className="text-xs font-bold text-muted-foreground uppercase">{format(d, "EEE")}</span>
+                        <span className="text-2xl font-black">{format(d, "d")}</span>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        {db.length > 0 ? db.map((b, idx) => (
+                          <div 
+                            key={idx} 
+                            onClick={() => { setSelected(bookings.find(x => x.clientName === b.name) || null); setShowView(true); }}
+                            className="flex items-center justify-between p-2 rounded-md border shadow-sm cursor-pointer hover:scale-[1.01] transition-transform"
+                            style={{
+                              backgroundColor: b.status === "confirmed" ? "#dcfce7" : b.status === "tentative" ? "#fef9c3" : b.status === "cancelled" ? "#fee2e2" : "#ffedd5",
+                              color: b.status === "confirmed" ? "#166534" : b.status === "tentative" ? "#854f0b" : b.status === "cancelled" ? "#991b1b" : "#9a3412",
+                              borderColor: b.status === "confirmed" ? "#bbf7d0" : b.status === "tentative" ? "#fef08a" : b.status === "cancelled" ? "#fecaca" : "#fed7aa"
+                            }}
+                          >
+                            <span className="font-bold text-sm">{b.name} — {bookings.find(x => x.clientName === b.name)?.eventType}</span>
+                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-white/50">{b.status}</span>
+                          </div>
+                        )) : (
+                          <div className="h-full flex items-center text-muted-foreground text-xs italic">No events scheduled</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {calView === "day" && (
+              <div className="p-6 rounded-xl border border-border bg-muted/10">
+                <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
+                  <div>
+                    <h4 className="text-2xl font-black text-foreground">{format(calMonth, "EEEE")}</h4>
+                    <p className="text-sm text-muted-foreground">{format(calMonth, "MMMM d, yyyy")}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Daily Events</p>
+                    <p className="text-3xl font-black text-primary">{getDayB(calMonth).length}</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {getDayB(calMonth).length > 0 ? getDayB(calMonth).map((b, i) => (
+                    <div 
+                      key={i} 
+                      onClick={() => { setSelected(bookings.find(x => x.clientName === b.name) || null); setShowView(true); }}
+                      className="p-4 rounded-xl border shadow-md flex items-center justify-between cursor-pointer hover:translate-x-1 transition-transform"
+                      style={{
+                        backgroundColor: b.status === "confirmed" ? "#dcfce7" : b.status === "tentative" ? "#fef9c3" : b.status === "cancelled" ? "#fee2e2" : "#ffedd5",
+                        color: b.status === "confirmed" ? "#166534" : b.status === "tentative" ? "#854f0b" : b.status === "cancelled" ? "#991b1b" : "#9a3412",
+                        borderColor: b.status === "confirmed" ? "#bbf7d0" : b.status === "tentative" ? "#fef08a" : b.status === "cancelled" ? "#fecaca" : "#fed7aa"
+                      }}
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-lg font-black">{b.name}</span>
+                        <span className="text-sm font-bold opacity-80">{bookings.find(x => x.clientName === b.name)?.eventType} at {bookings.find(x => x.clientName === b.name)?.venue}</span>
+                      </div>
+                      <span className="text-xs font-black uppercase px-3 py-1 rounded-full bg-white/40 shadow-inner">{b.status}</span>
+                    </div>
+                  )) : (
+                    <div className="py-20 text-center text-muted-foreground border-2 border-dashed border-border rounded-xl">
+                      <p className="text-lg font-bold">No bookings for this day</p>
+                      <p className="text-sm">Click "New Booking" to schedule an event</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -613,6 +773,12 @@ const EventBooking = () => {
         </TabsContent>
 
         <TabsContent value="suppliers">
+          <div className="mb-4 flex justify-end">
+            <Button onClick={() => setShowAddSupplierModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Supplier
+            </Button>
+          </div>
           <div className="space-y-4">
             {suppliers.map(s => (
               <div key={s.id} className="rounded-lg border border-border bg-card">
@@ -692,8 +858,19 @@ const EventBooking = () => {
               {nb.supplierCost&&nb.sellingRate&&<div className="col-span-2 rounded-lg bg-success/10 border border-success/20 p-2 text-sm">Auto Profit: <strong className="text-success">₨ {(Number(nb.sellingRate)-Number(nb.supplierCost)).toLocaleString()}</strong></div>}
             </>}
             <div className="col-span-2 space-y-1.5"><Label>Notes</Label><Input placeholder="Special requirements..." value={nb.notes} onChange={e=>setNb({...nb,notes:e.target.value})}/></div>
+            
+            {availabilityWarning && (
+              <div className="col-span-2 p-3 rounded-lg bg-warning/10 border border-warning/20 text-warning text-sm flex flex-col gap-2">
+                <p className="font-semibold flex items-center gap-2"><Plus className="h-4 w-4 rotate-45"/> Double Booking Warning</p>
+                <p>{availabilityWarning}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <input type="checkbox" id="confirm-booking" checked={proceedWithBooking} onChange={e => setProceedWithBooking(e.target.checked)} className="accent-warning" />
+                  <Label htmlFor="confirm-booking" className="text-warning font-medium">I understand and want to proceed anyway</Label>
+                </div>
+              </div>
+            )}
           </div>
-          <DialogFooter><Button variant="outline" onClick={()=>setShowAdd(false)}>Cancel</Button><Button onClick={handleAdd}>Save Booking</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={()=>{setShowAdd(false); setAvailabilityWarning(null); setProceedWithBooking(false);}}>Cancel</Button><Button onClick={handleAdd}>{proceedWithBooking ? "Save Anyway" : "Save Booking"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -918,6 +1095,56 @@ const EventBooking = () => {
              <Button onClick={handleSupplierPayment} disabled={isSaving}>
                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                Save Payment
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+
+       {/* ADD SUPPLIER MODAL */}
+       <Dialog open={showAddSupplierModal} onOpenChange={setShowAddSupplierModal}>
+         <DialogContent className="max-w-md">
+           <DialogHeader>
+             <DialogTitle>Add New Supplier</DialogTitle>
+             <DialogDescription>Enter the supplier details to add them to your ledger.</DialogDescription>
+           </DialogHeader>
+           <div className="space-y-4 py-4">
+             <div className="space-y-2">
+               <Label htmlFor="s-name">Supplier Name</Label>
+               <Input id="s-name" value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} placeholder="e.g. ABC Catering" />
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-2">
+                 <Label htmlFor="s-contact">Contact Number</Label>
+                 <Input id="s-contact" value={supplierForm.contact} onChange={e => setSupplierForm({...supplierForm, contact: e.target.value})} placeholder="e.g. 0300-1234567" />
+               </div>
+               <div className="space-y-2">
+                 <Label htmlFor="s-email">Email</Label>
+                 <Input id="s-email" type="email" value={supplierForm.email} onChange={e => setSupplierForm({...supplierForm, email: e.target.value})} placeholder="e.g. supplier@example.com" />
+               </div>
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-2">
+                 <Label htmlFor="s-category">Service Type</Label>
+                 <Select value={supplierForm.category} onValueChange={v => setSupplierForm({...supplierForm, category: v})}>
+                   <SelectTrigger id="s-category"><SelectValue /></SelectTrigger>
+                   <SelectContent>
+                     {["Food", "Decoration", "Logistics", "Photography", "Sound System", "Waiters", "Other"].map(cat => (
+                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div className="space-y-2">
+                 <Label htmlFor="s-balance">Opening Balance (₨)</Label>
+                 <Input id="s-balance" type="number" value={supplierForm.opening_balance} onChange={e => setSupplierForm({...supplierForm, opening_balance: Number(e.target.value)})} placeholder="0" />
+               </div>
+             </div>
+           </div>
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setShowAddSupplierModal(false)}>Cancel</Button>
+             <Button onClick={handleAddSupplier} disabled={isSaving}>
+               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+               Add Supplier
              </Button>
            </DialogFooter>
          </DialogContent>
