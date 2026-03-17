@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Plus, Search, Eye, Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Edit, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Plus, Search, Eye, Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Edit, Loader2, Printer, Save, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,12 +22,36 @@ const DUMMY_BOOKINGS: Booking[] = [
   { id:6, clientName:"Nikkah Ceremony", phone:"0305-6666666", eventType:"Wedding", eventDate:"2024-04-10", bookingDate:"2024-03-12", venue:"Main Hall", guests:400, totalAmount:280000, advance:140000, balanceRemaining:140000, status:"confirmed", paymentMethod:"Cheque", menu:"Menu A - Desi", notes:"", thirdParty:false, supplierCost:0, sellingRate:0 },
 ];
 
-interface MenuItem { id?: number | string; item: string; unit: string; rate: number; menu_id?: number | string; }
+interface MenuItem { id?: number | string; item: string; unit: string; rate: number; menu_id?: number | string; raw_materials?: RawMaterialRequirement[]; }
 interface Menu { id: number | string; name: string; items: MenuItem[]; }
 
+interface RawMaterialRequirement { material: string; unit: string; ratio_per_guest: number; }
+interface KitchenItem { id?: string; event_id: number; item_name: string; unit: string; estimated_qty: number; actual_qty: number; is_adjusted: boolean; }
+interface RawMaterial { id?: string; event_id: number; material_name: string; unit: string; estimated_qty: number; actual_qty: number; }
+
 const INITIAL_MENUS: Menu[] = [
-  { id: 1, name:"Menu A - Desi", items:[{id:1, item:"Biryani",unit:"per plate",rate:250},{id:2, item:"Nihari",unit:"per plate",rate:280},{id:3, item:"Naan",unit:"per piece",rate:30},{id:4, item:"Raita",unit:"per portion",rate:40},{id:5, item:"Dessert",unit:"per plate",rate:80}] },
-  { id: 2, name:"Menu B - Continental", items:[{id:6, item:"Grilled Chicken",unit:"per plate",rate:450},{id:7, item:"Pasta",unit:"per plate",rate:350},{id:8, item:"Garlic Bread",unit:"per piece",rate:60},{id:9, item:"Soup",unit:"per bowl",rate:120},{id:10, item:"Ice Cream",unit:"per scoop",rate:100}] },
+  { 
+    id: 1, 
+    name:"Menu A - Desi", 
+    items:[
+      {id:1, item:"Biryani", unit:"per plate", rate:250, raw_materials: [{material: "Rice", unit: "kg", ratio_per_guest: 0.2}, {material: "Chicken", unit: "kg", ratio_per_guest: 0.25}]},
+      {id:2, item:"Nihari", unit:"per plate", rate:280, raw_materials: [{material: "Beef", unit: "kg", ratio_per_guest: 0.25}, {material: "Wheat", unit: "kg", ratio_per_guest: 0.05}]},
+      {id:3, item:"Naan", unit:"per piece", rate:30, raw_materials: [{material: "Flour", unit: "kg", ratio_per_guest: 0.1}]},
+      {id:4, item:"Raita", unit:"per portion", rate:40, raw_materials: [{material: "Yogurt", unit: "kg", ratio_per_guest: 0.1}]},
+      {id:5, item:"Dessert", unit:"per plate", rate:80, raw_materials: [{material: "Sugar", unit: "kg", ratio_per_guest: 0.05}, {material: "Milk", unit: "liter", ratio_per_guest: 0.15}]}
+    ] 
+  },
+  { 
+    id: 2, 
+    name:"Menu B - Continental", 
+    items:[
+      {id:6, item:"Grilled Chicken", unit:"per plate", rate:450, raw_materials: [{material: "Chicken Breast", unit: "kg", ratio_per_guest: 0.3}]},
+      {id:7, item:"Pasta", unit:"per plate", rate:350, raw_materials: [{material: "Pasta", unit: "kg", ratio_per_guest: 0.15}, {material: "Cream", unit: "liter", ratio_per_guest: 0.05}]},
+      {id:8, item:"Garlic Bread", unit:"per piece", rate:60, raw_materials: [{material: "Bread", unit: "loaf", ratio_per_guest: 0.1}]},
+      {id:9, item:"Soup", unit:"per bowl", rate:120, raw_materials: [{material: "Vegetables", unit: "kg", ratio_per_guest: 0.1}]},
+      {id:10, item:"Ice Cream", unit:"per scoop", rate:100, raw_materials: [{material: "Ice Cream", unit: "liter", ratio_per_guest: 0.1}]}
+    ] 
+  },
   { id: 3, name:"Custom", items:[] },
 ];
 
@@ -48,6 +72,11 @@ const EventBooking = () => {
   const [activeMenuId, setActiveMenuId] = useState<number | string | null>(null);
   const [itemForm, setItemForm] = useState<MenuItem>({ item: "", unit: "per plate", rate: 0 });
   const [isSaving, setIsSaving] = useState(false);
+  const [kitchenItems, setKitchenItems] = useState<KitchenItem[]>([]);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  const [showRawMaterialsModal, setShowRawMaterialsModal] = useState(false);
+  const [showConsumptionModal, setShowConsumptionModal] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
 
   const fetchMenus = async () => {
     setLoadingMenus(true);
@@ -165,6 +194,95 @@ const EventBooking = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const fetchKitchenData = async (eventId: number) => {
+    try {
+      const { data: kiData } = await supabase.from('kitchen_items').select('*').eq('event_id', eventId);
+      const { data: rmData } = await supabase.from('raw_materials').select('*').eq('event_id', eventId);
+      
+      if (kiData && kiData.length > 0) setKitchenItems(kiData);
+      else {
+        // Generate from menu
+        const booking = bookings.find(b => b.id === eventId);
+        if (booking) {
+          const menu = menus.find(m => m.name === booking.menu);
+          if (menu) {
+            const items: KitchenItem[] = menu.items.map(mi => ({
+              event_id: eventId,
+              item_name: mi.item,
+              unit: mi.unit,
+              estimated_qty: booking.guests,
+              actual_qty: booking.guests,
+              is_adjusted: false
+            }));
+            setKitchenItems(items);
+          }
+        }
+      }
+
+      if (rmData && rmData.length > 0) setRawMaterials(rmData);
+      else {
+        // Generate from kitchen items & menu requirements
+        const booking = bookings.find(b => b.id === eventId);
+        if (booking) {
+          const menu = menus.find(m => m.name === booking.menu);
+          if (menu) {
+            const materialsMap = new Map<string, {name: string, unit: string, qty: number}>();
+            menu.items.forEach(mi => {
+              if (mi.raw_materials) {
+                mi.raw_materials.forEach(rm => {
+                  const key = `${rm.material}-${rm.unit}`;
+                  const current = materialsMap.get(key) || { name: rm.material, unit: rm.unit, qty: 0 };
+                  materialsMap.set(key, { ...current, qty: current.qty + (rm.ratio_per_guest * booking.guests) });
+                });
+              }
+            });
+            const materials: RawMaterial[] = Array.from(materialsMap.values()).map(m => ({
+              event_id: eventId,
+              material_name: m.name,
+              unit: m.unit,
+              estimated_qty: m.qty,
+              actual_qty: m.qty
+            }));
+            setRawMaterials(materials);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching kitchen data:", err);
+    }
+  };
+
+  const handleSaveKitchen = async () => {
+    if (!selected) return;
+    setIsSaving(true);
+    try {
+      // Upsert kitchen items
+      const { error: kiErr } = await supabase.from('kitchen_items').upsert(
+        kitchenItems.map(item => ({ ...item, event_id: selected.id })),
+        { onConflict: 'event_id,item_name' }
+      );
+      if (kiErr) throw kiErr;
+
+      // Upsert raw materials
+      const { error: rmErr } = await supabase.from('raw_materials').upsert(
+        rawMaterials.map(item => ({ ...item, event_id: selected.id })),
+        { onConflict: 'event_id,material_name' }
+      );
+      if (rmErr) throw rmErr;
+
+      toast.success("Kitchen data saved successfully");
+    } catch (err: any) {
+      console.error("Error saving kitchen data:", err);
+      toast.error(err.message || "Failed to save kitchen data");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   const [bookings, setBookings] = useState<Booking[]>(DUMMY_BOOKINGS);
@@ -318,10 +436,25 @@ const EventBooking = () => {
         <TabsContent value="kitchen">
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="mb-4 font-semibold text-card-foreground">Kitchen Production Sheet</h3>
-            <Select onValueChange={v=>{const b=bookings.find(x=>x.id===Number(v));setSelected(b||null);}}>
-              <SelectTrigger className="w-72 mb-4"><SelectValue placeholder="Select event..."/></SelectTrigger>
-              <SelectContent>{bookings.filter(b=>b.status!=="cancelled").map(b=><SelectItem key={b.id} value={String(b.id)}>{b.clientName} — {b.eventDate}</SelectItem>)}</SelectContent>
-            </Select>
+            <div className="flex flex-wrap gap-3 mb-4">
+              <Select onValueChange={v=>{const b=bookings.find(x=>x.id===Number(v));setSelected(b||null); if(b) fetchKitchenData(b.id);}}>
+                <SelectTrigger className="w-72"><SelectValue placeholder="Select event..."/></SelectTrigger>
+                <SelectContent>{bookings.filter(b=>b.status!=="cancelled").map(b=><SelectItem key={b.id} value={String(b.id)}>{b.clientName} — {b.eventDate}</SelectItem>)}</SelectContent>
+              </Select>
+              {selected && (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleSaveKitchen} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
+                    Save Progress
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setShowConsumptionModal(true)}>
+                    <CheckCircle2 className="h-4 w-4 mr-2"/>
+                    Track Consumption
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {selected&&(
               <>
                 <div className="mb-4 grid grid-cols-3 gap-3 rounded-lg bg-muted/40 p-3 text-sm">
@@ -329,14 +462,36 @@ const EventBooking = () => {
                   <div><p className="text-xs text-muted-foreground">Date</p><p className="font-medium">{selected.eventDate}</p></div>
                   <div><p className="text-xs text-muted-foreground">Guests</p><p className="font-medium">{selected.guests}</p></div>
                 </div>
-                <table className="w-full min-w-[700px]">
-                  <thead><tr className="border-b border-border bg-muted/40">{["Item","Unit","Rate/Unit","Qty","Total Cost"].map(h=><th key={h} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
-                  <tbody>{(menus.find(m=>m.name===selected.menu)?.items||[]).map((item,idx)=><tr key={idx} className="border-b border-border last:border-0"><td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item}</td><td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td><td className="px-4 py-2 text-sm">₨ {item.rate}</td><td className="px-4 py-2 text-sm">{selected.guests}</td><td className="px-4 py-2 text-sm font-medium text-primary">₨ {(selected.guests*item.rate).toLocaleString()}</td></tr>)}</tbody>
-                  <tfoot><tr className="border-t-2 border-border bg-muted/40"><td colSpan={4} className="px-4 py-2 text-sm font-semibold">Total Kitchen Cost</td><td className="px-4 py-2 text-sm font-bold text-primary">₨ {(menus.find(m=>m.name===selected.menu)?.items.reduce((s,i)=>s+selected.guests*i.rate,0)||0).toLocaleString()}</td></tr></tfoot>
-                </table>
-                <div className="mt-3 flex justify-end gap-2">
-                  <Button variant="outline" size="sm">Print Kitchen Sheet</Button>
-                  <Button variant="outline" size="sm">Raw Material List</Button>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[700px]">
+                    <thead><tr className="border-b border-border bg-muted/40">{["Item","Unit","Estimated Qty","Manual Adjustment"].map(h=><th key={h} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
+                    <tbody>
+                      {kitchenItems.map((item, idx) => (
+                        <tr key={idx} className="border-b border-border last:border-0">
+                          <td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item_name}</td>
+                          <td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td>
+                          <td className="px-4 py-2 text-sm">{item.estimated_qty}</td>
+                          <td className="px-4 py-2 text-sm">
+                            <Input 
+                              type="number" 
+                              className="w-24 h-8" 
+                              value={item.actual_qty} 
+                              onChange={e => {
+                                const val = Number(e.target.value);
+                                setKitchenItems(prev => prev.map((ki, i) => i === idx ? { ...ki, actual_qty: val, is_adjusted: val !== ki.estimated_qty } : ki));
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4 flex justify-end gap-2 print:hidden">
+                  <Button variant="outline" size="sm" onClick={handlePrint}><Printer className="h-4 w-4 mr-2"/>Print Sheet</Button>
+                  <Button variant="outline" size="sm" onClick={() => setShowRawMaterialsModal(true)}>Raw Material List</Button>
                 </div>
               </>
             )}
@@ -479,6 +634,99 @@ const EventBooking = () => {
               ) : (
                 "Save Item"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* RAW MATERIALS MODAL */}
+      <Dialog open={showRawMaterialsModal} onOpenChange={setShowRawMaterialsModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Raw Material Requirements — {selected?.clientName}</DialogTitle>
+            <DialogDescription>Auto-calculated based on menu and guest count ({selected?.guests} guests)</DialogDescription>
+          </DialogHeader>
+          <div className="py-4" ref={printRef}>
+            <div className="hidden print:block mb-4">
+              <h2 className="text-xl font-bold">Raw Material List</h2>
+              <p>Event: {selected?.clientName} | Date: {selected?.eventDate} | Guests: {selected?.guests}</p>
+            </div>
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border bg-muted/40">
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Material</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Unit</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Required Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rawMaterials.map((rm, idx) => (
+                  <tr key={idx} className="border-b border-border last:border-0">
+                    <td className="px-4 py-2 text-sm font-medium">{rm.material_name}</td>
+                    <td className="px-4 py-2 text-sm text-muted-foreground">{rm.unit}</td>
+                    <td className="px-4 py-2 text-sm font-bold">{rm.estimated_qty.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <DialogFooter className="print:hidden">
+            <Button variant="outline" onClick={handlePrint}><Printer className="h-4 w-4 mr-2"/>Print / Export PDF</Button>
+            <Button onClick={() => setShowRawMaterialsModal(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CONSUMPTION TRACKING MODAL */}
+      <Dialog open={showConsumptionModal} onOpenChange={setShowConsumptionModal}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Consumption Tracking — {selected?.clientName}</DialogTitle>
+            <DialogDescription>Compare estimated raw materials with actual consumption</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 overflow-y-auto max-h-[60vh]">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border bg-muted/40">
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Material</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Unit</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Estimated</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Actual</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Diff</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rawMaterials.map((rm, idx) => {
+                  const diff = rm.actual_qty - rm.estimated_qty;
+                  return (
+                    <tr key={idx} className="border-b border-border last:border-0">
+                      <td className="px-4 py-2 text-sm font-medium">{rm.material_name}</td>
+                      <td className="px-4 py-2 text-sm text-muted-foreground">{rm.unit}</td>
+                      <td className="px-4 py-2 text-sm">{rm.estimated_qty.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-sm">
+                        <Input 
+                          type="number" 
+                          className="w-24 h-8" 
+                          value={rm.actual_qty} 
+                          onChange={e => {
+                            const val = Number(e.target.value);
+                            setRawMaterials(prev => prev.map((item, i) => i === idx ? { ...item, actual_qty: val } : item));
+                          }}
+                        />
+                      </td>
+                      <td className={`px-4 py-2 text-sm font-bold ${diff > 0 ? 'text-destructive' : diff < 0 ? 'text-success' : 'text-muted-foreground'}`}>
+                        {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConsumptionModal(false)}>Cancel</Button>
+            <Button onClick={handleSaveKitchen} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
+              Save Consumption
             </Button>
           </DialogFooter>
         </DialogContent>
