@@ -151,6 +151,29 @@ const Finance = () => {
     setShowAdd(false); toast({title:"Entry added"});
   };
 
+  const handlePaySupplier = async () => {
+    if (!payAmount || !selectedSupplier) return;
+    setIsSaving(true);
+    try {
+      const amt = Number(payAmount);
+      
+      // Since this is for legacy suppliers (not vendors/Supabase yet)
+      // We update local state
+      setSuppliers(suppliers.map(s => s.id === selectedSupplier.id 
+        ? { ...s, paid: s.paid + amt, balance: Math.max(0, s.balance - amt) } 
+        : s
+      ));
+
+      toast({ title: "Supplier payment recorded" });
+      setShowPaySupplier(false);
+      setPayAmount("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handlePayVendor = async () => {
     if (!vendorPayForm.amount || !selectedVendor) return;
     setIsSaving(true);
