@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Search, Eye, Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Edit, Loader2, Printer, Save, CheckCircle2 } from "lucide-react";
+import { Plus, Search, Eye, Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Edit, Loader2, Printer, Save, CheckCircle2, User, Wallet, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,10 @@ interface Menu { id: number | string; name: string; items: MenuItem[]; }
 interface RawMaterialRequirement { material: string; unit: string; ratio_per_guest: number; }
 interface KitchenItem { id?: string; event_id: number; item_name: string; unit: string; estimated_qty: number; actual_qty: number; is_adjusted: boolean; }
 interface RawMaterial { id?: string; event_id: number; material_name: string; unit: string; estimated_qty: number; actual_qty: number; }
+
+interface Supplier { id: string; name: string; contact: string; category: string; total_owed: number; paid: number; balance: number; }
+interface SupplierPayment { id: string; supplier_id: string; date: string; amount: number; method: string; notes?: string; }
+interface ClientProfile { clientName: string; phone: string; totalPaid: number; remainingBalance: number; bookings: Booking[]; payments: {date: string, amount: number, method: string}[]; }
 
 const INITIAL_MENUS: Menu[] = [
   { 
@@ -76,6 +80,13 @@ const EventBooking = () => {
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const [showRawMaterialsModal, setShowRawMaterialsModal] = useState(false);
   const [showConsumptionModal, setShowConsumptionModal] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [showSupplierPaymentModal, setShowSupplierPaymentModal] = useState(false);
+  const [supplierPaymentForm, setSupplierPaymentForm] = useState({ amount: 0, method: "Cash", date: format(new Date(), "yyyy-MM-dd"), notes: "" });
+  const [selectedClient, setSelectedClient] = useState<ClientProfile | null>(null);
+  const [showClientProfile, setShowClientProfile] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   const fetchMenus = async () => {
@@ -116,8 +127,75 @@ const EventBooking = () => {
     }
   };
 
+  const fetchSuppliers = async () => {
+    try {
+      const { data: sData } = await supabase.from('suppliers').select('*');
+      if (sData) setSuppliers(sData);
+      
+      const { data: pData } = await supabase.from('supplier_payments').select('*').order('date', { ascending: false });
+      if (pData) setSupplierPayments(pData);
+    } catch (err) {
+      console.error("Error fetching suppliers:", err);
+    }
+  };
+
+  const handleSupplierPayment = async () => {
+    if (!selectedSupplier || supplierPaymentForm.amount <= 0) return;
+    setIsSaving(true);
+    try {
+      const payment = {
+        supplier_id: selectedSupplier.id,
+        amount: supplierPaymentForm.amount,
+        method: supplierPaymentForm.method,
+        date: supplierPaymentForm.date,
+        notes: supplierPaymentForm.notes
+      };
+
+      const { error: pErr } = await supabase.from('supplier_payments').insert([payment]);
+      if (pErr) throw pErr;
+
+      const { error: sErr } = await supabase.from('suppliers').update({
+        paid: selectedSupplier.paid + supplierPaymentForm.amount,
+        balance: selectedSupplier.balance - supplierPaymentForm.amount
+      }).eq('id', selectedSupplier.id);
+      if (sErr) throw sErr;
+
+      toast.success("Payment recorded successfully");
+      setShowSupplierPaymentModal(false);
+      fetchSuppliers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to record payment");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const openClientProfile = (clientName: string, phone: string) => {
+    const clientBookings = bookings.filter(b => b.clientName === clientName);
+    const totalPaid = clientBookings.reduce((sum, b) => sum + b.advance, 0);
+    const remainingBalance = clientBookings.reduce((sum, b) => sum + b.balanceRemaining, 0);
+    
+    // Mock client payments for now since we don't have a separate client_payments table yet
+    const clientPayments = clientBookings.map(b => ({
+      date: b.bookingDate,
+      amount: b.advance,
+      method: b.paymentMethod
+    }));
+
+    setSelectedClient({
+      clientName,
+      phone,
+      totalPaid,
+      remainingBalance,
+      bookings: clientBookings,
+      payments: clientPayments
+    });
+    setShowClientProfile(true);
+  };
+
   useEffect(() => {
     fetchMenus();
+    fetchSuppliers();
   }, []);
 
   const handleEditClick = (item: MenuItem, menuId: number | string) => {
@@ -335,6 +413,7 @@ const EventBooking = () => {
           <TabsTrigger value="menu">Menu Management</TabsTrigger>
           <TabsTrigger value="kitchen">Kitchen Sheet</TabsTrigger>
           <TabsTrigger value="thirdparty">Third-Party Sourcing</TabsTrigger>
+          <TabsTrigger value="suppliers">Supplier Ledger</TabsTrigger>
         </TabsList>
 
         <TabsContent value="list">
@@ -349,7 +428,12 @@ const EventBooking = () => {
                 <tbody>
                   {filtered.map(b=>(
                     <tr key={b.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-3 py-3 text-sm font-medium text-card-foreground whitespace-nowrap">{b.clientName}</td>
+                      <td className="px-3 py-3 text-sm font-medium text-card-foreground whitespace-nowrap">
+                        <button onClick={() => openClientProfile(b.clientName, b.phone)} className="hover:text-primary hover:underline transition-colors flex items-center gap-1.5">
+                          <User className="h-3 w-3" />
+                          {b.clientName}
+                        </button>
+                      </td>
                       <td className="px-3 py-3 text-sm text-muted-foreground">{b.eventType}</td>
                       <td className="px-3 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.eventDate}</td>
                       <td className="px-3 py-3 text-sm text-muted-foreground">{b.venue}</td>
@@ -525,6 +609,60 @@ const EventBooking = () => {
                 </tr></tfoot>
               </table>
             </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="suppliers">
+          <div className="space-y-4">
+            {suppliers.map(s => (
+              <div key={s.id} className="rounded-lg border border-border bg-card">
+                <div className="flex items-center justify-between border-b border-border p-4">
+                  <div>
+                    <h3 className="font-semibold text-card-foreground">{s.name}</h3>
+                    <p className="text-xs text-muted-foreground">{s.category} | {s.contact}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Outstanding Balance</p>
+                    <p className="text-lg font-bold text-destructive">₨ {s.balance.toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2"><History className="h-4 w-4"/>Payment History</h4>
+                    <div className="max-h-40 overflow-y-auto space-y-2">
+                      {supplierPayments.filter(p => p.supplier_id === s.id).map(p => (
+                        <div key={p.id} className="flex justify-between text-xs border-b border-border pb-1">
+                          <span className="text-muted-foreground">{p.date}</span>
+                          <span className="font-medium">₨ {p.amount.toLocaleString()} ({p.method})</span>
+                        </div>
+                      ))}
+                      {supplierPayments.filter(p => p.supplier_id === s.id).length === 0 && <p className="text-xs text-muted-foreground">No payment history found.</p>}
+                    </div>
+                  </div>
+                  <div className="flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Owed:</span>
+                        <span className="font-medium">₨ {s.total_owed.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Paid:</span>
+                        <span className="font-medium text-success">₨ {s.paid.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <Button className="mt-4 w-full" onClick={() => { setSelectedSupplier(s); setSupplierPaymentForm({ ...supplierPaymentForm, amount: 0 }); setShowSupplierPaymentModal(true); }}>
+                      <Wallet className="h-4 w-4 mr-2"/>
+                      Add Payment
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {suppliers.length === 0 && (
+              <div className="text-center py-10 border border-dashed border-border rounded-lg">
+                <p className="text-muted-foreground">No suppliers found in the database.</p>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -723,16 +861,156 @@ const EventBooking = () => {
             </table>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConsumptionModal(false)}>Cancel</Button>
-            <Button onClick={handleSaveKitchen} disabled={isSaving}>
-              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
-              Save Consumption
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
+             <Button variant="outline" onClick={() => setShowConsumptionModal(false)}>Cancel</Button>
+             <Button onClick={handleSaveKitchen} disabled={isSaving}>
+               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
+               Save Consumption
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+
+       {/* SUPPLIER PAYMENT MODAL */}
+       <Dialog open={showSupplierPaymentModal} onOpenChange={setShowSupplierPaymentModal}>
+         <DialogContent className="max-w-md">
+           <DialogHeader>
+             <DialogTitle>Add Supplier Payment — {selectedSupplier?.name}</DialogTitle>
+             <DialogDescription>Enter the amount and method of payment for this supplier.</DialogDescription>
+           </DialogHeader>
+           <div className="space-y-4 py-4">
+             <div className="space-y-2">
+               <Label>Amount (₨)</Label>
+               <Input 
+                 type="number" 
+                 placeholder="0" 
+                 value={supplierPaymentForm.amount} 
+                 onChange={e => setSupplierPaymentForm({ ...supplierPaymentForm, amount: Number(e.target.value) })} 
+               />
+             </div>
+             <div className="space-y-2">
+               <Label>Payment Method</Label>
+               <Select value={supplierPaymentForm.method} onValueChange={v => setSupplierPaymentForm({ ...supplierPaymentForm, method: v })}>
+                 <SelectTrigger><SelectValue /></SelectTrigger>
+                 <SelectContent>
+                   {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                 </SelectContent>
+               </Select>
+             </div>
+             <div className="space-y-2">
+               <Label>Date</Label>
+               <Input 
+                 type="date" 
+                 value={supplierPaymentForm.date} 
+                 onChange={e => setSupplierPaymentForm({ ...supplierPaymentForm, date: e.target.value })} 
+               />
+             </div>
+             <div className="space-y-2">
+               <Label>Notes (Optional)</Label>
+               <Input 
+                 placeholder="Add any additional notes..." 
+                 value={supplierPaymentForm.notes} 
+                 onChange={e => setSupplierPaymentForm({ ...supplierPaymentForm, notes: e.target.value })} 
+               />
+             </div>
+           </div>
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setShowSupplierPaymentModal(false)}>Cancel</Button>
+             <Button onClick={handleSupplierPayment} disabled={isSaving}>
+               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+               Save Payment
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+
+       {/* CLIENT PROFILE MODAL */}
+       <Dialog open={showClientProfile} onOpenChange={setShowClientProfile}>
+         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+           <DialogHeader>
+             <DialogTitle className="flex items-center gap-2"><User className="h-5 w-5"/>Client Profile: {selectedClient?.clientName}</DialogTitle>
+             <DialogDescription>Comprehensive booking and payment history for this client.</DialogDescription>
+           </DialogHeader>
+           {selectedClient && (
+             <div className="space-y-6 py-4">
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <div className="rounded-lg border border-border bg-card p-4">
+                   <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Total Paid</p>
+                   <p className="text-xl font-bold text-success">₨ {selectedClient.totalPaid.toLocaleString()}</p>
+                 </div>
+                 <div className="rounded-lg border border-border bg-card p-4">
+                   <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Outstanding Balance</p>
+                   <p className="text-xl font-bold text-destructive">₨ {selectedClient.remainingBalance.toLocaleString()}</p>
+                 </div>
+                 <div className="rounded-lg border border-border bg-card p-4">
+                   <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Total Bookings</p>
+                   <p className="text-xl font-bold">{selectedClient.bookings.length}</p>
+                 </div>
+               </div>
+
+               <div className="space-y-4">
+                 <h4 className="text-sm font-bold flex items-center gap-2 border-b border-border pb-2"><History className="h-4 w-4"/>Booking History</h4>
+                 <div className="overflow-x-auto">
+                   <table className="w-full text-sm">
+                     <thead>
+                       <tr className="border-b border-border bg-muted/40">
+                         <th className="px-3 py-2 text-left font-semibold">Date</th>
+                         <th className="px-3 py-2 text-left font-semibold">Event</th>
+                         <th className="px-3 py-2 text-left font-semibold">Venue</th>
+                         <th className="px-3 py-2 text-left font-semibold">Status</th>
+                         <th className="px-3 py-2 text-right font-semibold">Total</th>
+                       </tr>
+                     </thead>
+                     <tbody>
+                       {selectedClient.bookings.map(b => (
+                         <tr key={b.id} className="border-b border-border last:border-0">
+                           <td className="px-3 py-2">{b.eventDate}</td>
+                           <td className="px-3 py-2">{b.eventType}</td>
+                           <td className="px-3 py-2">{b.venue}</td>
+                           <td className="px-3 py-2">
+                             <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${sc(b.status)}`}>
+                               {b.status}
+                             </span>
+                           </td>
+                           <td className="px-3 py-2 text-right font-medium">₨ {b.totalAmount.toLocaleString()}</td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 </div>
+               </div>
+
+               <div className="space-y-4">
+                 <h4 className="text-sm font-bold flex items-center gap-2 border-b border-border pb-2"><Wallet className="h-4 w-4"/>Payment Summary</h4>
+                 <div className="overflow-x-auto">
+                   <table className="w-full text-sm">
+                     <thead>
+                       <tr className="border-b border-border bg-muted/40">
+                         <th className="px-3 py-2 text-left font-semibold">Date</th>
+                         <th className="px-3 py-2 text-left font-semibold">Amount</th>
+                         <th className="px-3 py-2 text-left font-semibold">Method</th>
+                       </tr>
+                     </thead>
+                     <tbody>
+                       {selectedClient.payments.map((p, idx) => (
+                         <tr key={idx} className="border-b border-border last:border-0">
+                           <td className="px-3 py-2">{p.date}</td>
+                           <td className="px-3 py-2 font-medium text-success">₨ {p.amount.toLocaleString()}</td>
+                           <td className="px-3 py-2">{p.method}</td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 </div>
+               </div>
+             </div>
+           )}
+           <DialogFooter>
+             <Button onClick={() => setShowClientProfile(false)}>Close Profile</Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+     </div>
+   );
+ };
 
 export default EventBooking;
