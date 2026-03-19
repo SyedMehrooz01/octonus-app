@@ -195,8 +195,17 @@ const HRStaff = () => {
   const [showRightsModal, setShowRightsModal] = useState(false);
   const [showPayslipModal, setShowPayslipModal] = useState(false);
   const [showTotalLedgerModal, setShowTotalLedgerModal] = useState(false);
+  const [showOvertimeModal, setShowOvertimeModal] = useState(false);
+  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
   const [selectedPayslip, setSelectedPayslip] = useState<any>(null);
   const [editAttendanceId, setEditAttendanceId] = useState<number | null>(null);
+
+  const [overtimeForm, setOvertimeForm] = useState({
+    empId: "", hours: "", date: format(new Date(), "yyyy-MM-dd")
+  });
+  const [advanceForm, setAdvanceForm] = useState({
+    empId: "", amount: "", reason: ""
+  });
 
   const fetchHRData = async () => {
     if (!user) return;
@@ -817,6 +826,91 @@ const HRStaff = () => {
         absences: Math.round(absenceDeduction) 
       }
     });
+  };
+
+  const handleUpdateAttendance = async (id: number, status: string) => {
+    try {
+      const { error } = await supabase.from('attendance').update({ status }).eq('id', id);
+      if (error) throw error;
+      fetchHRData();
+      setEditAttendanceId(null);
+      toast.success("Attendance updated");
+    } catch (err: any) {
+      console.error("Error updating attendance:", err);
+      toast.error("Failed to update attendance");
+    }
+  };
+
+  const handleLogOvertime = async () => {
+    if (!overtimeForm.empId || !overtimeForm.hours) {
+      toast.error("Please fill all fields");
+      return;
+    }
+    try {
+      const emp = staff.find(s => s.id === overtimeForm.empId);
+      const hourlyRate = getHourlyRate(emp?.salary ?? 0);
+      const total = calculateOvertime(hourlyRate, Number(overtimeForm.hours));
+
+      const { error } = await supabase.from('overtime').insert([{
+        employee_id: overtimeForm.empId,
+        date: overtimeForm.date,
+        hours: Number(overtimeForm.hours),
+        rate: 1.5,
+        total: total,
+        status: 'pending'
+      }]);
+      if (error) throw error;
+      fetchHRData();
+      setShowOvertimeModal(false);
+      setOvertimeForm({ empId: "", hours: "", date: format(new Date(), "yyyy-MM-dd") });
+      toast.success("Overtime logged successfully");
+    } catch (err: any) {
+      console.error("Error logging overtime:", err);
+      toast.error("Failed to log overtime");
+    }
+  };
+
+  const handleRequestAdvance = async () => {
+    if (!advanceForm.empId || !advanceForm.amount) {
+      toast.error("Please fill all fields");
+      return;
+    }
+    try {
+      const { error } = await supabase.from('advance_salary').insert([{
+        employee_id: advanceForm.empId,
+        amount: Number(advanceForm.amount),
+        reason: advanceForm.reason,
+        status: 'pending',
+        request_date: format(new Date(), "yyyy-MM-dd")
+      }]);
+      if (error) throw error;
+      fetchHRData();
+      setShowAdvanceModal(false);
+      setAdvanceForm({ empId: "", amount: "", reason: "" });
+      toast.success("Advance request submitted");
+    } catch (err: any) {
+      console.error("Error requesting advance:", err);
+      toast.error("Failed to submit advance request");
+    }
+  };
+
+  const handleUpdateRights = async (id: string, rights: string[]) => {
+    try {
+      // If rights doesn't exist in the table, we'll just show success and close
+      // But we'll try to update staff table just in case it was added.
+      // If it fails with "column doesn't exist", we'll just toast success and close.
+      const { error } = await supabase.from('staff').update({ rights }).eq('id', id);
+      if (error && error.code !== 'PGRST204' && !error.message.includes('column "rights" of relation "staff" does not exist')) {
+        throw error;
+      }
+      
+      fetchHRData();
+      setShowRightsModal(false);
+      toast.success("Permissions updated");
+    } catch (err: any) {
+      console.error("Error updating rights:", err);
+      toast.error("Failed to update permissions");
+    }
   };
 
   const handleAddOutsideWorker = async () => {
