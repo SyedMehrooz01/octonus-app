@@ -2,8 +2,9 @@ import { useState, useRef, useMemo } from "react";
 import { 
   Users, Plus, Search, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, 
   DollarSign, Camera, FileText, Calendar, Phone, Mail, MapPin, 
-  UserPlus, Download, Star, StarOff, Bell, ShieldCheck, ChevronRight, BarChart3, PieChart as PieChartIcon, Receipt
-, TrendingDown, LayoutDashboard, CalendarDays, Landmark, Package, Settings, LogOut
+  UserPlus, Download, Star, StarOff, Bell, ShieldCheck, ChevronRight, BarChart3, PieChart as PieChartIcon, Receipt,
+  TrendingDown, LayoutDashboard, CalendarDays, Landmark, Package, Settings, LogOut,
+  LayoutGrid, List, Printer
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,14 +97,17 @@ const statusColor = (status: string) => {
 const HRStaff = () => {
   const [staff, setStaff] = useState(DUMMY_STAFF);
   const [attendance, setAttendance] = useState(DUMMY_ATTENDANCE);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [attendanceChecked, setAttendanceChecked] = useState(false);
   const [leaves, setLeaves] = useState(DUMMY_LEAVES);
+  const [markedAllPresent, setMarkedAllPresent] = useState(false);
   const [announcements, setAnnouncements] = useState(DUMMY_ANNOUNCEMENTS);
   const [search, setSearch] = useState("");
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
-  const [selectedStaff, setSelectedStaff] = useState<any>(null);
-  const [showViewModal, setShowViewModal] = useState(false);
   const [showAnnounceModal, setShowAnnounceModal] = useState(false);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [showBulkAttendanceModal, setShowBulkAttendanceModal] = useState(false);
@@ -129,8 +133,12 @@ const HRStaff = () => {
   const [newAnnouncement, setNewAnnouncement] = useState({ title: "", content: "" });
 
   const [attendanceForm, setAttendanceForm] = useState({
-    empId: "", status: "present", date: format(new Date(), "yyyy-MM-dd"), checkIn: "09:00", checkOut: "18:00"
+    empId: "", status: "present", date: format(new Date(), "yyyy-MM-dd"), checkIn: "09:00", checkOut: "18:00", lateMinutes: 0
   });
+
+  const [bulkStatus, setBulkStatus] = useState("present");
+
+  const [printRef, setPrintRef] = useState<any>(null);
 
   const [payrollForm, setPayrollForm] = useState({
     empId: "", month: format(new Date(), "MMMM yyyy"), basicSalary: 0, 
@@ -220,26 +228,126 @@ const HRStaff = () => {
     const newRecord = {
       id: attendance.length + 1,
       name: emp.name,
-      ...attendanceForm
+      ...attendanceForm,
+      lateMinutes: attendanceForm.status === "late" ? attendanceForm.lateMinutes : 0,
+      isAuto: false
     };
-    setAttendance([newRecord, ...attendance]);
+    
+    // Check if attendance already exists for this employee on this date
+    const existingIndex = attendance.findIndex(a => a.empId === attendanceForm.empId && a.date === attendanceForm.date);
+    
+    if (existingIndex !== -1) {
+      // Override
+      const newAttendance = [...attendance];
+      newAttendance[existingIndex] = { ...newRecord, id: attendance[existingIndex].id };
+      setAttendance(newAttendance);
+      toast.success("Attendance updated (override)");
+    } else {
+      setAttendance([newRecord, ...attendance]);
+      toast.success("Attendance marked");
+    }
+    
     setShowAttendanceModal(false);
-    toast.success("Attendance marked");
   };
 
-  const handleBulkAttendance = (status: string) => {
-    const newRecords = staff.map((s, index) => ({
-      id: attendance.length + index + 1,
-      empId: s.id,
-      name: s.name,
-      status: status,
-      date: format(new Date(), "yyyy-MM-dd"),
-      checkIn: "09:00",
-      checkOut: "18:00"
-    }));
+  const handleMarkAllPresent = () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const markedIds = new Set(attendance.filter(a => a.date === today).map(a => a.empId));
+    
+    const newRecords = staff
+      .filter(s => !markedIds.has(s.id))
+      .map((s, index) => ({
+        id: attendance.length + index + 1,
+        empId: s.id,
+        name: s.name,
+        status: "present",
+        date: today,
+        checkIn: "09:00",
+        checkOut: "18:00",
+        lateMinutes: 0,
+        isAuto: false
+      }));
+
+    if (newRecords.length === 0) {
+      toast.info("All staff members already have attendance marked for today");
+      return;
+    }
+
     setAttendance([...newRecords, ...attendance]);
+    setMarkedAllPresent(true);
+    toast.success(`Marked ${newRecords.length} staff members as Present`);
+  };
+
+  const handleAutoAbsent = () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const markedIds = new Set(attendance.filter(a => a.date === today).map(a => a.empId));
+    
+    const absentees = staff
+      .filter(s => !markedIds.has(s.id))
+      .map((s, index) => ({
+        id: attendance.length + index + 1,
+        empId: s.id,
+        name: s.name,
+        status: "absent",
+        date: today,
+        checkIn: "-",
+        checkOut: "-",
+        lateMinutes: 0,
+        isAuto: true
+      }));
+
+    if (absentees.length > 0) {
+      setAttendance([...absentees, ...attendance]);
+      toast.info(`Auto-marked ${absentees.length} missing staff as Absent`);
+    }
+    setAttendanceChecked(true);
+  };
+
+  useEffect(() => {
+    // Auto Attendance Logic: Mark absent at end of day or if triggered
+    // In this app, we trigger it if attendance isn't marked by "midnight" (simulated by checking if it's a new day)
+    const today = format(new Date(), "yyyy-MM-dd");
+    const lastCheckedDate = localStorage.getItem('last_attendance_check');
+    
+    if (lastCheckedDate !== today) {
+      // It's a new day, we should check yesterday's attendance and mark absent if missing
+      // For simplicity in this demo, we'll just provide a way to trigger it or do it for "today" if requested
+      // but the requirement says "automatically mark all employees as Absent if attendance not marked"
+      // We'll simulate this by checking if any attendance exists for today. If not, and it's late in the day...
+      
+      const hour = new Date().getHours();
+      if (hour >= 23 || hour < 1) { // Near midnight
+        handleAutoAbsent();
+        localStorage.setItem('last_attendance_check', today);
+      }
+    }
+  }, [attendance, staff]);
+
+  const handleBulkAttendance = () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const markedIds = new Set(attendance.filter(a => a.date === today).map(a => a.empId));
+    
+    const newRecords = staff
+      .filter(s => !markedIds.has(s.id))
+      .map((s, index) => ({
+        id: attendance.length + index + 1,
+        empId: s.id,
+        name: s.name,
+        status: bulkStatus,
+        date: today,
+        checkIn: bulkStatus === "present" ? "09:00" : "-",
+        checkOut: bulkStatus === "present" ? "18:00" : "-",
+        lateMinutes: 0,
+        isAuto: false
+      }));
+
+    if (newRecords.length > 0) {
+      setAttendance([...newRecords, ...attendance]);
+      toast.success(`Bulk marked ${newRecords.length} staff members as ${bulkStatus}`);
+    } else {
+      toast.info("All staff members already have attendance marked for today");
+    }
     setShowBulkAttendanceModal(false);
-    toast.success(`Bulk attendance marked as ${status}`);
   };
 
   const handleRequestLeave = () => {
@@ -479,6 +587,67 @@ const HRStaff = () => {
     toast.success("Total payroll ledger exported to Excel");
   };
 
+  const handlePrintCard = (staff: any) => {
+    const printWindow = window.open('', '_blank', 'width=600,height=400');
+    if (!printWindow) return;
+
+    const initials = staff.name.split(' ').map((n:any) => n[0]).join('').toUpperCase();
+    const html = `
+      <html>
+        <head>
+          <title>ID Card - ${staff.name}</title>
+          <style>
+            body { font-family: 'Inter', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f0; }
+            .card { width: 350px; height: 220px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; display: flex; border: 1px solid #e2e8f0; }
+            .left { width: 120px; background: #4f46e5; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; padding: 10px; }
+            .avatar { width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; border: 2px solid white; margin-bottom: 10px; }
+            .right { flex: 1; padding: 15px; display: flex; flex-direction: column; justify-content: center; }
+            .name { font-size: 18px; font-weight: 800; color: #1e293b; margin: 0; margin-bottom: 2px; }
+            .role { font-size: 12px; color: #64748b; font-weight: 600; margin: 0; margin-bottom: 15px; }
+            .field { margin-bottom: 8px; }
+            .label { font-size: 8px; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.05em; margin: 0; }
+            .value { font-size: 11px; color: #334155; font-weight: 600; margin: 0; }
+            .emp-id { font-family: monospace; font-size: 10px; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; margin-top: 5px; }
+            @media print { body { background: white; } .card { box-shadow: none; border: 1px solid #ddd; } }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="left">
+              <div class="avatar">${initials}</div>
+              <div class="emp-id">${staff.id}</div>
+            </div>
+            <div class="right">
+              <h1 class="name">${staff.name}</h1>
+              <p class="role">${staff.role}</p>
+              
+              <div class="field">
+                <p class="label">Department</p>
+                <p class="value">${staff.department}</p>
+              </div>
+              <div class="field">
+                <p class="label">Email</p>
+                <p class="value">${staff.email}</p>
+              </div>
+              <div class="field">
+                <p class="label">Joining Date</p>
+                <p class="value">${staff.joinDate}</p>
+              </div>
+            </div>
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            }
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   const handleExportTotalLedgerPDF = () => {
     const doc = new jsPDF('l', 'mm', 'a4');
     
@@ -605,80 +774,164 @@ const HRStaff = () => {
 
         {/* Staff Profiles */}
         <TabsContent value="profiles" className="mt-4 space-y-4">
-          <div className="rounded-lg border border-border bg-card">
-            <div className="p-4">
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input 
-                  placeholder="Search by ID, Name..." 
-                  className="pl-9 h-9 w-full" 
-                  value={search} 
-                  onChange={e => setSearch(e.target.value)} 
-                />
-              </div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+              <Button 
+                variant={viewMode === "list" ? "secondary" : "ghost"} 
+                size="sm" 
+                onClick={() => setViewMode("list")}
+                className="h-8 gap-2"
+              >
+                <List className="h-4 w-4" /> List
+              </Button>
+              <Button 
+                variant={viewMode === "grid" ? "secondary" : "ghost"} 
+                size="sm" 
+                onClick={() => setViewMode("grid")}
+                className="h-8 gap-2"
+              >
+                <LayoutGrid className="h-4 w-4" /> Cards
+              </Button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[1000px]">
-                <thead>
-                  <tr className="border-y border-border bg-muted/40">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Staff ID</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Employee</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contact</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Role & Dept</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredStaff.map(s => (
-                    <tr key={s.id} className="hover:bg-muted/30 transition-colors group">
-                      <td className="px-4 py-4 text-sm font-mono font-medium text-primary">{s.id}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-bold text-xs">
-                            {s.name.split(" ").map((n:any) => n[0]).join("").toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-foreground truncate">{s.name}</p>
-                            <p className="text-[11px] text-muted-foreground truncate">{s.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-muted-foreground">{s.phone}</td>
-                      <td className="px-4 py-4">
-                        <p className="text-sm font-medium text-card-foreground">{s.role}</p>
-                        <p className="text-[11px] text-muted-foreground">{s.department}</p>
-                      </td>
-                      <td className="px-4 py-4">
-                        <Badge variant="outline" className={`capitalize font-medium ${statusColor(s.status)}`}>
-                          {s.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStaff(s); setShowViewModal(true); }}>
-                            <Eye className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditStaff(s); setShowEditModal(true); }}>
-                            <Edit className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setLedgerStaff(s); setShowLedgerModal(true); }}>
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setRightsStaff(s); setShowRightsModal(true); }}>
-                            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => setShowDeleteConfirm(s.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input 
+                placeholder="Search by ID, Name..." 
+                className="pl-9 h-9 w-full" 
+                value={search} 
+                onChange={e => setSearch(e.target.value)} 
+              />
             </div>
           </div>
+
+          {viewMode === "list" ? (
+            <div className="rounded-lg border border-border bg-card">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse min-w-[1000px]">
+                  <thead>
+                    <tr className="border-y border-border bg-muted/40">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Staff ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Employee</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contact</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Role & Dept</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredStaff.map(s => (
+                      <tr key={s.id} className="hover:bg-muted/30 transition-colors group">
+                        <td className="px-4 py-4 text-sm font-mono font-medium text-primary">{s.id}</td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-bold text-xs">
+                              {s.name.split(" ").map((n:any) => n[0]).join("").toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-foreground truncate">{s.name}</p>
+                              <p className="text-[11px] text-muted-foreground truncate">{s.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-muted-foreground">{s.phone}</td>
+                        <td className="px-4 py-4">
+                          <p className="text-sm font-medium text-card-foreground">{s.role}</p>
+                          <p className="text-[11px] text-muted-foreground">{s.department}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <Badge variant="outline" className={`capitalize font-medium ${statusColor(s.status)}`}>
+                            {s.status}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStaff(s); setShowViewModal(true); }}>
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handlePrintCard(s)}>
+                              <Printer className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditStaff(s); setShowEditModal(true); }}>
+                              <Edit className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setLedgerStaff(s); setShowLedgerModal(true); }}>
+                              <FileText className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setRightsStaff(s); setShowRightsModal(true); }}>
+                              <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => setShowDeleteConfirm(s.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredStaff.map(s => (
+                <div key={s.id} className="relative group overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-xl font-black text-primary border-2 border-primary/20">
+                        {s.name.split(' ').map((n:any) => n[0]).join('').toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 className="text-base font-bold text-card-foreground leading-tight">{s.name}</h4>
+                        <p className="text-xs text-muted-foreground font-medium">{s.role}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star key={i} className={`h-3 w-3 ${i < (s.performance?.[s.performance.length-1] || 4) ? "text-amber-400 fill-amber-400" : "text-muted"}`} />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase border ${
+                      s.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+                    }`}>
+                      {s.status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 border-t border-border pt-4 text-[11px]">
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Staff ID</p>
+                      <p className="font-bold">{s.id}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Department</p>
+                      <p className="font-bold">{s.department}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Monthly Salary</p>
+                      <p className="font-bold text-success">₨ {s.salary.toLocaleString()}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Joining Date</p>
+                      <p className="font-bold">{s.joinDate}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Monthly Attendance</span>
+                      <span className="text-sm font-black text-primary">{s.attendance}%</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => { setSelectedStaff(s); setShowViewModal(true); }}><Eye className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="sm" className="h-8 gap-2 px-3 text-[10px] font-bold uppercase tracking-wider" onClick={() => handlePrintCard(s)}>
+                        <Printer className="h-3 w-3" /> ID Card
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         {/* Attendance Management */}
@@ -688,13 +941,18 @@ const HRStaff = () => {
               <Button onClick={() => setShowAttendanceModal(true)} className="gap-2 flex-1 sm:flex-none">
                 <CheckCircle className="h-4 w-4" /> Mark Attendance
               </Button>
-              <Button onClick={() => setShowBulkAttendanceModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none">
-                <Users className="h-4 w-4" /> Bulk Mark
+              <Button onClick={handleMarkAllPresent} variant="outline" className="gap-2 flex-1 sm:flex-none">
+                <Users className="h-4 w-4" /> Mark All Present
               </Button>
             </div>
-            <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={handleExportAttendance}>
-              <Download className="h-4 w-4" /> Export Report
-            </Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={handleAutoAbsent}>
+                <Clock className="h-4 w-4" /> Run Auto Absent
+              </Button>
+              <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={handleExportAttendance}>
+                <Download className="h-4 w-4" /> Export Report
+              </Button>
+            </div>
           </div>
 
           <div className="rounded-lg border border-border bg-card">
@@ -997,12 +1255,24 @@ const HRStaff = () => {
             <DialogTitle>Bulk Mark Attendance</DialogTitle>
             <DialogDescription>Mark all staff members with a single status for today.</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 py-4">
-            {['Present', 'Absent', 'Late', 'Half-day'].map(s => (
-              <Button key={s} variant="outline" className="h-12 font-bold" onClick={() => handleBulkAttendance(s.toLowerCase())}>
-                {s}
-              </Button>
-            ))}
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <Label>Select Status</Label>
+              <Select value={bulkStatus} onValueChange={setBulkStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="present">Present</SelectItem>
+                  <SelectItem value="absent">Absent</SelectItem>
+                  <SelectItem value="late">Late</SelectItem>
+                  <SelectItem value="half-day">Half Day</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full h-12 font-bold" onClick={handleBulkAttendance}>
+              Mark All as {bulkStatus.charAt(0).toUpperCase() + bulkStatus.slice(1)}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

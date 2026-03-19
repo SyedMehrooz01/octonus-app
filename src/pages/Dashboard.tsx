@@ -5,6 +5,8 @@ import { format, startOfMonth, endOfMonth, startOfToday, endOfToday, addDays, su
 import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -17,6 +19,7 @@ const Dashboard = () => {
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [attendanceMissing, setAttendanceMissing] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,6 +28,7 @@ const Dashboard = () => {
       try {
         const today = startOfToday().toISOString();
         const endOfTodayStr = endOfToday().toISOString();
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
         const monthStart = startOfMonth(new Date()).toISOString();
         const monthEnd = endOfMonth(new Date()).toISOString();
         const nextWeek = addDays(new Date(), 7).toISOString();
@@ -41,6 +45,14 @@ const Dashboard = () => {
           .from('employees')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'active');
+
+        // 3. Check if attendance marked for today
+        const { count: attendanceCount } = await supabase
+          .from('attendance')
+          .select('*', { count: 'exact', head: true })
+          .eq('date', todayStr);
+        
+        setAttendanceMissing(!attendanceCount || attendanceCount === 0);
 
         // 3. Fetch Month Revenue
         const { data: monthlyPayments } = await supabase
@@ -176,9 +188,16 @@ const Dashboard = () => {
     <div className="space-y-6 pb-10">
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Welcome Back, Admin</h2>
-          <p className="text-sm text-muted-foreground">Here's what's happening with your business today.</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">Welcome Back, Admin</h2>
+            <p className="text-sm text-muted-foreground">Here's what's happening with your business today.</p>
+          </div>
+          {attendanceMissing && (
+            <Badge variant="destructive" className="animate-pulse flex items-center gap-1 py-1 px-3">
+              <Clock className="h-3 w-3" /> Attendance Not Marked
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full border border-border">
           <CalendarDays className="h-3.5 w-3.5" />
