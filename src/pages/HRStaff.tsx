@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { 
   Users, Plus, Search, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, 
   DollarSign, Camera, FileText, Calendar, Phone, Mail, MapPin, 
