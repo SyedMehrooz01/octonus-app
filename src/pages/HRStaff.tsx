@@ -248,6 +248,22 @@ const HRStaff = () => {
         empId: o.employee_id,
         name: (o as any).staff?.name
       })));
+
+      const { data: announcementsData } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
+      if (announcementsData) setAnnouncements(announcementsData);
+
+      const { data: outsideWorkersData } = await supabase.from('outside_workers').select('*').order('name');
+      if (outsideWorkersData) setOutsideWorkers(outsideWorkersData);
+
+      // Fetch performance data and map to staff
+      const { data: performanceData } = await supabase.from('performance').select('*');
+      if (performanceData && staffData) {
+        setStaff(prevStaff => prevStaff.map(s => ({
+          ...s,
+          performance: performanceData.filter(p => p.staff_id === s.id).map(p => p.rating),
+          performanceNotes: performanceData.filter(p => p.staff_id === s.id).map(p => ({ note: p.notes, date: p.created_at }))
+        })));
+      }
     } catch (err) {
       console.error("Error fetching HR data:", err);
       toast.error("Failed to load HR data");
@@ -950,8 +966,8 @@ const HRStaff = () => {
     
     let runningBalance = 0;
     (ledgerStaff.payrollHistory || []).forEach((h: any) => {
-      runningBalance += h.netPay;
-      content += `${h.date} | ${h.month} | Rs ${h.netPay.toLocaleString()} | Rs ${runningBalance.toLocaleString()}\n`;
+      runningBalance += (h.netPay || 0);
+      content += `${h.date} | ${h.month} | Rs ${(h.netPay || 0).toLocaleString()} | Rs ${(runningBalance || 0).toLocaleString()}\n`;
     });
 
     const blob = new Blob([content], { type: 'text/plain' });
@@ -1315,7 +1331,7 @@ const HRStaff = () => {
       startY: 40,
       head: [['ID', 'Name', 'Dept', 'Basic', 'Bonus', 'Allow.', 'Deduct.', 'Net Pay', 'Status', 'Date']],
       body: tableData,
-      foot: [['', '', '', '', '', '', 'GRAND TOTAL', `Rs ${grandTotal.toLocaleString()}`, '', '']],
+      foot: [['', '', '', '', '', '', 'GRAND TOTAL', `Rs ${(grandTotal || 0).toLocaleString()}`, '', '']],
       theme: 'striped',
       headStyles: { fillColor: [79, 70, 229] },
       footStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold' },
@@ -3111,10 +3127,10 @@ const HRStaff = () => {
               {[
                 { 
                   label: "Total Paid (Month)", 
-                  value: `₨ ${staff.reduce((acc, s) => {
+                  value: `₨ ${(staff.reduce((acc, s) => {
                     const latestPayroll = s.payrollHistory?.find(h => h.month === format(new Date(), 'MMMM yyyy'));
                     return acc + ((latestPayroll?.status === 'paid' ? latestPayroll.netPay : 0) || 0);
-                  }, 0).toLocaleString()}`,
+                  }, 0) || 0).toLocaleString()}`,
                   icon: DollarSign,
                   color: "text-success",
                   bg: "bg-success/10"
@@ -3135,14 +3151,14 @@ const HRStaff = () => {
                 },
                 { 
                   label: "Total Advances", 
-                  value: `₨ ${staff.reduce((acc, s) => acc + ((s.payrollHistory?.reduce((sum, h) => sum + (h.deductions.loans || 0), 0) || 0)), 0).toLocaleString()}`,
+                  value: `₨ ${(staff.reduce((acc, s) => acc + ((s.payrollHistory?.reduce((sum, h) => sum + (h.deductions.loans || 0), 0) || 0)), 0) || 0).toLocaleString()}`,
                   icon: Receipt,
                   color: "text-destructive",
                   bg: "bg-destructive/10"
                 },
                 { 
                   label: "Total Deductions", 
-                  value: `₨ ${staff.reduce((acc, s) => acc + ((s.payrollHistory?.reduce((sum, h) => sum + ((h.deductions.tax || 0) + (h.deductions.absences || 0)), 0) || 0)), 0).toLocaleString()}`,
+                  value: `₨ ${(staff.reduce((acc, s) => acc + ((s.payrollHistory?.reduce((sum, h) => sum + ((h.deductions.tax || 0) + (h.deductions.absences || 0)), 0) || 0)), 0) || 0).toLocaleString()}`,
                   icon: TrendingDown,
                   color: "text-destructive",
                   bg: "bg-destructive/10"
