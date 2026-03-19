@@ -493,16 +493,37 @@ const HRStaff = () => {
   const handleAutoAbsent = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
     try {
-      const records = (staff ?? []).map(s => ({
-        employee_id: s.id,
-        date: today,
-        status: 'absent'
-      }));
-      const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id,date' });
+      // Find staff who don't have attendance for today
+      const { data: todayAttendance } = await supabase
+        .from('attendance')
+        .select('employee_id')
+        .eq('date', today);
+      
+      const markedEmpIds = new Set((todayAttendance ?? []).map(a => a.employee_id));
+      const absentRecords = (staff ?? [])
+        .filter(s => s?.id && !markedEmpIds.has(s.id) && s.status === 'active')
+        .map(s => ({
+          employee_id: s.id,
+          date: today,
+          status: 'absent',
+          check_in: null,
+          check_out: null
+        }));
+
+      if (absentRecords.length === 0) {
+        toast.info("No missing attendance records found for today");
+        return;
+      }
+
+      const { error } = await supabase.from('attendance').insert(absentRecords);
       if (error) throw error;
-      fetchHRData();
-    } catch (err) {
-      // Auto absent fail
+      
+      await fetchHRData();
+      toast.success(`Automatically marked ${absentRecords.length} staff as absent`);
+      logAction(`Auto-marked ${absentRecords.length} staff as absent for ${today}`, "HR & Staff");
+    } catch (err: any) {
+      console.error("Auto absent error:", err);
+      toast.error(err?.message || "Failed to run auto-absent");
     }
   };
 
