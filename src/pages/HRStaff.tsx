@@ -19,8 +19,17 @@ import { format, subMonths, startOfMonth as dateFnsStartOfMonth } from "date-fns
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { numberToWords } from "@/lib/numberToWords";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { 
+  calculateTax, 
+  calculateEOBI, 
+  calculatePESSI, 
+  calculateOvertime, 
+  getHourlyRate, 
+  calculateNetSalary 
+} from "@/lib/salaryUtils";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -52,7 +61,9 @@ const DUMMY_STAFF = [
     attendance: 96,
     avatar: null,
     performance: [4, 5, 4, 5], // Monthly ratings
-    leaveBalance: { annual: 15, sick: 10, casual: 10 }
+    leaveBalance: { annual: 14, sick: 8, casual: 7, maternity: 12, paternity: 5, hajj: 1 },
+    advances: [{ amount: 5000, date: "2024-02-15", status: "paid" }],
+    overtime: [{ hours: 5, date: "2024-03-10", rate: 1.5 }]
   },
   { 
     id: "EMP-002", 
@@ -69,8 +80,18 @@ const DUMMY_STAFF = [
     attendance: 92,
     avatar: null,
     performance: [5, 5, 5],
-    leaveBalance: { annual: 12, sick: 8, casual: 7 }
+    leaveBalance: { annual: 14, sick: 10, casual: 10, maternity: 12, paternity: 5, hajj: 0 },
+    advances: [],
+    overtime: []
   },
+];
+
+const DUMMY_ADVANCES = [
+  { id: 1, empId: "EMP-001", name: "Ahmed Raza", amount: 5000, date: "2024-03-01", reason: "Urgent family need", status: "approved" },
+];
+
+const DUMMY_OVERTIME = [
+  { id: 1, empId: "EMP-001", name: "Ahmed Raza", hours: 5, date: "2024-03-10", rate: 1.5, status: "paid" },
 ];
 
 const DUMMY_ATTENDANCE = [
@@ -143,11 +164,11 @@ const statusColor = (status: string) => {
 
 const HRStaff = () => {
   const { user, canDo, logAction } = useAuth();
-  const [staff, setStaff] = useState(DUMMY_STAFF);
-  const [attendance, setAttendance] = useState(DUMMY_ATTENDANCE);
+  const [staff, setStaff] = useState<any[]>([]);
+  const [attendance, setAttendance] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [attendanceChecked, setAttendanceChecked] = useState(false);
-  const [leaves, setLeaves] = useState(DUMMY_LEAVES);
+  const [leaves, setLeaves] = useState<any[]>([]);
   const [markedAllPresent, setMarkedAllPresent] = useState(false);
   const [announcements, setAnnouncements] = useState(DUMMY_ANNOUNCEMENTS);
   const [search, setSearch] = useState("");
@@ -168,6 +189,77 @@ const HRStaff = () => {
   const [showTotalLedgerModal, setShowTotalLedgerModal] = useState(false);
   const [selectedPayslip, setSelectedPayslip] = useState<any>(null);
   const [editAttendanceId, setEditAttendanceId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Pakistani HRMS Features State
+  const [advances, setAdvances] = useState<any[]>([]);
+  const [overtime, setOvertime] = useState<any[]>([]);
+  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
+  const [showOvertimeModal, setShowOvertimeModal] = useState(false);
+  const [advanceForm, setAdvanceForm] = useState({ empId: "", amount: "", reason: "" });
+  const [overtimeForm, setOvertimeForm] = useState({ empId: "", hours: "", date: format(new Date(), "yyyy-MM-dd") });
+
+  const fetchHRData = async () => {
+    setLoading(true);
+    try {
+      const { data: staffData } = await supabase.from('employees').select('*').order('name');
+      
+      const { data: payrollData } = await supabase.from('payroll_history').select('*').order('month', { ascending: false });
+
+      if (staffData) setStaff(staffData.map(s => ({
+        ...s,
+        leaveBalance: s.leave_balance,
+        payrollHistory: payrollData?.filter(p => p.employee_id === s.id).map(p => ({
+          ...p,
+          netPay: p.net_salary // Map for compatibility
+        })) || []
+      })));
+
+      const { data: attendanceData } = await supabase.from('attendance').select('*, employees(name)').order('date', { ascending: false });
+      if (attendanceData) setAttendance(attendanceData.map(a => ({
+        ...a,
+        empId: a.employee_id,
+        name: (a as any).employees?.name,
+        lateMinutes: a.late_minutes,
+        isAuto: a.is_auto,
+        checkIn: a.check_in,
+        checkOut: a.check_out
+      })));
+
+      const { data: leavesData } = await supabase.from('leave_requests').select('*, employees(name)').order('created_at', { ascending: false });
+      if (leavesData) setLeaves(leavesData.map(l => ({
+        ...l,
+        empId: l.employee_id,
+        name: (l as any).employees?.name,
+        start: l.start_date,
+        end: l.end_date
+      })));
+
+      const { data: advanceData } = await supabase.from('advance_salary').select('*, employees(name)').order('created_at', { ascending: false });
+      if (advanceData) setAdvances(advanceData.map(a => ({
+        ...a,
+        empId: a.employee_id,
+        name: (a as any).employees?.name,
+        date: a.request_date
+      })));
+
+      const { data: overtimeData } = await supabase.from('overtime').select('*, employees(name)').order('created_at', { ascending: false });
+      if (overtimeData) setOvertime(overtimeData.map(o => ({
+        ...o,
+        empId: o.employee_id,
+        name: (o as any).employees?.name
+      })));
+    } catch (err) {
+      console.error("Error fetching HR data:", err);
+      toast.error("Failed to load HR data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHRData();
+  }, []);
 
   // Outside Workers State
   const [outsideWorkers, setOutsideWorkers] = useState(DUMMY_OUTSIDE_WORKERS);
@@ -210,9 +302,9 @@ const HRStaff = () => {
 
   const [payrollForm, setPayrollForm] = useState({
     empId: "", month: format(new Date(), "MMMM yyyy"), basicSalary: 0, 
-    deductions: { tax: 0, loans: 0, absences: 0 },
-    bonuses: 0,
-    allowances: { transport: 0, meal: 0, housing: 0 }
+    deductions: { tax: 0, loans: 0, absences: 0, eobi: 0, pessi: 0, late: 0 },
+    allowances: { houseRent: 0, medical: 0, conveyance: 0, special: 0 },
+    overtime: { hours: 0, pay: 0 }
   });
 
   const [leaveForm, setLeaveForm] = useState({
@@ -228,51 +320,75 @@ const HRStaff = () => {
 
   const generateEmpId = () => `EMP-${String(staff.length + 1).padStart(3, '0')}`;
 
-  const handleAddStaff = () => {
+  const handleAddStaff = async () => {
     if (!newStaff.name || !newStaff.role || !newStaff.email) {
       toast.error("Please fill all required fields");
       return;
     }
+    const id = generateEmpId();
     const emp = {
-      ...newStaff,
-      id: generateEmpId(),
+      id,
+      name: newStaff.name,
+      role: newStaff.role,
+      department: newStaff.department,
       salary: Number(newStaff.salary),
-      attendance: 100,
-      performance: [],
-      leaveBalance: { annual: 15, sick: 10, casual: 10 },
-      statusHistory: [{ status: "active", date: format(new Date(), "yyyy-MM-dd") }],
-      payrollHistory: [],
-      rights: ["dashboard", "events", "inventory", "expenses"] // Default rights
+      phone: newStaff.phone,
+      email: newStaff.email,
+      address: newStaff.address,
+      emergency_contact: newStaff.emergencyContact,
+      status: newStaff.status,
+      join_date: newStaff.joinDate,
+      leave_balance: { annual: 14, sick: 10, casual: 10, maternity: 12, paternity: 5, hajj: 1 }
     };
-    setStaff([...staff, emp]);
-    setNewStaff({ 
-      name: "", role: "", department: "", salary: "", phone: "", email: "", 
-      address: "", emergencyContact: "", status: "active", joinDate: format(new Date(), "yyyy-MM-dd") 
-    });
-    setShowAddModal(false);
-    logAction(`Added new staff member: ${emp.name}`, "HR & Staff");
-    toast.success("Staff member added successfully");
+    
+    try {
+      const { error } = await supabase.from('employees').insert([emp]);
+      if (error) throw error;
+      
+      fetchHRData();
+      setNewStaff({ 
+        name: "", role: "", department: "", salary: "", phone: "", email: "", 
+        address: "", emergencyContact: "", status: "active", joinDate: format(new Date(), "yyyy-MM-dd") 
+      });
+      setShowAddModal(false);
+      logAction(`Added new staff member: ${emp.name}`, "HR & Staff");
+      toast.success("Staff member added successfully");
+    } catch (err: any) {
+      console.error("Error adding staff:", err);
+      toast.error(err.message || "Failed to add staff member");
+    }
   };
 
-  const handleUpdateStaff = () => {
+  const handleUpdateStaff = async () => {
     if (!editStaff.name || !editStaff.role || !editStaff.email) {
       toast.error("Please fill all required fields");
       return;
     }
-    const updatedStaff = staff.map(s => {
-      if (s.id === editStaff.id) {
-        const statusChanged = s.status !== editStaff.status;
-        const statusHistory = statusChanged 
-          ? [...(s.statusHistory || []), { status: editStaff.status, date: format(new Date(), "yyyy-MM-dd") }]
-          : (s.statusHistory || []);
-        return { ...editStaff, statusHistory };
-      }
-      return s;
-    });
-    setStaff(updatedStaff);
-    setShowEditModal(false);
-    logAction(`Updated staff member: ${editStaff.name}`, "HR & Staff");
-    toast.success("Staff member updated successfully");
+    
+    try {
+      const { error } = await supabase.from('employees').update({
+        name: editStaff.name,
+        role: editStaff.role,
+        department: editStaff.department,
+        salary: Number(editStaff.salary),
+        phone: editStaff.phone,
+        email: editStaff.email,
+        address: editStaff.address,
+        emergency_contact: editStaff.emergency_contact || editStaff.emergencyContact,
+        status: editStaff.status,
+        join_date: editStaff.join_date || editStaff.joinDate
+      }).eq('id', editStaff.id);
+      
+      if (error) throw error;
+      
+      fetchHRData();
+      setShowEditModal(false);
+      logAction(`Updated staff member: ${editStaff.name}`, "HR & Staff");
+      toast.success("Staff member updated successfully");
+    } catch (err: any) {
+      console.error("Error updating staff:", err);
+      toast.error(err.message || "Failed to update staff member");
+    }
   };
 
   const handleAddAnnouncement = () => {
@@ -292,50 +408,61 @@ const HRStaff = () => {
     toast.success("Announcement posted");
   };
 
-  const handleMarkAttendance = () => {
+  const handleMarkAttendance = async () => {
     const emp = staff.find(s => s.id === attendanceForm.empId);
     if (!emp) return;
-    const newRecord = {
-      id: attendance.length + 1,
-      name: emp.name,
-      ...attendanceForm,
-      lateMinutes: attendanceForm.status === "late" ? attendanceForm.lateMinutes : 0,
-      isAuto: false
+    
+    const record = {
+      employee_id: attendanceForm.empId,
+      date: attendanceForm.date,
+      status: attendanceForm.status,
+      check_in: attendanceForm.status === 'present' ? attendanceForm.checkIn : null,
+      check_out: attendanceForm.status === 'present' ? attendanceForm.checkOut : null,
+      late_minutes: attendanceForm.status === "late" ? Number(attendanceForm.lateMinutes) : 0,
+      is_auto: false
     };
     
-    // Check if attendance already exists for this employee on this date
-    const existingIndex = attendance.findIndex(a => a.empId === attendanceForm.empId && a.date === attendanceForm.date);
-    
-    if (existingIndex !== -1) {
-      // Override
-      const newAttendance = [...attendance];
-      newAttendance[existingIndex] = { ...newRecord, id: attendance[existingIndex].id };
-      setAttendance(newAttendance);
-      toast.success("Attendance updated (override)");
-    } else {
-      setAttendance([newRecord, ...attendance]);
-      toast.success("Attendance marked");
+    try {
+      // Check if attendance already exists for this employee on this date
+      const { data: existing } = await supabase
+        .from('attendance')
+        .select('id')
+        .eq('employee_id', attendanceForm.empId)
+        .eq('date', attendanceForm.date)
+        .single();
+      
+      if (existing) {
+        const { error } = await supabase.from('attendance').update(record).eq('id', existing.id);
+        if (error) throw error;
+        toast.success("Attendance updated (override)");
+      } else {
+        const { error } = await supabase.from('attendance').insert([record]);
+        if (error) throw error;
+        toast.success("Attendance marked");
+      }
+      
+      fetchHRData();
+      setShowAttendanceModal(false);
+    } catch (err: any) {
+      console.error("Error marking attendance:", err);
+      toast.error("Failed to mark attendance");
     }
-    
-    setShowAttendanceModal(false);
   };
 
-  const handleMarkAllPresent = () => {
+  const handleMarkAllPresent = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
     const markedIds = new Set(attendance.filter(a => a.date === today).map(a => a.empId));
     
     const newRecords = staff
       .filter(s => !markedIds.has(s.id))
-      .map((s, index) => ({
-        id: attendance.length + index + 1,
-        empId: s.id,
-        name: s.name,
+      .map(s => ({
+        employee_id: s.id,
         status: "present",
         date: today,
-        checkIn: "09:00",
-        checkOut: "18:00",
-        lateMinutes: 0,
-        isAuto: false
+        check_in: "09:00",
+        check_out: "18:00",
+        late_minutes: 0,
+        is_auto: false
       }));
 
     if (newRecords.length === 0) {
@@ -343,32 +470,41 @@ const HRStaff = () => {
       return;
     }
 
-    setAttendance([...newRecords, ...attendance]);
-    setMarkedAllPresent(true);
-    toast.success(`Marked ${newRecords.length} staff members as Present`);
+    try {
+      const { error } = await supabase.from('attendance').insert(newRecords);
+      if (error) throw error;
+      
+      fetchHRData();
+      setMarkedAllPresent(true);
+      toast.success(`Marked ${newRecords.length} staff members as Present`);
+    } catch (err: any) {
+      console.error("Error marking all present:", err);
+      toast.error("Failed to mark bulk attendance");
+    }
   };
 
-  const handleAutoAbsent = () => {
+  const handleAutoAbsent = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
     const markedIds = new Set(attendance.filter(a => a.date === today).map(a => a.empId));
     
     const absentees = staff
       .filter(s => !markedIds.has(s.id))
-      .map((s, index) => ({
-        id: attendance.length + index + 1,
-        empId: s.id,
-        name: s.name,
+      .map(s => ({
+        employee_id: s.id,
         status: "absent",
         date: today,
-        checkIn: "-",
-        checkOut: "-",
-        lateMinutes: 0,
-        isAuto: true
+        is_auto: true
       }));
 
     if (absentees.length > 0) {
-      setAttendance([...absentees, ...attendance]);
-      toast.info(`Auto-marked ${absentees.length} missing staff as Absent`);
+      try {
+        const { error } = await supabase.from('attendance').insert(absentees);
+        if (error) throw error;
+        fetchHRData();
+        toast.info(`Auto-marked ${absentees.length} missing staff as Absent`);
+      } catch (err) {
+        console.error("Error marking auto-absent:", err);
+      }
     }
     setAttendanceChecked(true);
   };
@@ -420,23 +556,42 @@ const HRStaff = () => {
     setShowBulkAttendanceModal(false);
   };
 
-  const handleRequestLeave = () => {
+  const handleRequestLeave = async () => {
     const emp = staff.find(s => s.id === leaveForm.empId);
     if (!emp) return;
-    const newLeave = {
-      id: leaves.length + 1,
-      name: emp.name,
-      ...leaveForm,
-      status: "pending"
-    };
-    setLeaves([newLeave, ...leaves]);
-    setShowLeaveRequestModal(false);
-    toast.success("Leave request submitted");
+    
+    try {
+      const { error } = await supabase.from('leave_requests').insert([{
+        employee_id: leaveForm.empId,
+        type: leaveForm.type,
+        start_date: leaveForm.start,
+        end_date: leaveForm.end,
+        reason: leaveForm.reason,
+        status: 'pending'
+      }]);
+      
+      if (error) throw error;
+      
+      fetchHRData();
+      setShowLeaveRequestModal(false);
+      toast.success("Leave request submitted");
+    } catch (err: any) {
+      console.error("Error requesting leave:", err);
+      toast.error("Failed to submit leave request");
+    }
   };
 
-  const handleLeaveAction = (id: number, status: string) => {
-    setLeaves(leaves.map(l => l.id === id ? { ...l, status } : l));
-    toast.success(`Leave request ${status}`);
+  const handleLeaveAction = async (id: number, status: string) => {
+    try {
+      const { error } = await supabase.from('leave_requests').update({ status }).eq('id', id);
+      if (error) throw error;
+      
+      fetchHRData();
+      toast.success(`Leave request ${status}`);
+    } catch (err: any) {
+      console.error("Error updating leave:", err);
+      toast.error("Failed to update leave status");
+    }
   };
 
   const handleAddPerformance = () => {
@@ -455,33 +610,92 @@ const HRStaff = () => {
     toast.success("Performance rating added");
   };
 
-  const handleMarkAsPaid = () => {
-    const netPay = (payrollForm.basicSalary + payrollForm.bonuses + payrollForm.allowances.transport + payrollForm.allowances.meal + (payrollForm.allowances.housing || 0) - payrollForm.deductions.tax - payrollForm.deductions.loans - payrollForm.deductions.absences);
-    const updatedStaff = staff.map(s => {
-      if (s.id === payrollForm.empId) {
-        return {
-          ...s,
-          payrollHistory: [
-            ...(s.payrollHistory || []),
-            {
-              id: (s.payrollHistory?.length || 0) + 1,
-              month: payrollForm.month,
-              basic: payrollForm.basicSalary,
-              allowances: payrollForm.allowances,
-              bonuses: payrollForm.bonuses,
-              deductions: payrollForm.deductions,
-              netPay: netPay,
-              date: format(new Date(), "yyyy-MM-dd"),
-              status: "paid"
-            }
-          ]
-        };
+  const handleMarkAsPaid = async () => {
+    const gross = payrollForm.basicSalary + payrollForm.allowances.houseRent + payrollForm.allowances.medical + payrollForm.allowances.conveyance + payrollForm.allowances.special + payrollForm.overtime.pay;
+    const totalDeductions = payrollForm.deductions.tax + payrollForm.deductions.eobi + payrollForm.deductions.pessi + payrollForm.deductions.loans + payrollForm.deductions.late + payrollForm.deductions.absences;
+    const netSalary = gross - totalDeductions;
+    
+    try {
+      const { error } = await supabase.from('payroll_history').insert([{
+        employee_id: payrollForm.empId,
+        month: payrollForm.month,
+        basic_salary: payrollForm.basicSalary,
+        hra: payrollForm.allowances.houseRent,
+        medical_allowance: payrollForm.allowances.medical,
+        conveyance_allowance: payrollForm.allowances.conveyance,
+        special_allowance: payrollForm.allowances.special,
+        overtime_pay: payrollForm.overtime.pay,
+        gross_salary: gross,
+        income_tax: payrollForm.deductions.tax,
+        eobi: payrollForm.deductions.eobi,
+        pessi: payrollForm.deductions.pessi,
+        loan_deduction: payrollForm.deductions.loans,
+        late_deduction: payrollForm.deductions.late,
+        absence_deduction: payrollForm.deductions.absences,
+        net_salary: netSalary,
+        status: 'paid'
+      }]);
+      
+      if (error) throw error;
+      
+      fetchHRData();
+      setShowPayrollModal(false);
+      toast.success(`Payroll processed for ${payrollForm.month}`);
+    } catch (err: any) {
+      console.error("Error processing payroll:", err);
+      toast.error("Failed to process payroll");
+    }
+  };
+
+  const prefillPayrollForm = (emp: any) => {
+    const month = format(new Date(), "MMMM yyyy");
+    const basic = emp.salary;
+    
+    // Standard Pakistani Allowances (Estimated)
+    const hra = Math.round(basic * 0.45);
+    const medical = Math.round(basic * 0.10);
+    const conveyance = Math.round(basic * 0.10);
+    const special = 0;
+
+    // Deductions
+    const eobi = calculateEOBI(basic);
+    const pessi = calculatePESSI(basic);
+    const tax = calculateTax(basic * 12);
+
+    // Overtime
+    const empOvertime = overtime.filter(o => o.empId === emp.id && o.status === 'pending');
+    const otHours = empOvertime.reduce((sum, o) => sum + o.hours, 0);
+    const hourlyRate = getHourlyRate(basic);
+    const otPay = calculateOvertime(hourlyRate, otHours);
+
+    // Attendance Deductions (Absences & Late)
+    const monthAttendance = attendance.filter(a => a.empId === emp.id && a.date.startsWith(format(new Date(), "yyyy-MM")));
+    const absences = monthAttendance.filter(a => a.status === 'absent').length;
+    const lateDays = monthAttendance.filter(a => a.status === 'late').length;
+    
+    const dayRate = basic / 22;
+    const absenceDeduction = absences * dayRate;
+    const lateDeduction = lateDays > 3 ? (lateDays - 3) * (dayRate / 4) : 0; // Policy: 1/4 day pay after 3 late arrivals
+
+    // Advances
+    const empAdvances = advances.filter(a => a.empId === emp.id && a.status === 'approved');
+    const advanceDeduction = empAdvances.reduce((sum, a) => sum + a.amount, 0);
+
+    setPayrollForm({
+      empId: emp.id,
+      month,
+      basicSalary: basic,
+      allowances: { houseRent: hra, medical, conveyance, special },
+      overtime: { hours: otHours, pay: Math.round(otPay) },
+      deductions: { 
+        tax: Math.round(tax), 
+        eobi: Math.round(eobi), 
+        pessi, 
+        loans: advanceDeduction, 
+        late: Math.round(lateDeduction), 
+        absences: Math.round(absenceDeduction) 
       }
-      return s;
     });
-    setStaff(updatedStaff);
-    setShowPayrollModal(false);
-    toast.success(`Payroll processed for ${payrollForm.month}`);
   };
 
   const handleUpdateRights = (id: string, rights: string[]) => {
@@ -792,7 +1006,190 @@ const HRStaff = () => {
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
     saveAs(blob, `Total_Payroll_Ledger_${format(new Date(), 'MMM_yyyy')}.xlsx`);
-    toast.success("Total payroll ledger exported to Excel");
+    toast.success("Total payroll ledger exported to PDF");
+  };
+
+  const handleRequestAdvance = async () => {
+    const emp = staff.find(s => s.id === advanceForm.empId);
+    if (!emp) return;
+    
+    try {
+      const { error } = await supabase.from('advance_salary').insert([{
+        employee_id: advanceForm.empId,
+        amount: Number(advanceForm.amount),
+        reason: advanceForm.reason,
+        status: 'pending'
+      }]);
+      
+      if (error) throw error;
+      
+      fetchHRData();
+      setShowAdvanceModal(false);
+      logAction(`Requested advance for ${emp.name}: ₨ ${advanceForm.amount}`, "HR & Staff");
+      toast.success("Advance request submitted");
+    } catch (err: any) {
+      console.error("Error requesting advance:", err);
+      toast.error("Failed to submit advance request");
+    }
+  };
+
+  const handleLogOvertime = async () => {
+    const emp = staff.find(s => s.id === overtimeForm.empId);
+    if (!emp) return;
+    
+    try {
+      const { error } = await supabase.from('overtime').insert([{
+        employee_id: overtimeForm.empId,
+        hours: Number(overtimeForm.hours),
+        date: overtimeForm.date,
+        rate: 1.5,
+        status: 'pending'
+      }]);
+      
+      if (error) throw error;
+      
+      fetchHRData();
+      setShowOvertimeModal(false);
+      logAction(`Logged overtime for ${emp.name}: ${overtimeForm.hours} hours`, "HR & Staff");
+      toast.success("Overtime logged");
+    } catch (err: any) {
+      console.error("Error logging overtime:", err);
+      toast.error("Failed to log overtime");
+    }
+  };
+
+  const handleGeneratePayslip = (staff: any, payroll: any) => {
+    const doc = new jsPDF();
+    // Add company logo and header
+    doc.setFontSize(22);
+    doc.setTextColor(22, 163, 74); // success color
+    doc.text("Octonus Solutions", 105, 20, { align: 'center' });
+    doc.setFontSize(14);
+    doc.setTextColor(100);
+    doc.text("Salary Payslip", 105, 28, { align: 'center' });
+
+    // Employee details
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    doc.text(`Employee Name: ${staff.name}`, 14, 45);
+    doc.text(`Employee ID: ${staff.id}`, 14, 52);
+    doc.text(`Designation: ${staff.role}`, 14, 59);
+    doc.text(`Month & Year: ${payroll.month}`, 14, 66);
+
+    // Earnings and Deductions tables
+    const earnings = [
+      ["Basic Salary", `Rs ${payroll.basic_salary.toLocaleString()}`],
+      ["House Rent Allowance", `Rs ${payroll.hra.toLocaleString()}`],
+      ["Medical Allowance", `Rs ${payroll.medical_allowance.toLocaleString()}`],
+      ["Conveyance Allowance", `Rs ${payroll.conveyance_allowance.toLocaleString()}`],
+      ["Special Allowance", `Rs ${payroll.special_allowance.toLocaleString()}`],
+      ["Overtime Pay", `Rs ${payroll.overtime_pay.toLocaleString()}`],
+    ];
+    
+    const deductions = [
+      ["Income Tax", `Rs ${payroll.income_tax.toLocaleString()}`],
+      ["EOBI", `Rs ${payroll.eobi.toLocaleString()}`],
+      ["PESSI/SESSI", `Rs ${payroll.pessi.toLocaleString()}`],
+      ["Loan/Advance", `Rs ${payroll.loan_deduction.toLocaleString()}`],
+      ["Late Arrival", `Rs ${payroll.late_deduction.toLocaleString()}`],
+      ["Absence", `Rs ${payroll.absence_deduction.toLocaleString()}`],
+    ];
+
+    (doc as any).autoTable({
+      startY: 75,
+      head: [['Earnings', 'Amount']],
+      body: earnings,
+      theme: 'grid',
+      headStyles: { fillColor: [22, 163, 74] },
+    });
+
+    (doc as any).autoTable({
+      startY: (doc as any).lastAutoTable.finalY + 10,
+      head: [['Deductions', 'Amount']],
+      body: deductions,
+      theme: 'grid',
+      headStyles: { fillColor: [220, 38, 38] },
+    });
+
+    // Totals
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Gross Salary: Rs ${payroll.gross_salary.toLocaleString()}`, 14, finalY);
+    doc.text(`Net Salary: Rs ${payroll.net_salary.toLocaleString()}`, 14, finalY + 8);
+
+    // Net salary in words
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Net Salary in Words:", 14, finalY + 18);
+    doc.setFont("helvetica", "bold");
+    doc.text(numberToWords(payroll.net_salary).toUpperCase(), 14, finalY + 24);
+
+    // Signature placeholders
+    doc.setFont("helvetica", "normal");
+    doc.text("__________________________", 14, finalY + 45);
+    doc.text("Employee Signature", 14, finalY + 50);
+    doc.text("__________________________", 140, finalY + 45);
+    doc.text("Authorized Signature", 140, finalY + 50);
+
+    doc.save(`Payslip_${staff.name}_${payroll.month}.pdf`);
+  };
+
+
+  const handleExportEOBIReport = () => {
+    const data = staff.map(s => {
+      const latestPayroll = s.payrollHistory?.[0]; // History is sorted by month desc
+      return {
+        "Employee ID": s.id,
+        "Name": s.name,
+        "Department": s.department,
+        "Basic Salary": s.salary,
+        "EOBI Contribution": latestPayroll ? latestPayroll.eobi : 0,
+        "Month": latestPayroll ? latestPayroll.month : format(new Date(), "MMMM yyyy")
+      };
+    });
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "EOBI Report");
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
+    saveAs(blob, `EOBI_Report_${format(new Date(), "MMM_yyyy")}.xlsx`);
+    toast.success("EOBI report exported to Excel");
+  };
+
+  const handleExportTaxReport = () => {
+    const data = staff.map(s => {
+      const latestPayroll = s.payrollHistory?.[0];
+      return {
+        "Employee ID": s.id,
+        "Name": s.name,
+        "Department": s.department,
+        "Annual Salary": s.salary * 12,
+        "Monthly Tax Deduction": latestPayroll ? latestPayroll.income_tax : 0,
+        "Month": latestPayroll ? latestPayroll.month : format(new Date(), "MMMM yyyy")
+      };
+    });
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tax Report");
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
+    saveAs(blob, `Tax_Report_${format(new Date(), "MMM_yyyy")}.xlsx`);
+    toast.success("Tax report exported to Excel");
+  };
+
+  const handleDeleteStaff = async (id: string) => {
+    try {
+      const { error } = await supabase.from('employees').delete().eq('id', id);
+      if (error) throw error;
+      
+      fetchHRData();
+      setShowDeleteConfirm(null);
+      toast.success("Staff record deleted");
+    } catch (err: any) {
+      console.error("Error deleting staff:", err);
+      toast.error("Failed to delete staff member");
+    }
   };
 
   const handlePrintCard = (staff: any) => {
@@ -856,7 +1253,7 @@ const HRStaff = () => {
     printWindow.document.close();
   };
 
-  const handleExportTotalLedgerPDF = () => {
+  const handleTotalLedgerPdf = () => {
     const doc = new jsPDF('l', 'mm', 'a4');
     
     doc.setFontSize(18);
@@ -899,12 +1296,6 @@ const HRStaff = () => {
 
     doc.save(`Total_Payroll_Ledger_${format(new Date(), 'MMM_yyyy')}.pdf`);
     toast.success("Total payroll ledger exported to PDF");
-  };
-
-  const handleDeleteStaff = (id: string) => {
-    setStaff(staff.filter(s => s.id !== id));
-    setShowDeleteConfirm(null);
-    toast.success("Staff record deleted");
   };
 
   const filteredStaff = useMemo(() => staff.filter(s =>
@@ -960,9 +1351,12 @@ const HRStaff = () => {
               <TabsTrigger value="profiles" className="text-xs sm:text-sm">Profiles</TabsTrigger>
               <TabsTrigger value="attendance" className="text-xs sm:text-sm">Attendance</TabsTrigger>
               <TabsTrigger value="payroll" className="text-xs sm:text-sm">Payroll</TabsTrigger>
+              <TabsTrigger value="advances" className="text-xs sm:text-sm">Advances</TabsTrigger>
+              <TabsTrigger value="overtime" className="text-xs sm:text-sm">Overtime</TabsTrigger>
               <TabsTrigger value="outside" className="text-xs sm:text-sm">Outside Workers</TabsTrigger>
               <TabsTrigger value="leaves" className="text-xs sm:text-sm">Leaves</TabsTrigger>
               <TabsTrigger value="performance" className="text-xs sm:text-sm">Performance</TabsTrigger>
+              <TabsTrigger value="reports" className="text-xs sm:text-sm">Reports</TabsTrigger>
             </TabsList>
           </div>
           
@@ -1515,29 +1909,19 @@ const HRStaff = () => {
                           <div className="flex justify-end gap-2">
                             {canDo("edit") && (
                               <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
-                                setPayrollForm({
-                                  empId: s.id,
-                                  month: format(new Date(), "MMMM yyyy"),
-                                  basicSalary: s.salary,
-                                  deductions: { tax: 0, loans: 0, absences: 0 },
-                                  bonuses: 0,
-                                  allowances: { transport: 0, meal: 0, housing: 0 }
-                                });
+                                prefillPayrollForm(s);
                                 setShowPayrollModal(true);
                               }}>Process</Button>
                             )}
                             <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="h-7 w-7 p-0" 
-                              disabled={!latestPayroll}
-                              onClick={() => {
-                                setSelectedPayslip({ staff: s, payroll: latestPayroll });
-                                setShowPayslipModal(true);
-                              }}
-                            >
-                              <FileText className="h-4 w-4" />
-                            </Button>
+                                size="sm" 
+                                variant="ghost" 
+                                className="h-7 w-7 p-0" 
+                                disabled={!latestPayroll}
+                                onClick={() => handleGeneratePayslip(s, latestPayroll)}
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
                           </div>
                         </td>
                       </tr>
@@ -1617,7 +2001,98 @@ const HRStaff = () => {
           </div>
         </TabsContent>
 
-        {/* Performance Tracking */}
+        {/* Overtime Management */}
+        <TabsContent value="overtime" className="mt-4 space-y-4">
+          <div className="flex justify-end">
+            {canDo("add") && (
+              <Button onClick={() => setShowOvertimeModal(true)} className="gap-2">
+                <Plus className="h-4 w-4" /> Log Overtime
+              </Button>
+            )}
+          </div>
+          <div className="rounded-lg border border-border bg-card">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse min-w-[800px]">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left">Staff</th>
+                    <th className="px-4 py-3 text-left">Date</th>
+                    <th className="px-4 py-3 text-left">Hours</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {overtime.map(o => (
+                    <tr key={o.id} className="text-sm hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium">{o.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{o.date}</td>
+                      <td className="px-4 py-3">{o.hours}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className={statusColor(o.status)}>{o.status}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {o.status === 'pending' && canDo("edit") && (
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10">Mark as Paid</Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Advances Management */}
+        <TabsContent value="advances" className="mt-4 space-y-4">
+          <div className="flex justify-end">
+            {canDo("add") && (
+              <Button onClick={() => setShowAdvanceModal(true)} className="gap-2">
+                <Plus className="h-4 w-4" /> Request Advance
+              </Button>
+            )}
+          </div>
+          <div className="rounded-lg border border-border bg-card">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse min-w-[800px]">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left">Staff</th>
+                    <th className="px-4 py-3 text-left">Date</th>
+                    <th className="px-4 py-3 text-left">Amount</th>
+                    <th className="px-4 py-3 text-left">Reason</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {advances.map(a => (
+                    <tr key={a.id} className="text-sm hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium">{a.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{a.date}</td>
+                      <td className="px-4 py-3">₨ {a.amount.toLocaleString()}</td>
+                      <td className="px-4 py-3">{a.reason}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className={statusColor(a.status)}>{a.status}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {a.status === 'pending' && canDo("edit") && (
+                          <div className="flex justify-end gap-2">
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10">Approve</Button>
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-destructive text-destructive hover:bg-destructive/10">Reject</Button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Performance Management */}
         <TabsContent value="performance" className="mt-4 space-y-4">
           <div className="flex justify-end">
             {canDo("add") && (
@@ -1657,6 +2132,22 @@ const HRStaff = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </TabsContent>
+
+        {/* Reports */}
+        <TabsContent value="reports" className="mt-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="font-semibold">EOBI Report</h3>
+              <p className="text-sm text-muted-foreground">Monthly EOBI contribution report.</p>
+              <Button onClick={handleExportEOBIReport} className="mt-4">Export EOBI Report</Button>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="font-semibold">Tax Deduction Report</h3>
+              <p className="text-sm text-muted-foreground">Monthly tax deduction report.</p>
+              <Button onClick={handleExportTaxReport} className="mt-4">Export Tax Report</Button>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
@@ -1768,16 +2259,24 @@ const HRStaff = () => {
                 <div className="space-y-2">
                   <Label className="text-xs">Basic Salary: ₨ {payrollForm.basicSalary.toLocaleString()}</Label>
                   <div className="space-y-1.5">
-                    <Label>Transport Allowance</Label>
-                    <Input type="number" value={payrollForm.allowances.transport} onChange={e => setPayrollForm({ ...payrollForm, allowances: { ...payrollForm.allowances, transport: Number(e.target.value) } })} />
+                    <Label>House Rent Allowance</Label>
+                    <Input type="number" value={payrollForm.allowances.houseRent} onChange={e => setPayrollForm({ ...payrollForm, allowances: { ...payrollForm.allowances, houseRent: Number(e.target.value) } })} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Meal Allowance</Label>
-                    <Input type="number" value={payrollForm.allowances.meal} onChange={e => setPayrollForm({ ...payrollForm, allowances: { ...payrollForm.allowances, meal: Number(e.target.value) } })} />
+                    <Label>Medical Allowance</Label>
+                    <Input type="number" value={payrollForm.allowances.medical} onChange={e => setPayrollForm({ ...payrollForm, allowances: { ...payrollForm.allowances, medical: Number(e.target.value) } })} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Bonuses</Label>
-                    <Input type="number" value={payrollForm.bonuses} onChange={e => setPayrollForm({ ...payrollForm, bonuses: Number(e.target.value) })} />
+                    <Label>Conveyance Allowance</Label>
+                    <Input type="number" value={payrollForm.allowances.conveyance} onChange={e => setPayrollForm({ ...payrollForm, allowances: { ...payrollForm.allowances, conveyance: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Special Allowance</Label>
+                    <Input type="number" value={payrollForm.allowances.special} onChange={e => setPayrollForm({ ...payrollForm, allowances: { ...payrollForm.allowances, special: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Overtime Pay</Label>
+                    <Input type="number" value={payrollForm.overtime.pay} onChange={e => setPayrollForm({ ...payrollForm, overtime: { ...payrollForm.overtime, pay: Number(e.target.value) } })} />
                   </div>
                 </div>
               </div>
@@ -1789,11 +2288,23 @@ const HRStaff = () => {
                     <Input type="number" value={payrollForm.deductions.tax} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, tax: Number(e.target.value) } })} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Loans / Advances</Label>
+                    <Label>EOBI (1%)</Label>
+                    <Input type="number" value={payrollForm.deductions.eobi} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, eobi: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>PESSI/SESSI</Label>
+                    <Input type="number" value={payrollForm.deductions.pessi} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, pessi: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Loan/Advance</Label>
                     <Input type="number" value={payrollForm.deductions.loans} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, loans: Number(e.target.value) } })} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Absence Deductions</Label>
+                    <Label>Late Arrival Deduction</Label>
+                    <Input type="number" value={payrollForm.deductions.late} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, late: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Absence Deduction</Label>
                     <Input type="number" value={payrollForm.deductions.absences} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, absences: Number(e.target.value) } })} />
                   </div>
                 </div>
@@ -1802,13 +2313,13 @@ const HRStaff = () => {
             <div className="p-4 bg-muted rounded-lg flex justify-between items-center">
               <span className="font-bold">Net Payable:</span>
               <span className="text-xl font-bold text-success">
-                ₨ {(payrollForm.basicSalary + payrollForm.bonuses + payrollForm.allowances.transport + payrollForm.allowances.meal - payrollForm.deductions.tax - payrollForm.deductions.loans - payrollForm.deductions.absences).toLocaleString()}
+                ₨ {(payrollForm.basicSalary + payrollForm.allowances.houseRent + payrollForm.allowances.medical + payrollForm.allowances.conveyance + payrollForm.allowances.special + payrollForm.overtime.pay - payrollForm.deductions.tax - payrollForm.deductions.eobi - payrollForm.deductions.pessi - payrollForm.deductions.loans - payrollForm.deductions.late - payrollForm.deductions.absences).toLocaleString()}
               </span>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPayrollModal(false)}>Cancel</Button>
-            <Button className="bg-success hover:bg-success/90" onClick={() => { toast.success("Payroll marked as paid"); setShowPayrollModal(false); }}>Mark as Paid</Button>
+            <Button className="bg-success hover:bg-success/90" onClick={handleMarkAsPaid}>Mark as Paid</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1837,6 +2348,9 @@ const HRStaff = () => {
                   <SelectItem value="Annual">Annual Leave</SelectItem>
                   <SelectItem value="Sick">Sick Leave</SelectItem>
                   <SelectItem value="Casual">Casual Leave</SelectItem>
+                  <SelectItem value="Maternity">Maternity Leave</SelectItem>
+                  <SelectItem value="Paternity">Paternity Leave</SelectItem>
+                  <SelectItem value="Hajj">Hajj Leave</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2438,8 +2952,72 @@ const HRStaff = () => {
          </DialogContent>
        </Dialog>
 
-       {/* Delete Confirmation */}
-       <Dialog open={!!showDeleteConfirm} onOpenChange={() => setShowDeleteConfirm(null)}>
+       {/* Overtime Modal */}
+      <Dialog open={showOvertimeModal} onOpenChange={setShowOvertimeModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Log Overtime</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Employee</Label>
+              <Select onValueChange={v => setOvertimeForm({ ...overtimeForm, empId: v })}>
+                <SelectTrigger><SelectValue placeholder="Select Staff" /></SelectTrigger>
+                <SelectContent>
+                  {staff.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Overtime Hours</Label>
+                <Input type="number" value={overtimeForm.hours} onChange={e => setOvertimeForm({ ...overtimeForm, hours: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Date</Label>
+                <Input type="date" value={overtimeForm.date} onChange={e => setOvertimeForm({ ...overtimeForm, date: e.target.value })} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleLogOvertime} className="w-full">Log Overtime</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Advance Salary Modal */}
+      <Dialog open={showAdvanceModal} onOpenChange={setShowAdvanceModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Advance Salary</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Employee</Label>
+              <Select onValueChange={v => setAdvanceForm({ ...advanceForm, empId: v })}>
+                <SelectTrigger><SelectValue placeholder="Select Staff" /></SelectTrigger>
+                <SelectContent>
+                  {staff.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Amount (₨)</Label>
+              <Input type="number" value={advanceForm.amount} onChange={e => setAdvanceForm({ ...advanceForm, amount: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Reason</Label>
+              <Textarea placeholder="Brief reason for advance..." value={advanceForm.reason} onChange={e => setAdvanceForm({ ...advanceForm, reason: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleRequestAdvance} className="w-full">Submit Request</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={!!showDeleteConfirm} onOpenChange={(open) => !open && setShowDeleteConfirm(null)}>
          <DialogContent className="sm:max-w-md">
            <DialogHeader>
              <DialogTitle className="text-destructive flex items-center gap-2">
