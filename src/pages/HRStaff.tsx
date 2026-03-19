@@ -4,7 +4,7 @@ import {
   DollarSign, Camera, FileText, Calendar, Phone, Mail, MapPin, 
   UserPlus, Download, Star, StarOff, Bell, ShieldCheck, ChevronRight, BarChart3, PieChart as PieChartIcon, Receipt,
   TrendingDown, LayoutDashboard, CalendarDays, Landmark, Package, Settings, LogOut,
-  LayoutGrid, List, Printer, Briefcase, BriefcaseBusiness, QrCode, Wallet2
+  LayoutGrid, List, Printer, Briefcase, BriefcaseBusiness, QrCode, Wallet2, History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { format, subMonths, startOfMonth as dateFnsStartOfMonth } from "date-fns
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
+import autoTable from "jspdf-autotable";
 import { numberToWords } from "@/lib/numberToWords";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -1006,7 +1007,7 @@ const HRStaff = () => {
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
     saveAs(blob, `Total_Payroll_Ledger_${format(new Date(), 'MMM_yyyy')}.xlsx`);
-    toast.success("Total payroll ledger exported to PDF");
+    toast.success("Total payroll ledger exported to Excel");
   };
 
   const handleRequestAdvance = async () => {
@@ -1033,6 +1034,19 @@ const HRStaff = () => {
     }
   };
 
+  const handleAdvanceAction = async (id: number, status: string) => {
+    try {
+      const { error } = await supabase.from('advance_salary').update({ status }).eq('id', id);
+      if (error) throw error;
+      
+      fetchHRData();
+      toast.success(`Advance request ${status}`);
+    } catch (err: any) {
+      console.error("Error updating advance:", err);
+      toast.error("Failed to update advance status");
+    }
+  };
+
   const handleLogOvertime = async () => {
     const emp = staff.find(s => s.id === overtimeForm.empId);
     if (!emp) return;
@@ -1055,6 +1069,19 @@ const HRStaff = () => {
     } catch (err: any) {
       console.error("Error logging overtime:", err);
       toast.error("Failed to log overtime");
+    }
+  };
+
+  const handleOvertimeAction = async (id: number, status: string) => {
+    try {
+      const { error } = await supabase.from('overtime').update({ status }).eq('id', id);
+      if (error) throw error;
+      
+      fetchHRData();
+      toast.success(`Overtime marked as ${status}`);
+    } catch (err: any) {
+      console.error("Error updating overtime:", err);
+      toast.error("Failed to update overtime status");
     }
   };
 
@@ -1095,7 +1122,7 @@ const HRStaff = () => {
       ["Absence", `Rs ${payroll.absence_deduction.toLocaleString()}`],
     ];
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 75,
       head: [['Earnings', 'Amount']],
       body: earnings,
@@ -1103,7 +1130,7 @@ const HRStaff = () => {
       headStyles: { fillColor: [22, 163, 74] },
     });
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 10,
       head: [['Deductions', 'Amount']],
       body: deductions,
@@ -1253,7 +1280,7 @@ const HRStaff = () => {
     printWindow.document.close();
   };
 
-  const handleTotalLedgerPdf = () => {
+  const handleExportTotalLedgerPDF = () => {
     const doc = new jsPDF('l', 'mm', 'a4');
     
     doc.setFontSize(18);
@@ -1283,8 +1310,7 @@ const HRStaff = () => {
       return acc + (latestPayroll ? latestPayroll.netPay : s.salary);
     }, 0);
 
-    // @ts-ignore
-    doc.autoTable({
+    autoTable(doc, {
       startY: 40,
       head: [['ID', 'Name', 'Dept', 'Basic', 'Bonus', 'Allow.', 'Deduct.', 'Net Pay', 'Status', 'Date']],
       body: tableData,
@@ -2033,7 +2059,7 @@ const HRStaff = () => {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {o.status === 'pending' && canDo("edit") && (
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10">Mark as Paid</Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10" onClick={() => handleOvertimeAction(o.id, 'paid')}>Mark as Paid</Button>
                         )}
                       </td>
                     </tr>
@@ -2079,8 +2105,8 @@ const HRStaff = () => {
                       <td className="px-4 py-3 text-right">
                         {a.status === 'pending' && canDo("edit") && (
                           <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10">Approve</Button>
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-destructive text-destructive hover:bg-destructive/10">Reject</Button>
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10" onClick={() => handleAdvanceAction(a.id, 'approved')}>Approve</Button>
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-destructive text-destructive hover:bg-destructive/10" onClick={() => handleAdvanceAction(a.id, 'rejected')}>Reject</Button>
                           </div>
                         )}
                       </td>
