@@ -142,7 +142,7 @@ const statusColor = (status: string) => {
 };
 
 const HRStaff = () => {
-  const { canDo, logAction } = useAuth();
+  const { user, canDo, logAction } = useAuth();
   const [staff, setStaff] = useState(DUMMY_STAFF);
   const [attendance, setAttendance] = useState(DUMMY_ATTENDANCE);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
