@@ -68,6 +68,7 @@ const EVENT_FINANCE: any[] = [
 ];
 
 const ACCOUNTS = ["Cash","Bank","Supplier","Vendor","Other"];
+const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque", "Online Transfer"];
 
 const Finance = () => {
   const { toast } = useToast();
