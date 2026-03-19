@@ -15,6 +15,7 @@ const EventBooking = lazy(() => import("@/pages/EventBooking"));
 const Finance = lazy(() => import("@/pages/Finance"));
 const Inventory = lazy(() => import("@/pages/Inventory"));
 const Expenses = lazy(() => import("@/pages/Expenses"));
+const Documents = lazy(() => import("@/pages/Documents"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
@@ -69,6 +70,7 @@ const AppRoutes = () => {
           <Route path="/finance" element={<ProtectedRoute page="finance"><Finance /></ProtectedRoute>} />
           <Route path="/inventory" element={<ProtectedRoute page="inventory"><Inventory /></ProtectedRoute>} />
           <Route path="/expenses" element={<ProtectedRoute page="expenses"><Expenses /></ProtectedRoute>} />
+          <Route path="/documents" element={<ProtectedRoute page="documents"><Documents /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute page="settings"><SettingsPage /></ProtectedRoute>} />
         </Route>
         <Route path="*" element={<NotFound />} />

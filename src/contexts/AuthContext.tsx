@@ -24,19 +24,19 @@ export interface AuthUser {
 
 export const ROLE_PERMISSIONS: Record<UserRole, UserPermissions> = {
   admin: {
-    pages: ["dashboard", "hr", "events", "finance", "inventory", "expenses", "settings"],
+    pages: ["dashboard", "hr", "events", "finance", "inventory", "expenses", "documents", "settings"],
     actions: ["view", "add", "edit", "delete", "export"]
   },
   manager: {
-    pages: ["dashboard", "hr", "events", "inventory", "expenses"],
+    pages: ["dashboard", "hr", "events", "inventory", "expenses", "documents"],
     actions: ["view", "add", "edit", "export"]
   },
   staff: {
-    pages: ["dashboard", "events", "inventory"],
+    pages: ["dashboard", "events", "inventory", "documents"],
     actions: ["view", "add"]
   },
   accountant: {
-    pages: ["dashboard", "finance", "expenses"],
+    pages: ["dashboard", "finance", "expenses", "documents"],
     actions: ["view", "add", "edit", "export"]
   },
 };

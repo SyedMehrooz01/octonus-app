@@ -1,8 +1,20 @@
 import { useState } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, CalendarDays, Landmark, Package, Receipt, Settings, LogOut, Menu, ShieldCheck } from "lucide-react";
-import { Sheet, SheetClose, SheetContent } from "@/components/ui/sheet";
-import { BRAND_INITIALS, BRAND_NAME } from "@/constants";
+import { 
+  LayoutDashboard, 
+  Users, 
+  CalendarDays, 
+  Landmark, 
+  Package, 
+  Receipt, 
+  FileText, 
+  Settings, 
+  LogOut, 
+  Menu, 
+  ShieldCheck 
+} from "lucide-react";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { BRAND_NAME } from "@/constants";
 import TopHeader from "@/components/TopHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import Logo from "@/components/Logo";
@@ -14,15 +26,9 @@ export const navItems = [
   { to: "/finance", label: "Finance", icon: Landmark, page: "finance" },
   { to: "/inventory", label: "Inventory", icon: Package, page: "inventory" },
   { to: "/expenses", label: "Expenses", icon: Receipt, page: "expenses" },
+  { to: "/documents", label: "Documents", icon: FileText, page: "documents" },
   { to: "/settings", label: "Settings", icon: Settings, page: "settings" },
 ];
-
-const ROLE_COLORS: Record<string, string> = {
-  admin: "bg-primary text-primary-foreground",
-  manager: "bg-secondary text-secondary-foreground",
-  staff: "bg-accent text-accent-foreground",
-  accountant: "bg-warning text-warning-foreground",
-};
 
 const AppLayout = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
