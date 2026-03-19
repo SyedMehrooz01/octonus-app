@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { Landmark, TrendingUp, TrendingDown, Plus, Search, FileText, Download, Calendar, Users, History, Wallet, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,7 +117,16 @@ const Finance = () => {
       }
       
       const { data: pData } = await supabase.from('supplier_payments').select('*').order('date', { ascending: false });
-      if (pData) setVendorPayments(pData);
+      if (pData) {
+        setVendorPayments(pData.map((p: any) => ({
+          id: p.id,
+          vendor_id: p.supplier_id,
+          date: p.date,
+          amount: p.amount,
+          method: p.method,
+          notes: p.notes
+        })));
+      }
     } catch (err) {
       console.error("Error fetching vendors:", err);
     }
@@ -729,4 +738,4 @@ const Finance = () => {
   );
 };
 
-export default Finance;
+export default memo(Finance);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { Package, Plus, Search, AlertTriangle, ArrowUp, ArrowDown, RotateCcw, FileText, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -156,7 +156,8 @@ const Inventory = () => {
     setIsSaving(true);
     try {
       const qty = Number(stockAction.qty);
-      const newStock = stockAction.type === "purchase" ? selectedItem.stock + qty : Math.max(0, selectedItem.stock - qty);
+      const currentStock = selectedItem.stock ?? 0;
+      const newStock = stockAction.type === "purchase" ? currentStock + qty : Math.max(0, currentStock - qty);
       
       const { error: itemError } = await supabase.from('inventory_items').update({
         stock: newStock
@@ -193,13 +194,15 @@ const Inventory = () => {
     setIsSaving(true);
     try {
       const qty = Number(returnForm.qty);
-      if (qty > selectedMovement.qty) {
+      const issuedQty = selectedMovement.qty ?? 0;
+      if (qty > issuedQty) {
         throw new Error("Return quantity cannot exceed issued quantity");
       }
 
       // Update item stock
+      const currentStock = selectedItem.stock ?? 0;
       const { error: itemError } = await supabase.from('inventory_items').update({
-        stock: selectedItem.stock + qty
+        stock: currentStock + qty
       }).eq('id', selectedItem.id);
 
       if (itemError) throw itemError;
@@ -572,4 +575,4 @@ const Inventory = () => {
   );
 };
 
-export default Inventory;
+export default memo(Inventory);

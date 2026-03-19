@@ -40,10 +40,24 @@ const ProtectedRoute = ({ children, page }: { children: React.ReactNode; page: s
 const AppRoutes = () => {
   const { user, loading } = useAuth();
   
-  if (loading) return null;
+  if (loading) return (
+    <div className="flex h-screen w-full items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-sm font-medium text-muted-foreground animate-pulse">Initializing Application...</p>
+      </div>
+    </div>
+  );
   
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm font-medium text-muted-foreground animate-pulse">Loading secure resources...</p>
+        </div>
+      </div>
+    }>
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <Signup />} />

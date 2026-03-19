@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { Plus, Search, Eye, Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Edit, Loader2, Printer, Save, CheckCircle2, User, Wallet, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -311,8 +311,9 @@ const EventBooking = () => {
       const { data: kiData } = await supabase.from('kitchen_items').select('*').eq('event_id', eventId);
       const { data: rmData } = await supabase.from('raw_materials').select('*').eq('event_id', eventId);
       
-      if (kiData && kiData.length > 0) setKitchenItems(kiData);
-      else {
+      if (kiData && kiData.length > 0) {
+        setKitchenItems(kiData);
+      } else {
         // Generate from menu
         const booking = bookings.find(b => b.id === eventId);
         if (booking) {
@@ -327,12 +328,17 @@ const EventBooking = () => {
               is_adjusted: false
             }));
             setKitchenItems(items);
+          } else {
+            setKitchenItems([]);
           }
+        } else {
+          setKitchenItems([]);
         }
       }
 
-      if (rmData && rmData.length > 0) setRawMaterials(rmData);
-      else {
+      if (rmData && rmData.length > 0) {
+        setRawMaterials(rmData);
+      } else {
         // Generate from kitchen items & menu requirements
         const booking = bookings.find(b => b.id === eventId);
         if (booking) {
@@ -344,7 +350,7 @@ const EventBooking = () => {
                 mi.raw_materials.forEach(rm => {
                   const key = `${rm.material}-${rm.unit}`;
                   const current = materialsMap.get(key) || { name: rm.material, unit: rm.unit, qty: 0 };
-                  materialsMap.set(key, { ...current, qty: current.qty + (rm.ratio_per_guest * booking.guests) });
+                  materialsMap.set(key, { ...current, qty: current.qty + ((rm.ratio_per_guest ?? 0) * (booking.guests ?? 0)) });
                 });
               }
             });
@@ -356,11 +362,17 @@ const EventBooking = () => {
               actual_qty: m.qty
             }));
             setRawMaterials(materials);
+          } else {
+            setRawMaterials([]);
           }
+        } else {
+          setRawMaterials([]);
         }
       }
     } catch (err) {
       console.error("Error fetching kitchen data:", err);
+      setKitchenItems([]);
+      setRawMaterials([]);
     }
   };
 
@@ -1244,4 +1256,4 @@ const EventBooking = () => {
    );
  };
 
-export default EventBooking;
+export default memo(EventBooking);

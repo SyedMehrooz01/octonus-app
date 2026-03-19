@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { CalendarDays, Users, Landmark, Clock, Plus, Receipt, CheckCircle, Wallet, ArrowRight, Activity, TrendingUp, TrendingDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, startOfToday, endOfToday, addDays, subMonths, startOfDay, endOfDay } from "date-fns";
@@ -411,4 +411,4 @@ const Loader2 = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export default Dashboard;
+export default memo(Dashboard);
