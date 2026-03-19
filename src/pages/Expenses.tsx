@@ -56,7 +56,7 @@ const Expenses = () => {
     head: "", 
     amount: "", 
     payment_mode: "Cash", 
-    event_id: null 
+    event_id: "" as string | null
   });
 
   const fetchExpenses = async () => {
@@ -106,7 +106,7 @@ const Expenses = () => {
         head: "", 
         amount: "", 
         payment_mode: "Cash", 
-        event_id: null 
+        event_id: "" as string | null
       });
       fetchExpenses();
     } catch (error: any) {
@@ -584,12 +584,16 @@ const Expenses = () => {
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Expense</DialogTitle></DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <Label>Date</Label>
+              <Input type="date" value={newExpense.date} onChange={e => setNewExpense({ ...newExpense, date: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Input placeholder="What was this expense for?" value={newExpense.description} onChange={e => setNewExpense({ ...newExpense, description: e.target.value })} />
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Date</Label>
-                <Input type="date" value={newExpense.date} onChange={e => setNewExpense({ ...newExpense, date: e.target.value })} />
-              </div>
               <div className="space-y-1.5">
                 <Label>Category / Head</Label>
                 <Select value={newExpense.head} onValueChange={v => setNewExpense({ ...newExpense, head: v })}>
@@ -597,10 +601,13 @@ const Expenses = () => {
                   <SelectContent>{EXPENSE_HEADS.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Input placeholder="e.g. Electricity bill payment" value={newExpense.description} onChange={e => setNewExpense({ ...newExpense, description: e.target.value })} />
+              <div className="space-y-1.5">
+                <Label>Payment Mode</Label>
+                <Select value={newExpense.payment_mode} onValueChange={v => setNewExpense({ ...newExpense, payment_mode: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{PAYMENT_MODES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -608,11 +615,13 @@ const Expenses = () => {
                 <Input type="number" placeholder="0" value={newExpense.amount} onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })} />
               </div>
               <div className="space-y-1.5">
-                <Label>Payment Mode</Label>
-                <Select value={newExpense.payment_mode} onValueChange={v => setNewExpense({ ...newExpense, payment_mode: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{PAYMENT_MODES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                </Select>
+                <Label htmlFor="event_id">Linked Event (Optional)</Label>
+                <Input 
+                  id="event_id" 
+                  placeholder="Event ID or Name" 
+                  value={newExpense.event_id || ""} 
+                  onChange={e => setNewExpense({ ...newExpense, event_id: e.target.value })} 
+                />
               </div>
             </div>
           </div>

@@ -1,9 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { 
   Users, Plus, Search, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, 
   DollarSign, Camera, FileText, Calendar, Phone, Mail, MapPin, 
   UserPlus, Download, Star, StarOff, Bell, ShieldCheck, ChevronRight, BarChart3, PieChart as PieChartIcon, Receipt
-, TrendingDown
+, TrendingDown, LayoutDashboard, CalendarDays, Landmark, Package, Settings, LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,16 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
+
+const NAV_ICONS: Record<string, any> = {
+  dashboard: LayoutDashboard,
+  hr: Users,
+  events: CalendarDays,
+  finance: Landmark,
+  inventory: Package,
+  expenses: Receipt,
+  settings: Settings
+};
 
 const DUMMY_STAFF = [
   { 
@@ -520,11 +530,16 @@ const HRStaff = () => {
     toast.success("Staff record deleted");
   };
 
-  const filtered = staff.filter(s =>
+  const filteredStaff = useMemo(() => staff.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.id.toLowerCase().includes(search.toLowerCase()) ||
     s.department.toLowerCase().includes(search.toLowerCase())
-  );
+  ), [staff, search]);
+
+  const monthlyPayrollTotal = useMemo(() => staff.reduce((acc, s) => {
+    const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+    return acc + (latestPayroll ? latestPayroll.netPay : s.salary);
+  }, 0), [staff]);
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-10">
@@ -534,14 +549,14 @@ const HRStaff = () => {
           <h2 className="text-xl sm:text-2xl font-bold text-foreground">Workforce Management</h2>
           <p className="text-xs sm:text-sm text-muted-foreground text-balance">Comprehensive HR portal for staff, attendance, and payroll</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setShowTotalLedgerModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none border-primary/20 hover:bg-primary/5 text-primary">
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <Button onClick={() => setShowTotalLedgerModal(true)} variant="outline" className="gap-2 flex-shrink-0 border-primary/20 hover:bg-primary/5 text-primary">
             <BarChart3 className="h-4 w-4" /> Total Ledger
           </Button>
-          <Button onClick={() => setShowAnnounceModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none">
+          <Button onClick={() => setShowAnnounceModal(true)} variant="outline" className="gap-2 flex-shrink-0">
             <Bell className="h-4 w-4" /> Announce
           </Button>
-          <Button onClick={() => setShowAddModal(true)} className="gap-2 flex-1 sm:flex-none">
+          <Button onClick={() => setShowAddModal(true)} className="gap-2 flex-shrink-0">
             <UserPlus className="h-4 w-4" /> Add Staff
           </Button>
         </div>
@@ -577,10 +592,7 @@ const HRStaff = () => {
             <div className="flex flex-col">
               <span className="text-[10px] uppercase font-bold text-muted-foreground">Monthly Total Payroll</span>
               <span className="text-sm font-bold text-success">
-                ₨ {staff.reduce((acc, s) => {
-                  const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-                  return acc + (latestPayroll ? latestPayroll.netPay : s.salary);
-                }, 0).toLocaleString()}
+                ₨ {monthlyPayrollTotal.toLocaleString()}
               </span>
             </div>
             <div className="h-8 w-[1px] bg-border mx-2" />
@@ -618,7 +630,7 @@ const HRStaff = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filtered.map(s => (
+                  {filteredStaff.map(s => (
                     <tr key={s.id} className="hover:bg-muted/30 transition-colors group">
                       <td className="px-4 py-4 text-sm font-mono font-medium text-primary">{s.id}</td>
                       <td className="px-4 py-4">

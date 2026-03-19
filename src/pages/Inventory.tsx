@@ -408,7 +408,7 @@ const Inventory = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${h.type === "purchase" ? "bg-success/10 text-success border-success/20" : h.type === "return" ? "bg-blue-10 text-blue-700 border-blue-200" : "bg-destructive/10 text-destructive border-destructive/20"}`}>
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${h.type === "purchase" ? "bg-success/10 text-success border-success/20" : h.type === "return" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-destructive/10 text-destructive border-destructive/20"}`}>
                           {h.type === "purchase" ? <ArrowUp className="h-3 w-3" /> : h.type === "return" ? <RotateCcw className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
                           {h.type}
                         </span>
