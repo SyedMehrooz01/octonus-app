@@ -108,7 +108,7 @@ const Inventory = () => {
   });
 
   const lowStock = items.filter(i => i.stock <= i.minStock);
-  const totalValue = items.reduce((s, i) => s + i.stock * i.purchasePrice, 0);
+  const totalValue = items.reduce((s, i) => s + (i.stock ?? 0) * (i.purchasePrice ?? 0), 0);
 
   const handleAdd = async () => {
     if (!newItem.name) return;
@@ -118,16 +118,15 @@ const Inventory = () => {
         name: newItem.name,
         category: newItem.category,
         unit: newItem.unit,
-        stock: Number(newItem.stock),
-        minStock: Number(newItem.minStock),
-        purchasePrice: Number(newItem.purchasePrice),
+        stock: Number(newItem.stock || 0),
+        minStock: Number(newItem.minStock || 0),
+        purchasePrice: Number(newItem.purchasePrice || 0),
         supplier: newItem.supplier,
         type: newItem.type
       }]).select();
 
       if (error) throw error;
       
-      // Also record initial stock movement if stock > 0
       if (Number(newItem.stock) > 0) {
         await supabase.from('stock_movements').insert([{
           date: format(new Date(), "yyyy-MM-dd"),
@@ -253,112 +252,139 @@ const Inventory = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Inventory & Stock Management</h2>
-          <p className="text-sm text-muted-foreground">Track items, purchases, and stock levels</p>
+    <div className="space-y-8 pb-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="animate-in fade-in slide-in-from-left duration-500">
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Inventory & Stock Control</h1>
+          <p className="text-slate-500 font-bold mt-1">Real-time tracking of assets, consumables, and procurement.</p>
         </div>
         {canDo("add") && (
-          <Button onClick={() => setShowAddModal(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Add Item
+          <Button onClick={() => setShowAddModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-600/20 h-12 px-8 gap-2 transition-all hover:-translate-y-0.5 animate-in fade-in slide-in-from-right duration-500">
+            <Plus className="h-5 w-5" /> ADD NEW ASSET
           </Button>
         )}
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Total Items", value: items.length, icon: Package, color: "bg-primary" },
-          { label: "Low Stock", value: lowStock.length, icon: AlertTriangle, color: "bg-warning" },
-          { label: "Stock Value", value: `₨ ${totalValue.toLocaleString()}`, icon: Package, color: "bg-success" },
-          { label: "Categories", value: [...new Set(items.map(i => i.category))].length, icon: Package, color: "bg-secondary" },
-        ].map(card => (
-          <div key={card.label} className="rounded-lg border border-border bg-card p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground truncate">{card.label}</p>
-                <p className="mt-1 text-base sm:text-xl font-bold text-card-foreground truncate">{card.value}</p>
+          { label: "Total Asset Types", value: items.length, icon: Package, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20" },
+          { label: "Low Stock Alerts", value: lowStock.length, icon: AlertTriangle, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20" },
+          { label: "Est. Stock Value", value: `₨ ${totalValue.toLocaleString()}`, icon: Wallet2, color: "from-emerald-500 to-emerald-700", shadow: "shadow-emerald-500/20" },
+          { label: "Active Categories", value: [...new Set(items.map(i => i.category))].length, icon: Landmark, color: "from-violet-500 to-violet-700", shadow: "shadow-violet-500/20" },
+        ].map((card, i) => (
+          <div key={card.label} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.color} p-6 text-white shadow-xl ${card.shadow} transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
+            <div className="relative z-10 flex flex-col gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+                <card.icon className="h-6 w-6 text-white" />
               </div>
-              <div className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg flex-shrink-0 ${card.color}`}>
-                <card.icon className="h-4 w-4 text-white" />
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{card.label}</p>
+                <p className="text-2xl font-black truncate tracking-tight">{card.value}</p>
               </div>
+            </div>
+            <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
+              <card.icon size={140} className="text-white" />
             </div>
           </div>
         ))}
       </div>
 
-      {/* Low Stock Alert */}
       {lowStock.length > 0 && (
-        <div className="rounded-lg border border-warning/30 bg-warning/10 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="h-4 w-4 text-warning" />
-            <h4 className="text-sm font-semibold text-warning">Low Stock Alert ({lowStock.length} items)</h4>
+        <div className="rounded-3xl border border-rose-100 bg-rose-50/50 p-6 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="rounded-xl bg-rose-500 p-2.5 text-white shadow-lg shadow-rose-500/30 animate-pulse">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <h4 className="text-sm font-black text-rose-900 uppercase tracking-[0.1em]">Critical Low Stock Warning ({lowStock.length})</h4>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {lowStock.map(i => (
-              <span key={i.id} className="rounded-full bg-warning/20 px-3 py-1 text-xs font-medium text-warning">
-                {i.name} ({i.stock} {i.unit})
+              <span key={i.id} className="rounded-xl bg-white border border-rose-100 px-4 py-2.5 text-xs font-black text-rose-600 shadow-sm flex items-center gap-3 group hover:border-rose-300 transition-colors">
+                <div className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
+                {i.name} <span className="text-rose-400 font-bold ml-1">— {i.stock} {i.unit} LEFT</span>
               </span>
             ))}
           </div>
         </div>
       )}
 
-      <Tabs defaultValue="stock">
-        <TabsList className="mb-4">
-          <TabsTrigger value="stock">Stock Balance</TabsTrigger>
-          <TabsTrigger value="history">Stock History</TabsTrigger>
+      <Tabs defaultValue="stock" className="w-full">
+        <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
+          <TabsTrigger value="stock" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Inventory List</TabsTrigger>
+          <TabsTrigger value="history" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Movement History</TabsTrigger>
         </TabsList>
 
-        {/* Stock Balance */}
-        <TabsContent value="stock">
-          <div className="rounded-lg border border-border bg-card">
-            <div className="flex items-center gap-3 border-b border-border p-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search items..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+        <TabsContent value="stock" className="space-y-6 animate-in fade-in duration-500">
+          <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
+            <div className="p-6 border-b border-slate-50 bg-slate-50/30">
+              <div className="relative max-w-md group">
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                <Input placeholder="Search inventory items..." className="pl-11 h-12 bg-white border-slate-200 rounded-xl font-bold shadow-sm focus-visible:ring-blue-500/20" value={search} onChange={e => setSearch(e.target.value)} />
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px]">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40">
-                    {["Item Name", "Type", "Category", "Unit", "In Stock", "Min Stock", "Value", "Actions"].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>
-                    ))}
+                  <tr className="bg-slate-50/80 text-left border-b border-slate-100">
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Item Details</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Type</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Category</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Stock Level</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Asset Value</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-50">
                   {loading ? (
-                    <tr><td colSpan={8} className="px-4 py-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" /></td></tr>
-                  ) : filteredItems.map(item => (
-                    <tr key={item.id} className={`border-b border-border last:border-0 hover:bg-muted/20 ${item.stock <= item.minStock ? "bg-warning/5" : ""}`}>
-                      <td className="px-4 py-3 text-sm font-medium text-card-foreground">{item.name}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase border ${item.type === 'consumable' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'}`}>
+                    Array(5).fill(0).map((_, i) => (
+                      <tr key={i}><td colSpan={6} className="px-6 py-8"><div className="h-12 w-full animate-pulse rounded-2xl bg-slate-100" /></td></tr>
+                    ))
+                  ) : filteredItems.map((item, idx) => (
+                    <tr key={item.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
+                      <td className="px-6 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-blue-600 font-black text-sm shadow-sm border border-blue-100/50 group-hover:scale-110 transition-transform duration-300">
+                            <Package className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{item.name}</p>
+                            <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter flex items-center gap-2">
+                              <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
+                              Supplier: {item.supplier}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-6">
+                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${item.type === 'consumable' ? 'bg-blue-500 text-white' : 'bg-violet-500 text-white'}`}>
                           {item.type}
-                        </span>
+                        </Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{item.category}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{item.unit}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-sm font-bold ${item.stock <= item.minStock ? "text-warning" : "text-card-foreground"}`}>
-                          {item.stock}
-                          {item.stock <= item.minStock && <AlertTriangle className="ml-1 inline h-3 w-3" />}
-                        </span>
+                      <td className="px-6 py-6">
+                        <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm">
+                          {item.category}
+                        </Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{item.minStock}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-card-foreground">₨ {(item.stock * item.purchasePrice).toLocaleString()}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-6">
+                        <div className="flex flex-col items-center gap-2">
+                          <span className={`text-sm font-black tracking-tight ${item.stock <= item.minStock ? "text-rose-600" : "text-slate-700"}`}>
+                            {item.stock} {item.unit}
+                          </span>
+                          <div className="h-1.5 w-20 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                            <div className={`h-full transition-all duration-500 ${item.stock <= item.minStock ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"}`} style={{ width: `${Math.min(100, (item.stock / (item.minStock || 1)) * 50)}%` }} />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-6 text-sm font-black text-right text-slate-700 tracking-tight">₨ {(item.stock * item.purchasePrice).toLocaleString()}</td>
+                      <td className="px-6 py-6 text-right">
                         {canDo("edit") && (
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => { setSelectedItem(item); setStockAction({ type: "purchase", qty: "", note: "", issued_to: "" }); setShowStockModal(true); }} className="flex items-center gap-1 rounded bg-success/10 px-2 py-1 text-xs text-success hover:bg-success/20">
-                              <ArrowUp className="h-3 w-3" /> In
-                            </button>
-                            <button onClick={() => { setSelectedItem(item); setStockAction({ type: "issue", qty: "", note: "", issued_to: "" }); setShowStockModal(true); }} className="flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-xs text-destructive hover:bg-destructive/20">
-                              <ArrowDown className="h-3 w-3" /> Out
-                            </button>
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
+                            <Button size="sm" onClick={() => { setSelectedItem(item); setStockAction({ type: "purchase", qty: "", note: "", issued_to: "" }); setShowStockModal(true); }} className="h-9 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest gap-2 shadow-lg shadow-emerald-500/20">
+                              <ArrowUp className="h-3.5 w-3.5" /> STOCK IN
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => { setSelectedItem(item); setStockAction({ type: "issue", qty: "", note: "", issued_to: "" }); setShowStockModal(true); }} className="h-9 px-4 rounded-xl border-rose-200 text-rose-500 hover:bg-rose-50 font-black text-[10px] uppercase tracking-widest gap-2 shadow-sm">
+                              <ArrowDown className="h-3.5 w-3.5" /> STOCK OUT
+                            </Button>
                           </div>
                         )}
                       </td>

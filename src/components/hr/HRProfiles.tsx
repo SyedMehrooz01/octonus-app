@@ -46,31 +46,31 @@ const HRProfiles = memo(({
   statusColor
 }: HRProfilesProps) => {
   return (
-    <div className="mt-4 space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+    <div className="mt-8 space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 bg-white p-6 rounded-2xl border border-border shadow-sm">
+        <div className="flex items-center gap-2 bg-muted/50 p-1.5 rounded-xl border border-border/50">
           <Button 
-            variant={viewMode === "list" ? "secondary" : "ghost"} 
+            variant={viewMode === "list" ? "default" : "ghost"} 
             size="sm" 
             onClick={() => setViewMode("list")}
-            className="h-8 gap-2"
+            className={`h-9 px-4 rounded-lg font-bold gap-2 transition-all ${viewMode === "list" ? "shadow-md shadow-primary/20" : "text-muted-foreground hover:text-foreground"}`}
           >
-            <List className="h-4 w-4" /> List
+            <List className="h-4 w-4" /> List View
           </Button>
           <Button 
-            variant={viewMode === "grid" ? "secondary" : "ghost"} 
+            variant={viewMode === "grid" ? "default" : "ghost"} 
             size="sm" 
             onClick={() => setViewMode("grid")}
-            className="h-8 gap-2"
+            className={`h-9 px-4 rounded-lg font-bold gap-2 transition-all ${viewMode === "grid" ? "shadow-md shadow-primary/20" : "text-muted-foreground hover:text-foreground"}`}
           >
-            <LayoutGrid className="h-4 w-4" /> Cards
+            <LayoutGrid className="h-4 w-4" /> Grid View
           </Button>
         </div>
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative w-full sm:max-w-md group">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
-            placeholder="Search by ID, Name..." 
-            className="pl-9 h-9 w-full" 
+            placeholder="Search by ID, Name, Role or Department..." 
+            className="pl-10 h-11 w-full bg-white border-border rounded-xl focus:ring-primary/20 focus:border-primary transition-all shadow-sm" 
             value={search} 
             onChange={e => setSearch(e.target.value)} 
           />
@@ -78,68 +78,77 @@ const HRProfiles = memo(({
       </div>
 
       {viewMode === "list" ? (
-        <div className="rounded-lg border border-border bg-card">
+        <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse min-w-[1000px]">
               <thead>
-                <tr className="border-y border-border bg-muted/40">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Staff ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Employee</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contact</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Role & Dept</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
+                <tr className="bg-muted/30 text-left border-b border-border">
+                  <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Employee ID</th>
+                  <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Staff Member</th>
+                  <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Designation & Dept</th>
+                  <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Contact Info</th>
+                  <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-center">Status</th>
+                  <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {(filteredStaff ?? []).map(s => (
-                  <tr key={s?.id ?? Math.random()} className="hover:bg-muted/30 transition-colors group">
-                    <td className="px-4 py-4 text-sm font-mono font-medium text-primary">{s?.id ?? "N/A"}</td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-bold text-xs">
+                {(filteredStaff ?? []).map((s, idx) => (
+                  <tr key={s?.id ?? Math.random()} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-primary/5 transition-colors group`}>
+                    <td className="px-6 py-5">
+                      <span className="inline-flex items-center justify-center px-3 py-1 rounded-lg bg-primary/5 text-primary font-black text-xs border border-primary/10">
+                        {s?.id ?? "N/A"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-4">
+                        <div className="h-11 w-11 rounded-xl bg-gradient-to-tr from-blue-600 to-blue-400 flex items-center justify-center text-white font-black text-sm shadow-md shadow-blue-500/20">
                           {(s?.name ?? "U").split(" ").map((n:any) => n[0]).join("").toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground truncate">{s?.name ?? "Unknown"}</p>
-                          <p className="text-[11px] text-muted-foreground truncate">{s?.email ?? "No Email"}</p>
+                          <p className="text-base font-black text-foreground leading-tight group-hover:text-primary transition-colors">{s?.name ?? "Unknown"}</p>
+                          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-tighter mt-0.5">{s?.email ?? "No Email Address"}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-sm text-muted-foreground">{s?.phone ?? "N/A"}</td>
-                    <td className="px-4 py-4">
-                      <p className="text-sm font-medium text-card-foreground">{s?.role ?? "N/A"}</p>
-                      <p className="text-[11px] text-muted-foreground">{s?.department ?? "N/A"}</p>
+                    <td className="px-6 py-5">
+                      <p className="text-sm font-black text-foreground/80 leading-tight">{s?.role ?? "N/A"}</p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">{s?.department ?? "Unassigned"}</p>
                     </td>
-                    <td className="px-4 py-4">
-                      <Badge variant="outline" className={`capitalize font-medium ${statusColor(s?.status ?? "inactive")}`}>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-2 text-sm font-bold text-foreground/70">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        {s?.phone ?? "No Contact"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-center">
+                      <Badge className={`${statusColor(s?.status ?? "inactive")} rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tighter border-none`}>
                         {s?.status ?? "inactive"}
                       </Badge>
                     </td>
-                    <td className="px-4 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedStaff(s); setShowViewModal(true); }}>
-                          <Eye className="h-4 w-4 text-muted-foreground" />
+                    <td className="px-6 py-5 text-right">
+                      <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 hover:text-blue-700 shadow-sm" onClick={() => { setSelectedStaff(s); setShowViewModal(true); }}>
+                          <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handlePrintCard(s)}>
-                          <Printer className="h-4 w-4 text-muted-foreground" />
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100/50 shadow-sm" onClick={() => handlePrintCard(s)}>
+                          <Printer className="h-4 w-4" />
                         </Button>
                         {canDo("edit") && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditStaff(s); setShowEditModal(true); }}>
-                            <Edit className="h-4 w-4 text-muted-foreground" />
+                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50 shadow-sm" onClick={() => { setEditStaff(s); setShowEditModal(true); }}>
+                            <Edit className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setLedgerStaff(s); setShowLedgerModal(true); }}>
-                          <FileText className="h-4 w-4 text-muted-foreground" />
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-violet-600 hover:text-violet-700 hover:bg-violet-100/50 shadow-sm" onClick={() => { setLedgerStaff(s); setShowLedgerModal(true); }}>
+                          <FileText className="h-4 w-4" />
                         </Button>
                         {user?.role === "admin" && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setRightsStaff(s); setShowRightsModal(true); }}>
-                            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-amber-600 hover:text-amber-700 hover:bg-amber-100/50 shadow-sm" onClick={() => { setRightsStaff(s); setShowRightsModal(true); }}>
+                            <ShieldCheck className="h-4 w-4" />
                           </Button>
                         )}
                         {canDo("delete") && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => setShowDeleteConfirm(s?.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-100/50 shadow-sm" onClick={() => setShowDeleteConfirm(s?.id)}>
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
@@ -151,59 +160,67 @@ const HRProfiles = memo(({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {(filteredStaff ?? []).map(s => (
-            <div key={s?.id ?? Math.random()} className="relative group overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-xl font-black text-primary border-2 border-primary/20">
-                    {(s?.name ?? "U").split(' ').map((n:any) => n[0]).join('').toUpperCase()}
+            <div key={s?.id ?? Math.random()} className="relative group overflow-hidden rounded-2xl border border-border bg-white p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-5">
+                  <div className="relative">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary to-blue-400 text-2xl font-black text-white shadow-lg shadow-primary/20">
+                      {(s?.name ?? "U").split(' ').map((n:any) => n[0]).join('').toUpperCase()}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-2 border-white bg-emerald-500 shadow-sm" />
                   </div>
-                  <div>
-                    <h4 className="text-base font-bold text-card-foreground leading-tight">{s?.name ?? "Unknown"}</h4>
-                    <p className="text-xs text-muted-foreground font-medium">{s?.role ?? "No Role"}</p>
-                    <div className="flex items-center gap-1 mt-1">
+                  <div className="min-w-0">
+                    <h4 className="text-lg font-black text-foreground leading-tight truncate max-w-[150px]">{s?.name ?? "Unknown"}</h4>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1 truncate max-w-[150px]">{s?.role ?? "No Role"}</p>
+                    <div className="flex items-center gap-1 mt-2">
                       {Array.from({ length: 5 }).map((_, i) => (
-                        <Star key={i} className={`h-3 w-3 ${i < (s?.performance?.[(s?.performance?.length ?? 0) - 1] || 4) ? "text-amber-400 fill-amber-400" : "text-muted"}`} />
+                        <Star key={i} className={`h-3 w-3 ${i < (s?.performance?.[(s?.performance?.length ?? 0) - 1] || 4) ? "text-amber-400 fill-amber-400" : "text-muted/30"}`} />
                       ))}
                     </div>
                   </div>
                 </div>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase border ${
-                  (s?.status ?? 'active') === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
-                }`}>
+                <Badge className={`${statusColor(s?.status ?? "inactive")} rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tighter border-none`}>
                   {s?.status ?? "inactive"}
-                </span>
+                </Badge>
               </div>
 
-              <div className="grid grid-cols-2 gap-y-3 gap-x-2 border-t border-border pt-4 text-[11px]">
-                <div className="space-y-1">
-                  <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Staff ID</p>
-                  <p className="font-bold">{s?.id ?? "N/A"}</p>
+              <div className="grid grid-cols-2 gap-y-4 gap-x-3 border-t border-border pt-6 mb-6">
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.1em]">Employee ID</p>
+                  <p className="text-sm font-black text-foreground/80">{s?.id ?? "N/A"}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Department</p>
-                  <p className="font-bold">{s?.department ?? "N/A"}</p>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.1em]">Department</p>
+                  <p className="text-sm font-black text-foreground/80">{s?.department ?? "N/A"}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Monthly Salary</p>
-                  <p className="font-bold text-success">₨ {(s?.salary ?? 0).toLocaleString()}</p>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.1em]">Base Salary</p>
+                  <p className="text-sm font-black text-emerald-600">₨ {(s?.salary ?? 0).toLocaleString()}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Joining Date</p>
-                  <p className="font-bold">{s?.joinDate ?? "N/A"}</p>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.1em]">Join Date</p>
+                  <p className="text-sm font-black text-foreground/80">{s?.joinDate ?? "N/A"}</p>
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+              <div className="flex items-center justify-between border-t border-border pt-6">
                 <div className="flex flex-col">
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Monthly Attendance</span>
-                  <span className="text-sm font-black text-primary">{(s?.attendance ?? 100)}%</span>
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Attendance</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-lg font-black text-primary">{(s?.attendance ?? 100)}%</span>
+                    <div className="h-1.5 w-16 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary" style={{ width: `${s?.attendance ?? 100}%` }} />
+                    </div>
+                  </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => { setSelectedStaff(s); setShowViewModal(true); }}><Eye className="h-4 w-4" /></Button>
-                  <Button variant="outline" size="sm" className="h-8 gap-2 px-3 text-[10px] font-bold uppercase tracking-wider" onClick={() => handlePrintCard(s)}>
-                    <Printer className="h-3 w-3" /> ID Card
+                  <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-border hover:bg-muted hover:text-primary transition-colors" onClick={() => { setSelectedStaff(s); setShowViewModal(true); }}>
+                    <Eye className="h-5 w-5" />
+                  </Button>
+                  <Button variant="default" className="h-10 rounded-xl font-bold px-4 gap-2 shadow-lg shadow-primary/20" onClick={() => handlePrintCard(s)}>
+                    <Printer className="h-4 w-4" /> <span className="text-[11px] uppercase tracking-widest">ID Card</span>
                   </Button>
                 </div>
               </div>

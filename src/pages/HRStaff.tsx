@@ -48,10 +48,10 @@ const HRReports = lazy(() => import("@/components/hr/HRReports"));
 
 const statusColor = (status: string) => {
   const s = status.toLowerCase();
-  if (s === "active" || s === "present" || s === "paid" || s === "approved") return "bg-success/10 text-success border-success/20";
-  if (s === "inactive" || s === "absent" || s === "rejected") return "bg-destructive/10 text-destructive border-destructive/20";
-  if (s === "late" || s === "pending" || s === "half-day") return "bg-warning/10 text-warning border-warning/20";
-  return "bg-muted text-muted-foreground";
+  if (s === "active" || s === "present" || s === "paid" || s === "approved" || s === "confirmed") return "bg-emerald-500 hover:bg-emerald-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold";
+  if (s === "inactive" || s === "absent" || s === "rejected" || s === "cancelled") return "bg-rose-500 hover:bg-rose-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold";
+  if (s === "late" || s === "pending" || s === "half-day" || s === "tentative") return "bg-blue-500 hover:bg-blue-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold";
+  return "bg-gray-400 hover:bg-gray-500 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold";
 };
 
 const HRStaff = () => {
@@ -494,14 +494,18 @@ const HRStaff = () => {
     const today = format(new Date(), "yyyy-MM-dd");
     try {
       // Find staff who don't have attendance for today
-      const { data: todayAttendance } = await supabase
+      const { data: todayAttendance, error: fetchError } = await supabase
         .from('attendance')
         .select('employee_id')
         .eq('date', today);
       
+      if (fetchError) throw fetchError;
+
       const markedEmpIds = new Set((todayAttendance ?? []).map(a => a.employee_id));
+      
+      // Filter staff: active, has id, and NOT marked today
       const absentRecords = (staff ?? [])
-        .filter(s => s?.id && !markedEmpIds.has(s.id) && s.status === 'active')
+        .filter(s => s?.id && !markedEmpIds.has(s.id) && s.status?.toLowerCase() === 'active')
         .map(s => ({
           employee_id: s.id,
           date: today,
@@ -511,19 +515,19 @@ const HRStaff = () => {
         }));
 
       if (absentRecords.length === 0) {
-        toast.info("No missing attendance records found for today");
+        toast.info("All active staff already have attendance records for today");
         return;
       }
 
-      const { error } = await supabase.from('attendance').insert(absentRecords);
-      if (error) throw error;
+      const { error: insertError } = await supabase.from('attendance').insert(absentRecords);
+      if (insertError) throw insertError;
       
       await fetchHRData();
-      toast.success(`Automatically marked ${absentRecords.length} staff as absent`);
+      toast.success(`Successfully marked ${absentRecords.length} staff members as absent`);
       logAction(`Auto-marked ${absentRecords.length} staff as absent for ${today}`, "HR & Staff");
     } catch (err: any) {
       console.error("Auto absent error:", err);
-      toast.error(err?.message || "Failed to run auto-absent");
+      toast.error(err?.message || "Failed to run auto-absent process");
     }
   };
 

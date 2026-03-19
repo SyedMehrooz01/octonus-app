@@ -1,27 +1,36 @@
-import { useState, useEffect, memo } from "react";
-import { CalendarDays, Users, Landmark, Clock, Plus, Receipt, CheckCircle, Wallet, ArrowRight, Activity, TrendingUp, TrendingDown } from "lucide-react";
+import { useState, useEffect, memo, useMemo } from "react";
+import { CalendarDays, Users, Landmark, Clock, Plus, Receipt, CheckCircle, Wallet, ArrowRight, Activity, TrendingUp, TrendingDown, Search, Filter, Eye, Edit, Trash2, AlertTriangle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, startOfToday, endOfToday, addDays, subMonths, startOfDay, endOfDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfToday, endOfToday, addDays, subMonths } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const Dashboard = () => {
-  const { canDo, hasAccess } = useAuth();
+  const { canDo, hasAccess, logAction } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState([
-    { label: "Today's Events", value: "0", icon: CalendarDays, color: "bg-blue-500", textColor: "text-blue-500" },
-    { label: "This Month Revenue", value: "₨ 0", icon: Landmark, color: "bg-emerald-500", textColor: "text-emerald-500" },
-    { label: "Active Staff", value: "0", icon: Users, color: "bg-violet-500", textColor: "text-violet-500" },
-    { label: "Pending Balances", value: "₨ 0", icon: Clock, color: "bg-amber-500", textColor: "text-amber-500" },
-  ]);
+  const [loading, setLoading] = useState(true);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [attendanceMissing, setAttendanceMissing] = useState(false);
-  const [loading, setLoading] = useState(true);
+  
+  // Stats state
+  const [totalEventsCount, setTotalEventsCount] = useState(0);
+  const [upcomingEventsCount, setUpcomingEventsCount] = useState(0);
+  const [paymentsDue, setPaymentsDue] = useState(0);
+  const [lowInventoryCount, setLowInventoryCount] = useState(0);
+  const [activeStaffCount, setActiveStaffCount] = useState(0);
+  const [thisMonthRevenue, setThisMonthRevenue] = useState(0);
+
+  // Table state
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -34,66 +43,79 @@ const Dashboard = () => {
         const monthEnd = endOfMonth(new Date()).toISOString();
         const nextWeek = addDays(new Date(), 7).toISOString();
 
-        // 1. Fetch Today's Events Count
-        const { count: todayEventsCount } = await supabase
+        // 1. Fetch Total Events
+        const { count: totalEvents } = await supabase
+          .from('events')
+          .select('*', { count: 'exact', head: true })
+          .neq('status', 'cancelled');
+        setTotalEventsCount(totalEvents || 0);
+
+        // 2. Fetch Upcoming Events Count
+        const { count: upcomingCount } = await supabase
           .from('events')
           .select('*', { count: 'exact', head: true })
           .gte('event_date', today)
-          .lte('event_date', endOfTodayStr);
+          .neq('status', 'cancelled');
+        setUpcomingEventsCount(upcomingCount || 0);
 
-        // 2. Fetch Active Staff Count
-        const { count: activeStaffCount } = await supabase
+        // 3. Fetch Payments Due (Balance Remaining)
+        const { data: balanceData } = await supabase
+          .from('events')
+          .select('balance_remaining')
+          .neq('status', 'cancelled')
+          .gt('balance_remaining', 0);
+        const totalDue = balanceData?.reduce((sum, e) => sum + (e.balance_remaining || 0), 0) || 0;
+        setPaymentsDue(totalDue);
+
+        // 4. Fetch Low Inventory Alerts
+        const { data: inventoryData } = await supabase
+          .from('inventory_items')
+          .select('id, stock, min_stock');
+        const lowStock = inventoryData?.filter(i => (i.stock ?? 0) <= (i.min_stock ?? 0)).length || 0;
+        setLowInventoryCount(lowStock);
+
+        // 5. Fetch Active Staff Count
+        const { count: staffCount } = await supabase
           .from('staff')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'active');
+        setActiveStaffCount(staffCount || 0);
 
-        // 3. Check if attendance marked for today
+        // 6. Check if attendance marked for today
         const { count: attendanceCount } = await supabase
           .from('attendance')
           .select('*', { count: 'exact', head: true })
           .eq('date', todayStr);
-        
         setAttendanceMissing(!attendanceCount || attendanceCount === 0);
 
-        // 3. Fetch Month Revenue
+        // 7. Fetch Month Revenue
         const { data: monthlyPayments } = await supabase
           .from('event_payments')
           .select('amount')
           .gte('date', monthStart)
           .lte('date', monthEnd);
-        
         const totalRevenue = monthlyPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+        setThisMonthRevenue(totalRevenue);
 
-        // 4. Fetch Pending Balances
-        const { data: pendingBalances } = await supabase
-          .from('events')
-          .select('balance_remaining')
-          .neq('status', 'cancelled');
-        
-        const totalPending = pendingBalances?.reduce((sum, e) => sum + (e.balance_remaining || 0), 0) || 0;
-
-        // 5. Fetch Upcoming Events
+        // 8. Fetch Upcoming Events Table
         const { data: upcoming } = await supabase
           .from('events')
-          .select(`id, client_name, event_date, total_amount, event_type, venue, status`)
+          .select(`id, client_name, event_date, total_amount, event_type, venue, status, guests, balance_remaining`)
           .gte('event_date', today)
-          .lte('event_date', nextWeek)
-          .order('event_date', { ascending: true })
-          .limit(5);
+          .order('event_date', { ascending: true });
+        setUpcomingEvents(upcoming || []);
 
-        // 6. Fetch last 6 months revenue for chart
+        // 9. Fetch last 6 months revenue for chart
         const last6Months = [];
         for (let i = 5; i >= 0; i--) {
           const date = subMonths(new Date(), i);
           const start = startOfMonth(date).toISOString();
           const end = endOfMonth(date).toISOString();
-          
           const { data: payments } = await supabase
             .from('event_payments')
             .select('amount')
             .gte('date', start)
             .lte('date', end);
-          
           const total = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
           last6Months.push({
             month: format(date, 'MMM'),
@@ -102,15 +124,13 @@ const Dashboard = () => {
         }
         setRevenueData(last6Months);
 
-        // 7. Recent Activity (Bookings, Payments, Attendance)
+        // 10. Recent Activity
         const activity = [];
-        
         const { data: recentBookings } = await supabase
           .from('events')
           .select('client_name, created_at, event_type')
           .order('created_at', { ascending: false })
           .limit(3);
-        
         recentBookings?.forEach(b => activity.push({
           type: 'booking',
           title: `New booking: ${b.client_name}`,
@@ -124,7 +144,6 @@ const Dashboard = () => {
           .select('amount, date, events(client_name)')
           .order('date', { ascending: false })
           .limit(3);
-        
         recentPayments?.forEach(p => activity.push({
           type: 'payment',
           title: `Payment of ₨ ${p.amount.toLocaleString()} received from ${(p as any).events?.client_name}`,
@@ -138,7 +157,6 @@ const Dashboard = () => {
           .select('id, date, status, staff(name)')
           .order('date', { ascending: false })
           .limit(3);
-        
         recentAttendance?.forEach(a => activity.push({
           type: 'attendance',
           title: `Attendance marked for ${(a as any).staff?.name}: ${a.status}`,
@@ -148,15 +166,6 @@ const Dashboard = () => {
         }));
 
         setRecentActivity(activity.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 6));
-
-        setStats([
-          { label: "Today's Events", value: (todayEventsCount || 0).toString(), icon: CalendarDays, color: "bg-blue-500", textColor: "text-blue-500" },
-          { label: "This Month Revenue", value: `₨ ${totalRevenue.toLocaleString()}`, icon: Landmark, color: "bg-emerald-500", textColor: "text-emerald-500" },
-          { label: "Active Staff", value: (activeStaffCount || 0).toString(), icon: Users, color: "bg-violet-500", textColor: "text-violet-500" },
-          { label: "Pending Balances", value: `₨ ${totalPending.toLocaleString()}`, icon: Clock, color: "bg-amber-500", textColor: "text-amber-500" },
-        ]);
-
-        setUpcomingEvents(upcoming || []);
 
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -185,230 +194,349 @@ const Dashboard = () => {
     }
   };
 
+  const handleDeleteEvent = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this event?")) return;
+    try {
+      const { error } = await supabase.from('events').delete().eq('id', id);
+      if (error) throw error;
+      setUpcomingEvents(prev => prev.filter(e => e.id !== id));
+      toast.success("Event deleted successfully");
+      logAction("Deleted an event from dashboard", "Dashboard");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete event");
+    }
+  };
+
+  const filteredEvents = useMemo(() => {
+    return upcomingEvents.filter(e => 
+      e.client_name?.toLowerCase().includes(search.toLowerCase()) ||
+      e.event_type?.toLowerCase().includes(search.toLowerCase()) ||
+      e.venue?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [upcomingEvents, search]);
+
+  const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
+  const paginatedEvents = filteredEvents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const getStatusBadge = (status: string) => {
+    const s = status?.toLowerCase();
+    if (s === 'confirmed') return <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold">Confirmed</Badge>;
+    if (s === 'pending') return <Badge className="bg-blue-500 hover:bg-blue-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold">Pending</Badge>;
+    if (s === 'tentative') return <Badge className="bg-gray-400 hover:bg-gray-500 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold">Tentative</Badge>;
+    if (s === 'cancelled') return <Badge className="bg-rose-500 hover:bg-rose-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold">Cancelled</Badge>;
+    return <Badge variant="outline" className="px-3 py-1 rounded-lg font-bold">{status}</Badge>;
+  };
+
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-8 pb-10">
       {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">Welcome Back, Admin</h2>
-            <p className="text-sm text-muted-foreground">Here's what's happening with your business today.</p>
-          </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="animate-in fade-in slide-in-from-left duration-500">
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Welcome to Octonus Solutions!</h1>
+          <p className="text-slate-500 font-bold mt-1">Here's what's happening with your business today.</p>
+        </div>
+        <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right duration-500">
           {attendanceMissing && (
-            <Badge variant="destructive" className="animate-pulse flex items-center gap-1 py-1 px-3">
-              <Clock className="h-3 w-3" /> Attendance Not Marked
+            <Badge className="bg-rose-500 hover:bg-rose-600 text-white animate-pulse flex items-center gap-1.5 py-2.5 px-5 rounded-xl shadow-lg shadow-rose-500/20 border-none font-bold">
+              <Clock className="h-4 w-4" /> Attendance Missing
             </Badge>
           )}
-        </div>
-        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full border border-border">
-          <CalendarDays className="h-3.5 w-3.5" />
-          {format(new Date(), 'EEEE, MMMM do, yyyy')}
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <div key={stat.label} className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 transition-all hover:shadow-lg hover:-translate-y-1">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{stat.label}</p>
-                <p className="text-2xl font-black text-card-foreground">{stat.value}</p>
-              </div>
-              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${stat.color} bg-opacity-10 ${stat.textColor} transition-all group-hover:scale-110 group-hover:rotate-3`}>
-                <stat.icon className="h-6 w-6" />
-              </div>
-            </div>
-            <div className={`absolute bottom-0 left-0 h-1 w-full ${stat.color} opacity-20`} />
+          <div className="hidden lg:flex items-center gap-2 text-xs font-black text-slate-500 bg-white border border-slate-200/60 px-5 py-3 rounded-xl shadow-sm">
+            <CalendarDays className="h-4 w-4 text-blue-600" />
+            {format(new Date(), 'EEEE, MMMM do, yyyy').toUpperCase()}
           </div>
-        ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Revenue Chart */}
-        <div className="lg:col-span-2 rounded-xl border border-border bg-card p-6 shadow-sm">
-          <div className="mb-6 flex items-center justify-between">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Total Events */}
+        <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-500 to-blue-700 p-6 shadow-xl shadow-blue-500/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/30">
+          <div className="relative z-10 flex flex-col gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+              <CalendarDays className="h-7 w-7 text-white" />
+            </div>
             <div>
-              <h3 className="text-lg font-bold text-card-foreground">Revenue Overview</h3>
-              <p className="text-xs text-muted-foreground">Monthly earnings for the last 6 months</p>
+              <p className="text-xs font-black text-blue-100/80 uppercase tracking-widest">Total Events</p>
+              <h3 className="text-4xl font-black text-white mt-1 tracking-tight">{totalEventsCount.toLocaleString()}</h3>
             </div>
-            <TrendingUp className="h-5 w-5 text-emerald-500" />
           </div>
-          <div className="h-[300px] w-full">
-            {loading ? (
-              <div className="flex h-full items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary/20" />
+          <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
+            <CalendarDays size={160} className="text-white" />
+          </div>
+        </div>
+
+        {/* Upcoming Events */}
+        <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-600 p-6 shadow-xl shadow-emerald-400/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-400/30">
+          <div className="relative z-10 flex flex-col gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+              <Clock className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-emerald-50/80 uppercase tracking-widest">Upcoming Events</p>
+              <h3 className="text-4xl font-black text-white mt-1 tracking-tight">{upcomingEventsCount.toLocaleString()}</h3>
+            </div>
+          </div>
+          <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-6">
+            <Clock size={160} className="text-white" />
+          </div>
+        </div>
+
+        {/* Payments Due */}
+        <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-400 to-teal-600 p-6 shadow-xl shadow-teal-400/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-teal-400/30">
+          <div className="relative z-10 flex flex-col gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+              <span className="text-3xl font-black text-white italic">₨</span>
+            </div>
+            <div>
+              <p className="text-xs font-black text-teal-50/80 uppercase tracking-widest">Payments Due</p>
+              <h3 className="text-3xl font-black text-white mt-1 tracking-tight">₨ {paymentsDue.toLocaleString()}</h3>
+            </div>
+          </div>
+          <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+            <Landmark size={160} className="text-white" />
+          </div>
+        </div>
+
+        {/* Low Inventory */}
+        <div className="group relative overflow-hidden rounded-3xl bg-white p-6 shadow-xl shadow-slate-200/50 border border-slate-100 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-slate-200/60">
+          <div className="relative z-10 flex flex-col gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 shadow-inner">
+              <AlertTriangle className="h-7 w-7 text-rose-500" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Low Inventory</p>
+              <h3 className="text-4xl font-black text-[#0f172a] mt-1 tracking-tight">{lowInventoryCount.toLocaleString()}</h3>
+            </div>
+          </div>
+          <div className="absolute -right-6 -bottom-6 opacity-5 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3">
+            <Package size={160} className="text-slate-900" />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        {/* Main Table Section */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl border border-slate-100 shadow-sm animate-in fade-in zoom-in duration-500">
+            <div className="relative flex-1 max-w-sm group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+              <Input 
+                placeholder="Search events..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-11 h-12 bg-slate-50 border-slate-100 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500/20 font-bold transition-all shadow-sm"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" className="h-12 rounded-xl border-slate-200 font-black px-6 gap-2 hover:bg-slate-50 transition-all shadow-sm">
+                <Filter className="h-4 w-4 text-slate-500" /> FILTER
+              </Button>
+              {canDo('add') && (
+                <Button onClick={() => navigate("/events")} className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-6 gap-2 shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5">
+                  <Plus className="h-5 w-5" /> ADD BOOKING
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="bg-slate-50/80 text-left border-b border-slate-100">
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Event & Client</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Guests</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-24 text-center">
+                        <div className="flex flex-col items-center gap-4">
+                          <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Syncing Intelligence...</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : paginatedEvents.length > 0 ? (
+                    paginatedEvents.map((event, idx) => (
+                      <tr key={event.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
+                        <td className="px-6 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-blue-600 font-black text-sm shadow-sm border border-blue-100/50 group-hover:scale-110 transition-transform duration-300">
+                              {event.event_type?.[0]?.toUpperCase() || 'E'}
+                            </div>
+                            <div>
+                              <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{event.client_name}</p>
+                              <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter flex items-center gap-2">
+                                <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
+                                {event.event_type} • {event.venue}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-6">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-black text-slate-600 tracking-tight">{format(new Date(event.event_date), 'MMM dd, yyyy')}</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase mt-1 tracking-widest">{format(new Date(event.event_date), 'EEEE')}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-6">
+                          <Badge variant="outline" className="rounded-lg border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black text-slate-600 shadow-sm">
+                            {event.guests} GUESTS
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-6">
+                          {getStatusBadge(event.status)}
+                        </td>
+                        <td className="px-6 py-6 text-right">
+                          <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 hover:text-blue-700 shadow-sm" onClick={() => navigate(`/events?id=${event.id}`)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {canDo('edit') && (
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-100/50 hover:text-emerald-700 shadow-sm">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {canDo('delete') && (
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 hover:text-rose-600 shadow-sm" onClick={() => handleDeleteEvent(event.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-24 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center">
+                            <Search className="h-8 w-8 text-slate-200" />
+                          </div>
+                          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No matching records found</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-8 py-6 bg-slate-50/50 border-t border-slate-100">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                  Showing {Math.min(filteredEvents.length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(filteredEvents.length, currentPage * itemsPerPage)} of {filteredEvents.length} results
+                </p>
+                <div className="flex gap-3">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    className="rounded-xl border-slate-200 bg-white font-black h-10 px-6 disabled:opacity-40 transition-all hover:bg-slate-50 active:scale-95 shadow-sm"
+                  >
+                    PREVIOUS
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    className="rounded-xl border-slate-200 bg-white font-black h-10 px-6 disabled:opacity-40 transition-all hover:bg-slate-50 active:scale-95 shadow-sm"
+                  >
+                    NEXT
+                  </Button>
+                </div>
               </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `₨${value >= 1000 ? value/1000 + 'k' : value}`} />
-                  <Tooltip 
-                    cursor={{ fill: '#f8fafc' }}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: number) => [`₨ ${value.toLocaleString()}`, 'Revenue']}
-                  />
-                  <Bar dataKey="revenue" radius={[6, 6, 0, 0]} barSize={40}>
-                    {revenueData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === revenueData.length - 1 ? '#10b981' : '#3b82f6'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
             )}
           </div>
         </div>
 
-        {/* Quick Actions & Recent Activity */}
-        <div className="space-y-6">
-          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <h3 className="mb-4 text-lg font-bold text-card-foreground flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              Quick Actions
-            </h3>
-            <div className="grid grid-cols-1 gap-3">
-              {[
-                { name: "New Event Booking", icon: Plus, color: "bg-blue-500", access: "events", action: "add" },
-                { name: "Add Expense", icon: Receipt, color: "bg-rose-500", access: "expenses", action: "add" },
-                { name: "Mark Attendance", icon: CheckCircle, color: "bg-emerald-500", access: "hr", action: "add" },
-                { name: "Generate Payroll", icon: Wallet, color: "bg-violet-500", access: "hr", action: "edit" }
-              ].filter(a => hasAccess(a.access) && canDo(a.action as any)).map((action) => (
-                <Button
-                  key={action.name}
-                  onClick={() => handleQuickAction(action.name)}
-                  variant="outline"
-                  className="group justify-between h-12 border-border/50 hover:border-primary hover:bg-primary/5 transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-1.5 rounded-lg ${action.color} text-white group-hover:scale-110 transition-transform`}>
-                      <action.icon className="h-4 w-4" />
-                    </div>
-                    <span className="font-semibold text-sm">{action.name}</span>
+        {/* Sidebar Widgets */}
+        <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-700">
+          {/* Revenue Chart Widget */}
+          <div className="rounded-3xl border border-slate-100 bg-white p-7 shadow-xl shadow-slate-200/40 transition-all hover:shadow-2xl">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-xs font-black text-[#0f172a] uppercase tracking-[0.2em]">Revenue Analytics</h3>
+                <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">Performance Matrix</p>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-emerald-500" />
+              </div>
+            </div>
+            <div className="h-[220px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={revenueData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="month" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
+                    dy={12}
+                  />
+                  <YAxis hide />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc', radius: 8 }}
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', fontWeight: 900, fontSize: '11px', padding: '12px' }}
+                  />
+                  <Bar dataKey="revenue" radius={[8, 8, 0, 0]} barSize={32}>
+                    {revenueData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === revenueData.length - 1 ? '#2563eb' : '#e2e8f0'} className="transition-all duration-500" />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">MTD REVENUE</p>
+                <p className="text-xl font-black text-[#0f172a] mt-0.5">₨ {thisMonthRevenue.toLocaleString()}</p>
+              </div>
+              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none px-3 py-1 font-black text-[10px]">
+                +12.5%
+              </Badge>
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <div className="rounded-3xl border border-slate-100 bg-white p-7 shadow-xl shadow-slate-200/40 transition-all hover:shadow-2xl">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xs font-black text-[#0f172a] uppercase tracking-[0.2em]">Operational Pulse</h3>
+              <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+            </div>
+            <div className="space-y-7">
+              {recentActivity.map((activity, i) => (
+                <div key={i} className="flex gap-4 group cursor-default">
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-50 transition-all duration-300 group-hover:bg-white group-hover:shadow-lg group-hover:scale-110 border border-transparent group-hover:border-slate-100`}>
+                    <activity.icon className={`h-5 w-5 ${activity.color}`} />
                   </div>
-                  <ArrowRight className="h-4 w-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-                </Button>
+                  <div className="flex flex-col gap-1.5 overflow-hidden">
+                    <p className="text-[13px] font-black text-slate-700 leading-snug group-hover:text-blue-600 transition-colors">{activity.title}</p>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-3 w-3 text-slate-300" />
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{format(new Date(activity.time), 'MMM dd, HH:mm')}</p>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-
-          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <h3 className="mb-4 text-lg font-bold text-card-foreground">Recent Activity</h3>
-            <div className="space-y-4">
-              {loading ? (
-                Array(4).fill(0).map((_, i) => <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-muted" />)
-              ) : recentActivity.length > 0 ? (
-                recentActivity.map((item, idx) => (
-                  <div key={idx} className="flex gap-3">
-                    <div className={`mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-primary/40`} />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-card-foreground leading-tight">{item.title}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {format(new Date(item.time), 'MMM d, h:mm a')}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-xs text-muted-foreground py-4 italic">No recent activity</p>
-              )}
-            </div>
+            <Button variant="ghost" className="w-full mt-8 rounded-xl font-black text-[11px] text-blue-600 uppercase tracking-widest hover:bg-blue-50 gap-2 h-11">
+              VIEW ALL AUDITS <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-      </div>
-
-      {/* Upcoming Events */}
-      <div className="rounded-xl border border-border bg-card p-6 shadow-sm overflow-hidden">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-card-foreground">Upcoming Events (Next 7 Days)</h3>
-            <p className="text-xs text-muted-foreground">Detailed schedule of confirmed bookings</p>
-          </div>
-          {hasAccess("events") && (
-            <Button variant="ghost" size="sm" onClick={() => navigate("/events")} className="text-primary font-bold">View Calendar</Button>
-          )}
-        </div>
-        
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => <div key={i} className="h-16 w-full animate-pulse rounded-xl bg-muted" />)}
-          </div>
-        ) : upcomingEvents.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px]">
-              <thead>
-                <tr className="border-b border-border bg-muted/30 text-left">
-                  <th className="px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest">Client</th>
-                  <th className="px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest">Event & Venue</th>
-                  <th className="px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest">Date</th>
-                  <th className="px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest">Status</th>
-                  <th className="px-4 py-3 text-right text-xs font-bold text-muted-foreground uppercase tracking-widest">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {upcomingEvents.map((event) => (
-                  <tr key={event.id} className="group hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-4">
-                      <p className="text-sm font-black text-card-foreground">{event.client_name}</p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <p className="text-sm font-bold text-foreground/80">{event.event_type}</p>
-                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">{event.venue}</p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <p className="text-xs font-bold text-muted-foreground">{format(new Date(event.event_date), 'MMM d, yyyy')}</p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-tighter border ${
-                        event.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
-                        event.status === 'tentative' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-muted text-muted-foreground border-border'
-                      }`}>
-                        {event.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <p className="text-sm font-black text-primary">₨ {event.total_amount?.toLocaleString()}</p>
-                        {hasAccess("events") && (
-                          <Button variant="ghost" size="sm" onClick={() => navigate("/events")} className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <ArrowRight className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-border rounded-xl bg-muted/5">
-            <Activity className="mb-3 h-10 w-10 text-muted-foreground/20" />
-            <p className="text-sm font-bold text-muted-foreground">No events scheduled for the next 7 days.</p>
-            <Button onClick={() => navigate("/events")} variant="link" className="mt-2 h-auto p-0">Schedule an event</Button>
-          </div>
-        )}
       </div>
     </div>
   );
 };
-
-const Loader2 = ({ className }: { className?: string }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={`animate-spin ${className}`}
-  >
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
-);
 
 export default memo(Dashboard);

@@ -1,7 +1,7 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, CalendarDays, Landmark, Package, Receipt, Settings, LogOut } from "lucide-react";
-import { BRAND_NAME, BRAND_INITIALS } from "@/constants";
+import { LayoutDashboard, Users, CalendarDays, Landmark, Package, Receipt, Settings, LogOut, ChevronRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export const navItems = [
   { id: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -31,50 +31,69 @@ const AppSidebar = ({ onLogout }: AppSidebarProps) => {
   const filteredNavItems = navItems.filter(item => hasAccess(item.id));
 
   return (
-    <aside className="hidden md:flex md:w-52 md:flex-col md:fixed md:inset-y-0 bg-secondary text-sidebar-foreground z-10">
-      <div className="flex h-14 items-center gap-3 border-b border-sidebar-border px-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary flex-shrink-0">
-          <span className="text-sm font-bold text-primary-foreground">{BRAND_INITIALS}</span>
+    <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-[#0f172a] text-white z-30 shadow-2xl">
+      {/* Brand Logo */}
+      <div className="flex h-20 items-center gap-3 px-6 border-b border-white/5 bg-[#1e293b]/20 backdrop-blur-md">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-400 shadow-lg shadow-blue-500/20 flex-shrink-0 border border-white/10">
+          <span className="text-lg font-black text-white italic">O</span>
         </div>
         <div className="min-w-0">
-          <h1 className="truncate text-sm font-bold text-primary">{BRAND_NAME}</h1>
-          <p className="text-[10px] text-sidebar-foreground/60">HRMS & Events</p>
+          <h1 className="text-lg font-black tracking-tighter text-white leading-tight">Octonus Solutions</h1>
+          <p className="text-[10px] font-bold text-blue-400/80 uppercase tracking-widest">Enterprise HRMS</p>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
+      {/* User Profile Section */}
+      <div className="px-4 py-6">
+        <div className="flex items-center gap-3 px-3 py-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
+          <Avatar className="h-10 w-10 border-2 border-blue-500/30">
+            <AvatarFallback className="bg-blue-600 text-white font-black text-xs uppercase">
+              {user?.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-black text-white truncate leading-none">{user?.name || "Admin User"}</p>
+            <p className="text-[10px] font-bold text-blue-400/60 uppercase tracking-tighter mt-1.5">{user?.role || "Administrator"}</p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-white/20 group-hover:text-white/40 group-hover:translate-x-0.5 transition-all" />
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 space-y-1.5 px-4 py-2 overflow-y-auto custom-scrollbar">
+        <p className="px-4 mb-3 text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Main Menu</p>
         {filteredNavItems.map((item) => {
           const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
           return (
             <NavLink
               key={item.to}
               to={item.to}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`group flex items-center justify-between rounded-xl px-4 py-3 text-sm font-bold transition-all duration-200 ${
                 isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+                  : "text-white/60 hover:bg-white/5 hover:text-white"
               }`}
             >
-              <item.icon className="h-4 w-4" />
-              {item.label}
+              <div className="flex items-center gap-3">
+                <item.icon className={`h-5 w-5 transition-transform duration-200 ${isActive ? "scale-110" : "group-hover:scale-110"}`} />
+                <span className="tracking-tight">{item.label}</span>
+              </div>
+              {isActive && <div className="h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_8px_white]" />}
             </NavLink>
           );
         })}
       </nav>
 
-      <div className="border-t border-sidebar-border px-3 py-3">
-        {user && (
-          <div className="mb-2 px-3 py-1">
-            <p className="text-xs font-medium text-sidebar-foreground/80 truncate">{user.name}</p>
-            <p className="text-[10px] text-sidebar-foreground/50 capitalize">{user.role}</p>
-          </div>
-        )}
+      {/* Footer / Logout */}
+      <div className="p-4 border-t border-white/5 bg-[#1e293b]/10">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-black text-white/40 transition-all hover:bg-rose-500/10 hover:text-rose-400 group"
         >
-          <LogOut className="h-4 w-4" />
-          Logout
+          <div className="p-2 rounded-lg bg-white/5 group-hover:bg-rose-500/20 transition-colors">
+            <LogOut className="h-4 w-4" />
+          </div>
+          <span className="uppercase tracking-widest text-[11px]">Logout Session</span>
         </button>
       </div>
     </aside>

@@ -39,49 +39,49 @@ const HROutsideWorkers = memo(({
   outsidePayments
 }: HROutsideWorkersProps) => {
   return (
-    <div className="mt-4 space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+    <div className="mt-8 space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 bg-white p-6 rounded-2xl border border-border shadow-sm">
+        <div className="flex items-center gap-2 bg-muted/50 p-1.5 rounded-xl border border-border/50">
           <Button 
-            variant={outsideViewMode === "cards" ? "secondary" : "ghost"} 
+            variant={outsideViewMode === "cards" ? "default" : "ghost"} 
             size="sm" 
             onClick={() => setOutsideViewMode("cards")}
-            className="h-8 gap-2"
+            className={`h-9 px-4 rounded-lg font-bold gap-2 transition-all ${outsideViewMode === "cards" ? "shadow-md shadow-primary/20" : "text-muted-foreground hover:text-foreground"}`}
           >
-            <Users className="h-4 w-4" /> Workers
+            <Users className="h-4 w-4" /> Workers Directory
           </Button>
           <Button 
-            variant={outsideViewMode === "history" ? "secondary" : "ghost"} 
+            variant={outsideViewMode === "history" ? "default" : "ghost"} 
             size="sm" 
             onClick={() => setOutsideViewMode("history")}
-            className="h-8 gap-2"
+            className={`h-9 px-4 rounded-lg font-bold gap-2 transition-all ${outsideViewMode === "history" ? "shadow-md shadow-primary/20" : "text-muted-foreground hover:text-foreground"}`}
           >
-            <History className="h-4 w-4" /> History & Payments
+            <History className="h-4 w-4" /> Activity & Ledger
           </Button>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:w-72 group">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input 
-              placeholder="Search workers..." 
-              className="pl-9 h-9 w-full" 
+              placeholder="Search by name or skill..." 
+              className="pl-10 h-11 w-full bg-white border-border rounded-xl focus:ring-primary/20 focus:border-primary transition-all shadow-sm" 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
             />
           </div>
           <div className="flex gap-2">
             {canDo("add") && (
-              <Button onClick={() => setShowAddOutsideModal(true)} className="gap-2 flex-1 sm:flex-none h-9">
+              <Button onClick={() => setShowAddOutsideModal(true)} className="bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 h-11 px-6 gap-2 flex-1 sm:flex-none">
                 <Plus className="h-4 w-4" /> Add Worker
               </Button>
             )}
             {canDo("edit") && (
               <>
-                <Button onClick={() => setShowAssignEventModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none h-9">
-                  <CalendarDays className="h-4 w-4" /> Assign
+                <Button onClick={() => setShowAssignEventModal(true)} variant="outline" className="rounded-xl font-bold border-border h-11 px-6 gap-2 flex-1 sm:flex-none hover:bg-muted">
+                  <CalendarDays className="h-4 w-4 text-emerald-500" /> Assign Event
                 </Button>
-                <Button onClick={() => setShowOutsidePaymentModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none h-9">
-                  <Wallet2 className="h-4 w-4" /> Pay
+                <Button onClick={() => setShowOutsidePaymentModal(true)} variant="outline" className="rounded-xl font-bold border-border h-11 px-6 gap-2 flex-1 sm:flex-none hover:bg-muted">
+                  <Wallet2 className="h-4 w-4 text-blue-500" /> Record Pay
                 </Button>
               </>
             )}
@@ -90,79 +90,84 @@ const HROutsideWorkers = memo(({
       </div>
 
       {outsideViewMode === "cards" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {(outsideWorkers ?? []).filter(w => 
             (w?.name ?? "").toLowerCase().includes(search.toLowerCase()) || 
             (w?.skill ?? "").toLowerCase().includes(search.toLowerCase())
           ).map(worker => (
-            <div key={worker?.id ?? Math.random()} className="relative group overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-xl font-black text-primary border-2 border-primary/20">
-                    {(worker?.name ?? "W")[0]}
+            <div key={worker?.id ?? Math.random()} className="relative group overflow-hidden rounded-2xl border border-border bg-white p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-5">
+                  <div className="relative">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-400 text-2xl font-black text-white shadow-lg shadow-indigo-500/20">
+                      {(worker?.name ?? "W")[0].toUpperCase()}
+                    </div>
+                    <div className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-2 border-white shadow-sm ${worker?.status === 'available' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                   </div>
-                  <div>
-                    <h4 className="text-base font-bold text-card-foreground leading-tight">{worker?.name ?? "Unknown"}</h4>
-                    <p className="text-xs text-primary font-bold uppercase tracking-wider">{worker?.skill ?? "General"}</p>
-                    <div className="flex items-center gap-1 mt-1">
+                  <div className="min-w-0">
+                    <h4 className="text-lg font-black text-foreground leading-tight truncate max-w-[150px]">{worker?.name ?? "Unknown"}</h4>
+                    <p className="text-xs font-bold text-primary uppercase tracking-widest mt-1 truncate max-w-[150px]">{worker?.skill ?? "General Service"}</p>
+                    <div className="flex items-center gap-1 mt-2">
                       {Array.from({ length: 5 }).map((_, i) => (
-                        <Star key={i} className={`h-3 w-3 ${i < (worker?.rating ?? 5) ? "text-amber-400 fill-amber-400" : "text-muted"}`} />
+                        <Star key={i} className={`h-3 w-3 ${i < (worker?.rating ?? 5) ? "text-amber-400 fill-amber-400" : "text-muted/30"}`} />
                       ))}
                     </div>
                   </div>
                 </div>
-                <Badge variant="outline" className={`capitalize font-bold ${worker?.status === 'available' ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'}`}>
+                <Badge className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tighter border-none ${worker?.status === 'available' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                   {worker?.status ?? "available"}
                 </Badge>
               </div>
 
-              <div className="grid grid-cols-2 gap-y-3 gap-x-2 border-t border-border pt-4 text-[11px]">
-                <div className="space-y-1">
-                  <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Type</p>
-                  <p className="font-bold">{worker?.type ?? "Freelancer"}</p>
+              <div className="grid grid-cols-2 gap-y-4 gap-x-3 border-t border-border pt-6 mb-6">
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.1em]">Worker Type</p>
+                  <p className="text-sm font-black text-foreground/80">{worker?.type ?? "Freelancer"}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Rate</p>
-                  <p className="font-bold">₨ {(worker?.rate ?? 0).toLocaleString()} <span className="text-[9px] text-muted-foreground font-normal">{worker?.rate_type ?? "per event"}</span></p>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.1em]">Base Rate</p>
+                  <p className="text-sm font-black text-foreground/80">₨ {(worker?.rate ?? 0).toLocaleString()} <span className="text-[9px] text-muted-foreground font-bold">{worker?.rate_type ?? "per event"}</span></p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Contact</p>
-                  <p className="font-bold">{worker?.phone ?? "N/A"}</p>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.1em]">Contact No.</p>
+                  <p className="text-sm font-black text-foreground/80">{worker?.phone ?? "N/A"}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Location</p>
-                  <p className="font-bold truncate">{worker?.area ?? ""}, {worker?.city ?? ""}</p>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.1em]">City / Area</p>
+                  <p className="text-sm font-black text-foreground/80 truncate">{worker?.area || worker?.city || "N/A"}</p>
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+              <div className="flex items-center justify-between border-t border-border pt-6 mb-6">
                 <div className="flex flex-col">
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Total Paid</span>
-                  <span className="text-sm font-black text-success">₨ {(worker?.totalPaid ?? 0).toLocaleString()}</span>
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Aggregate Earnings</span>
+                  <span className="text-lg font-black text-emerald-600">₨ {(worker?.totalPaid ?? 0).toLocaleString()}</span>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-8 gap-2 px-3 text-[10px] font-bold uppercase tracking-wider" onClick={() => handlePrintWorkerCard(worker)}>
-                    <Printer className="h-3 w-3" /> Worker Card
-                  </Button>
-                </div>
+                <Button variant="default" className="h-10 rounded-xl font-bold px-4 gap-2 shadow-lg shadow-primary/20" onClick={() => handlePrintWorkerCard(worker)}>
+                  <Printer className="h-4 w-4" /> <span className="text-[11px] uppercase tracking-widest">Print ID</span>
+                </Button>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-border">
-                <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest mb-2">Recent Assignments</p>
+              <div className="rounded-xl bg-muted/30 p-4 border border-border/50">
+                <p className="text-[10px] uppercase font-black text-muted-foreground tracking-widest mb-3 flex items-center gap-2">
+                  <CalendarDays className="h-3 w-3 text-primary" /> Recent Assignments
+                </p>
                 <div className="space-y-2">
                   {(outsideAssignments ?? []).filter(a => a?.workerId === worker?.id).slice(0, 2).map(a => (
-                    <div key={a?.id ?? Math.random()} className="flex items-center justify-between text-[10px] bg-muted/30 p-1.5 rounded">
-                      <span className="font-bold truncate max-w-[120px]">{a?.eventName ?? "Event"}</span>
+                    <div key={a?.id ?? Math.random()} className="flex items-center justify-between text-[10px] bg-white/50 p-2 rounded-lg border border-border/30">
+                      <span className="font-black text-foreground/80 truncate max-w-[110px]">{a?.eventName ?? "Event"}</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">{a?.date ?? "N/A"}</span>
-                        <Badge variant="outline" className={`h-4 text-[8px] px-1 ${a?.status === 'paid' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                        <span className="text-muted-foreground font-bold">{a?.date ? format(new Date(a.date), 'MMM d') : "N/A"}</span>
+                        <Badge className={`h-4 text-[8px] px-1 border-none ${a?.status === 'paid' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
                           {a?.status ?? "pending"}
                         </Badge>
                       </div>
                     </div>
                   ))}
                   {(outsideAssignments ?? []).filter(a => a?.workerId === worker?.id).length === 0 && (
-                    <p className="text-[10px] text-muted-foreground italic">No past events found</p>
+                    <div className="py-4 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-tighter italic border border-dashed border-border/50 rounded-lg">
+                      No past events found
+                    </div>
                   )}
                 </div>
               </div>
@@ -170,25 +175,23 @@ const HROutsideWorkers = memo(({
           ))}
         </div>
       ) : (
-        <div className="space-y-6">
-          <div className="rounded-lg border border-border bg-card">
-            <div className="p-4 border-b border-border bg-muted/20">
-              <h4 className="text-sm font-bold flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-primary" /> Worker Assignments & Attendance
+        <div className="space-y-8">
+          <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-border bg-muted/5">
+              <h4 className="text-lg font-black text-foreground flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-primary" /> Active Assignments & Attendance
               </h4>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[800px]">
+              <table className="w-full border-collapse min-w-[900px]">
                 <thead>
-                  <tr className="border-b border-border text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    <th className="px-4 py-3 text-left">Worker</th>
-                    <th className="px-4 py-3 text-left">Event</th>
-                    <th className="px-4 py-3 text-left">Date</th>
-                    <th className="px-4 py-3 text-right">Rate</th>
-                    <th className="px-4 py-3 text-center">Hours</th>
-                    <th className="px-4 py-3 text-center">Attendance</th>
-                    <th className="px-4 py-3 text-center">Status</th>
-                    <th className="px-4 py-3 text-right">Action</th>
+                  <tr className="bg-muted/30 text-left border-b border-border">
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Worker Member</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Event Detail</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Scheduled Date</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-right">Agreed Rate</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-center">Status</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -196,47 +199,38 @@ const HROutsideWorkers = memo(({
                     const w = (outsideWorkers ?? []).find(x => x?.id === a?.workerId);
                     return (w?.name ?? "").toLowerCase().includes(search.toLowerCase()) || 
                            (a?.eventName ?? "").toLowerCase().includes(search.toLowerCase());
-                  }).map(a => (
-                    <tr key={a?.id ?? Math.random()} className="text-xs hover:bg-muted/10 transition-colors">
-                      <td className="px-4 py-3 font-bold">{(outsideWorkers ?? []).find(w => w?.id === a?.workerId)?.name ?? "Unknown"}</td>
-                      <td className="px-4 py-3">{a?.eventName ?? "Event"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{a?.date ?? "N/A"}</td>
-                      <td className="px-4 py-3 text-right font-bold">₨ {(a?.amount ?? 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center">
-                        <Input 
-                          type="number" 
-                          className="h-7 w-16 text-center mx-auto" 
-                          value={a?.hours ?? 0} 
-                          onChange={e => setOutsideAssignments((outsideAssignments ?? []).map(x => x?.id === a?.id ? { ...x, hours: Number(e.target.value) } : x))}
-                        />
+                  }).map((a, idx) => (
+                    <tr key={a?.id ?? Math.random()} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-primary/5 transition-colors group`}>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs border border-indigo-100">
+                            {((outsideWorkers ?? []).find(w => w?.id === a?.workerId)?.name ?? "U")[0].toUpperCase()}
+                          </div>
+                          <span className="text-sm font-black text-foreground">{(outsideWorkers ?? []).find(w => w?.id === a?.workerId)?.name ?? "Unknown Worker"}</span>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <Select value={a?.attendance ?? "pending"} onValueChange={v => setOutsideAssignments((outsideAssignments ?? []).map(x => x?.id === a?.id ? { ...x, attendance: v } : x))}>
-                          <SelectTrigger className="h-7 w-24 mx-auto text-[10px]"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="present">Present</SelectItem>
-                            <SelectItem value="absent">Absent</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <td className="px-6 py-5">
+                        <span className="text-sm font-bold text-foreground/80">{a?.eventName ?? "Event Detail"}</span>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge variant="outline" className={`h-5 text-[9px] capitalize ${a?.status === 'paid' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                      <td className="px-6 py-5 text-sm font-bold text-muted-foreground uppercase tracking-tighter">{a?.date ? format(new Date(a.date), 'MMM d, yyyy') : "N/A"}</td>
+                      <td className="px-6 py-5 text-right font-black text-emerald-600 text-sm">₨ {(a?.amount ?? 0).toLocaleString()}</td>
+                      <td className="px-6 py-5 text-center">
+                        <Badge className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tighter border-none ${a?.status === 'paid' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
                           {a?.status ?? "pending"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-6 py-5 text-right">
                         <Button 
                           size="sm" 
                           variant="outline" 
-                          className="h-7 text-[9px] gap-1"
+                          className="h-9 rounded-xl font-bold border-border gap-2 hover:bg-muted"
                           disabled={a?.status === 'paid'}
                           onClick={() => {
                             setOutsidePaymentForm({ workerId: a?.workerId ?? "", amount: a?.amount ?? 0, method: "cash", eventId: a?.eventId ?? "" });
                             setShowOutsidePaymentModal(true);
                           }}
                         >
-                          <Wallet2 className="h-3 w-3" /> Pay
+                          <Wallet2 className="h-3.5 w-3.5 text-blue-500" /> Pay
                         </Button>
                       </td>
                     </tr>
@@ -246,21 +240,21 @@ const HROutsideWorkers = memo(({
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-card">
-            <div className="p-4 border-b border-border bg-muted/20">
-              <h4 className="text-sm font-bold flex items-center gap-2">
-                <History className="h-4 w-4 text-primary" /> Payment History
+          <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-border bg-muted/5">
+              <h4 className="text-lg font-black text-foreground flex items-center gap-2">
+                <History className="h-5 w-5 text-primary" /> Historical Payment Records
               </h4>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[600px]">
+              <table className="w-full border-collapse min-w-[800px]">
                 <thead>
-                  <tr className="border-b border-border text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    <th className="px-4 py-3 text-left">Date</th>
-                    <th className="px-4 py-3 text-left">Worker</th>
-                    <th className="px-4 py-3 text-left">Method</th>
-                    <th className="px-4 py-3 text-left">Reference</th>
-                    <th className="px-4 py-3 text-right">Amount Paid</th>
+                  <tr className="bg-muted/30 text-left border-b border-border">
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Payment Date</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Recipient Worker</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Method</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Event / Reference</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-right">Amount Disbursed</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -268,13 +262,17 @@ const HROutsideWorkers = memo(({
                     const w = (outsideWorkers ?? []).find(x => x?.id === p?.workerId);
                     return (w?.name ?? "").toLowerCase().includes(search.toLowerCase()) || 
                            (p?.method ?? "").toLowerCase().includes(search.toLowerCase());
-                  }).map(p => (
-                    <tr key={p?.id ?? Math.random()} className="text-xs hover:bg-muted/10 transition-colors">
-                      <td className="px-4 py-3 text-muted-foreground">{p?.date ?? "N/A"}</td>
-                      <td className="px-4 py-3 font-bold">{(outsideWorkers ?? []).find(w => w?.id === p?.workerId)?.name ?? "Unknown"}</td>
-                      <td className="px-4 py-3 capitalize">{p?.method ?? "cash"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{p?.eventId ?? "General Payment"}</td>
-                      <td className="px-4 py-3 text-right font-bold text-success">₨ {(p?.amount ?? 0).toLocaleString()}</td>
+                  }).map((p, idx) => (
+                    <tr key={p?.id ?? Math.random()} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-emerald-50 transition-colors group`}>
+                      <td className="px-6 py-5 text-sm font-bold text-muted-foreground uppercase tracking-tighter">{p?.date ? format(new Date(p.date), 'MMMM dd, yyyy') : "N/A"}</td>
+                      <td className="px-6 py-5 font-black text-foreground">{(outsideWorkers ?? []).find(w => w?.id === p?.workerId)?.name ?? "Unknown"}</td>
+                      <td className="px-6 py-5 text-center">
+                        <span className={`inline-flex px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${p?.method === "cash" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}>
+                          {p?.method ?? "cash"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5 text-sm font-bold text-foreground/60">{p?.eventId || "General Ledger Disbursement"}</td>
+                      <td className="px-6 py-5 text-right font-black text-emerald-600 text-base">₨ {(p?.amount ?? 0).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>

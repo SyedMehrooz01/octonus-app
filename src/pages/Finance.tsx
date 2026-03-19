@@ -74,6 +74,7 @@ const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque", "Online Transfer"];
 const Finance = () => {
   const { canDo, logAction } = useAuth();
   const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
   const [ledger, setLedger] = useState<LedgerEntry[]>(INIT_LEDGER);
   const [suppliers, setSuppliers] = useState(INIT_SUPPLIERS);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -133,7 +134,12 @@ const Finance = () => {
   };
 
   useEffect(() => {
-    fetchVendors();
+    const init = async () => {
+      setLoading(true);
+      await fetchVendors();
+      setLoading(false);
+    };
+    init();
   }, []);
 
   const filtered = ledger.filter(l => {
@@ -168,14 +174,10 @@ const Finance = () => {
     setIsSaving(true);
     try {
       const amt = Number(payAmount);
-      
-      // Since this is for legacy suppliers (not vendors/Supabase yet)
-      // We update local state
       setSuppliers(suppliers.map(s => s.id === selectedSupplier.id 
         ? { ...s, paid: s.paid + amt, balance: Math.max(0, s.balance - amt) } 
         : s
       ));
-
       toast({ title: "Supplier payment recorded" });
       setShowPaySupplier(false);
       setPayAmount("");
@@ -277,111 +279,174 @@ const Finance = () => {
 
   const totalAdvances = EVENT_FINANCE.reduce((s,e)=>s+e.advance,0);
   
-  // Yearly Breakdown logic
   const yearlyMonths = eachMonthOfInterval({
     start: startOfYear(parseISO(`${selectedYear}-01-01`)),
     end: endOfYear(parseISO(`${selectedYear}-01-01`))
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h2 className="text-2xl font-bold text-foreground">Finance & Accounts</h2><p className="text-sm text-muted-foreground">Ledger, event finance, advance tracking, supplier & P&L</p></div>
+    <div className="space-y-8 pb-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="animate-in fade-in slide-in-from-left duration-500">
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Finance & Accounts</h1>
+          <p className="text-slate-500 font-bold mt-1">Manage general ledger, event finance, and profit reports.</p>
+        </div>
         {canDo("add") && (
-          <Button onClick={()=>setShowAdd(true)} className="gap-2"><Plus className="h-4 w-4"/>Add Entry</Button>
+          <Button onClick={()=>setShowAdd(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-600/20 h-12 px-8 gap-2 transition-all hover:-translate-y-0.5 animate-in fade-in slide-in-from-right duration-500">
+            <Plus className="h-5 w-5"/> ADD LEDGER ENTRY
+          </Button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[{l:"Total Revenue",v:`₨${totalRevenue.toLocaleString()}`,c:"text-success",icon:TrendingUp},{l:"Total Expenses",v:`₨${totalCredit.toLocaleString()}`,c:"text-destructive",icon:TrendingDown},{l:"Net Balance",v:`₨${netBalance.toLocaleString()}`,c:netBalance>=0?"text-success":"text-destructive",icon:Landmark},{l:"Pending Balances",v:`₨${totalPending.toLocaleString()}`,c:"text-warning",icon:Landmark}].map(c=>(
-          <div key={c.l} className="rounded-lg border border-border bg-card p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <div><p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{c.l}</p><p className={`mt-1 text-lg sm:text-xl font-bold ${c.c}`}>{c.v}</p></div>
-              <div className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg ${c.c==="text-success"?"bg-success":c.c==="text-destructive"?"bg-destructive":c.c==="text-warning"?"bg-warning":"bg-primary"}`}><c.icon className="h-4 w-4 sm:h-5 sm:w-5 text-white"/></div>
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          {l:"Total Revenue",v:`₨ ${totalRevenue.toLocaleString()}`,c:"from-emerald-500 to-emerald-700",shadow:"shadow-emerald-500/20",icon:TrendingUp},
+          {l:"Total Expenses",v:`₨ ${totalCredit.toLocaleString()}`,c:"from-rose-500 to-rose-700",shadow:"shadow-rose-500/20",icon:TrendingDown},
+          {l:"Net Cash Balance",v:`₨ ${netBalance.toLocaleString()}`,c:"from-blue-500 to-blue-700",shadow:"shadow-blue-500/20",icon:Landmark},
+          {l:"Pending Receivables",v:`₨ ${totalPending.toLocaleString()}`,c:"from-amber-500 to-amber-700",shadow:"shadow-amber-500/20",icon:Wallet}
+        ].map((c, i)=>(
+          <div key={c.l} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${c.c} p-6 text-white shadow-xl ${c.shadow} transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
+            <div className="relative z-10 flex flex-col gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+                <c.icon className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{c.l}</p>
+                <p className="text-2xl font-black truncate tracking-tight">{c.v}</p>
+              </div>
+            </div>
+            <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
+              <c.icon size={140} className="text-white" />
             </div>
           </div>
         ))}
       </div>
 
-      <Tabs defaultValue="ledger">
-        <TabsList className="mb-4">
-          <TabsTrigger value="ledger">General Ledger</TabsTrigger>
-          <TabsTrigger value="event">Event-Based Finance</TabsTrigger>
-          <TabsTrigger value="advances">Advance Tracking</TabsTrigger>
-          <TabsTrigger value="suppliers">Supplier Ledger</TabsTrigger>
-          <TabsTrigger value="vendors">Vendor Ledger</TabsTrigger>
-          <TabsTrigger value="pnl">Profit & Loss</TabsTrigger>
+      <Tabs defaultValue="ledger" className="w-full">
+        <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
+          <TabsTrigger value="ledger" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">General Ledger</TabsTrigger>
+          <TabsTrigger value="event" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Event Finance</TabsTrigger>
+          <TabsTrigger value="advances" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Advances</TabsTrigger>
+          <TabsTrigger value="vendors" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Vendor Ledger</TabsTrigger>
+          <TabsTrigger value="pnl" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Profit & Loss</TabsTrigger>
         </TabsList>
 
-        {/* GENERAL LEDGER */}
-        <TabsContent value="ledger">
-          <div className="rounded-lg border border-border bg-card">
-            <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
-              <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><Input placeholder="Search transactions..." className="pl-9" value={search} onChange={e=>setSearch(e.target.value)}/></div>
-              <div className="flex flex-wrap items-center gap-2">
+        <TabsContent value="ledger" className="space-y-6 animate-in fade-in duration-500">
+          <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
+            <div className="p-6 border-b border-slate-50 flex flex-col xl:flex-row gap-4 xl:items-center bg-slate-50/30">
+              <div className="relative flex-1 group">
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                <Input placeholder="Search transactions..." className="pl-11 h-12 bg-white border-slate-200 rounded-xl font-bold shadow-sm focus-visible:ring-blue-500/20" value={search} onChange={e=>setSearch(e.target.value)}/>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
                 <Select value={accountFilter} onValueChange={setAccountFilter}>
-                  <SelectTrigger className="w-32"><SelectValue placeholder="Account"/></SelectTrigger>
-                  <SelectContent>
+                  <SelectTrigger className="w-40 h-12 rounded-xl border-slate-200 bg-white font-black text-sm shadow-sm focus:ring-blue-500/20"><SelectValue placeholder="All Accounts"/></SelectTrigger>
+                  <SelectContent className="rounded-xl">
                     <SelectItem value="all">All Accounts</SelectItem>
                     {ACCOUNTS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <div className="flex items-center gap-1">
-                  <Input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} className="w-36 text-xs h-9" />
-                  <span className="text-muted-foreground">to</span>
-                  <Input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} className="w-36 text-xs h-9" />
+                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 h-12 shadow-sm">
+                  <Input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} className="w-36 border-none bg-transparent h-full text-xs font-black focus-visible:ring-0" />
+                  <span className="text-slate-300 font-black text-xs">—</span>
+                  <Input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} className="w-36 border-none bg-transparent h-full text-xs font-black focus-visible:ring-0" />
                 </div>
                 {canDo("export") && (
-                  <div className="flex items-center gap-1 ml-2">
-                    <Button variant="outline" size="sm" onClick={() => exportStatement('pdf')} className="h-9 px-2"><FileText className="h-4 w-4 mr-1"/>PDF</Button>
-                    <Button variant="outline" size="sm" onClick={() => exportStatement('excel')} className="h-9 px-2"><Download className="h-4 w-4 mr-1"/>Excel</Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => exportStatement('pdf')} className="h-12 rounded-xl font-black border-slate-200 bg-white gap-2 px-6 shadow-sm hover:bg-slate-50">
+                      <FileText className="h-4 w-4 text-rose-500"/> PDF
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => exportStatement('excel')} className="h-12 rounded-xl font-black border-slate-200 bg-white gap-2 px-6 shadow-sm hover:bg-slate-50">
+                      <Download className="h-4 w-4 text-emerald-500"/> EXCEL
+                    </Button>
                   </div>
                 )}
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[800px]">
-                <thead><tr className="border-b border-border bg-muted/40">{["Date","Description","Account","Type","Amount","Balance"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
-                <tbody>
-                  {filtered.map(l=>(
-                    <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{l.date}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-card-foreground">{l.description}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{l.account}</td>
-                      <td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${l.type==="debit"?"bg-success/10 text-success border-success/20":"bg-destructive/10 text-destructive border-destructive/20"}`}>{l.type}</span></td>
-                      <td className={`px-4 py-3 text-sm font-bold ${l.type==="debit"?"text-success":"text-destructive"}`}>{l.type==="debit"?"+":"-"}₨{l.amount.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-card-foreground">₨{l.balance.toLocaleString()}</td>
+                <thead>
+                  <tr className="bg-slate-50/80 text-left border-b border-slate-100">
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Description</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Account</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Type</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Amount</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Balance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filtered.map((l, idx)=>(
+                    <tr key={l.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
+                      <td className="px-6 py-6 text-sm font-black text-slate-500 whitespace-nowrap tracking-tight">{format(new Date(l.date), 'MMM d, yyyy')}</td>
+                      <td className="px-6 py-6 text-sm font-black text-[#0f172a] leading-tight tracking-tight">{l.description}</td>
+                      <td className="px-6 py-6">
+                        <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm">
+                          {l.account}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-6 text-center">
+                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${l.type==="debit"?"bg-emerald-500 text-white":"bg-rose-500 text-white"}`}>
+                          {l.type}
+                        </Badge>
+                      </td>
+                      <td className={`px-6 py-6 text-sm font-black text-right tracking-tight ${l.type==="debit"?"text-emerald-600":"text-rose-600"}`}>
+                        {l.type==="debit"?"+":"-"} ₨ {l.amount.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-6 text-sm font-black text-right text-[#0f172a] tracking-tight">₨ {l.balance.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot><tr className="bg-muted/40">
-                  <td colSpan={4} className="px-4 py-3 text-sm font-semibold">Current Balance</td>
-                  <td colSpan={2} className={`px-4 py-3 text-sm font-bold ${netBalance>=0?"text-success":"text-destructive"}`}>₨{netBalance.toLocaleString()}</td>
-                </tr></tfoot>
+                <tfoot className="bg-slate-50/80 border-t border-slate-200">
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Aggregate Cash Position</td>
+                    <td colSpan={2} className={`px-6 py-8 text-right`}>
+                      <span className={`px-8 py-3 rounded-2xl font-black text-xl shadow-xl ${netBalance>=0?"bg-emerald-500 text-white shadow-emerald-500/20":"bg-rose-500 text-white shadow-rose-500/20"}`}>
+                        ₨ {netBalance.toLocaleString()}
+                      </span>
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
         </TabsContent>
 
-        {/* EVENT FINANCE */}
-        <TabsContent value="event">
-          <div className="rounded-lg border border-border bg-card">
-            <div className="border-b border-border p-4"><h3 className="text-sm font-semibold text-card-foreground">Event-Based Finance — Track each event's financial status</h3></div>
+        <TabsContent value="event" className="space-y-6">
+          <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
+            <div className="p-8 border-b border-border bg-muted/5">
+              <h3 className="text-xl font-black text-foreground">Event-Based Financial Tracking</h3>
+              <p className="text-sm text-muted-foreground font-medium mt-1">Detailed breakdown of revenue, costs and profit per event</p>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1000px]">
-                <thead><tr className="border-b border-border bg-muted/40">{["Event","Date","Total","Advance","Balance","Menu Cost","3rd Party","Profit","Status"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}</tr></thead>
-                <tbody>
-                  {EVENT_FINANCE.map(e=>(
-                    <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 text-sm font-medium text-card-foreground whitespace-nowrap">{e.event}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{e.date}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-card-foreground whitespace-nowrap">₨{e.totalAmount.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-success whitespace-nowrap">₨{e.advance.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-destructive whitespace-nowrap">₨{e.balance.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{e.menuCost>0?`₨${e.menuCost.toLocaleString()}`:"-"}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{e.thirdPartyCost>0?`₨${e.thirdPartyCost.toLocaleString()}`:"-"}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-success whitespace-nowrap">₨{e.profit.toLocaleString()}</td>
-                      <td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${{confirmed:"bg-success/10 text-success border-success/20",tentative:"bg-warning/10 text-warning border-warning/20"}[e.status]||"bg-muted text-muted-foreground"}`}>{e.status}</span></td>
+                <thead>
+                  <tr className="bg-muted/30 text-left border-b border-border">
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Event Detail</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Date</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Revenue</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Advance</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Pending</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-center">Profit</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {EVENT_FINANCE.map((e, idx)=>(
+                    <tr key={e.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/10'} hover:bg-primary/5 transition-colors`}>
+                      <td className="px-6 py-5 text-sm font-black text-foreground">{e.event}</td>
+                      <td className="px-6 py-5 text-xs font-bold text-muted-foreground uppercase tracking-tighter">{format(new Date(e.date), 'MMM d, yyyy')}</td>
+                      <td className="px-6 py-5 text-sm font-black text-foreground">₨ {e.totalAmount.toLocaleString()}</td>
+                      <td className="px-6 py-5 text-sm font-bold text-emerald-600">₨ {e.advance.toLocaleString()}</td>
+                      <td className="px-6 py-5 text-sm font-bold text-rose-500">₨ {e.balance.toLocaleString()}</td>
+                      <td className="px-6 py-5 text-center">
+                        <span className="inline-flex px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-black text-sm">₨ {e.profit.toLocaleString()}</span>
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        <Badge className={`${e.status === 'confirmed' ? 'bg-emerald-500' : 'bg-amber-500'} text-white border-none rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tighter`}>
+                          {e.status}
+                        </Badge>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

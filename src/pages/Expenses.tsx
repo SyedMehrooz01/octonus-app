@@ -250,81 +250,83 @@ const Expenses = () => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-foreground">Expenses Management</h2>
-          <p className="text-xs sm:text-sm text-muted-foreground">Track and manage all business expenses</p>
+    <div className="space-y-8 pb-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="animate-in fade-in slide-in-from-left duration-500">
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Expense Tracking</h1>
+          <p className="text-slate-500 font-bold mt-1">Monitor all business spending and category-wise overheads.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex bg-muted p-1 rounded-lg">
+        <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right duration-500">
+          <div className="hidden sm:flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/60">
             {(["monthly", "yearly"] as const).map(v => (
               <button 
                 key={v} 
                 onClick={() => setPlViewType(v)} 
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${viewType === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                className={`px-6 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-[0.2em] ${viewType === v ? "bg-white text-blue-600 shadow-lg" : "text-slate-400 hover:text-slate-600"}`}
               >
-                {v.charAt(0).toUpperCase() + v.slice(1)}
+                {v}
               </button>
             ))}
           </div>
           {canDo("add") && (
-            <Button onClick={() => setShowAddModal(true)} className="gap-2 w-full sm:w-auto justify-center">
-              <Plus className="h-4 w-4" /> Add Expense
+            <Button onClick={() => setShowAddModal(true)} className="bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl shadow-lg shadow-rose-500/20 h-12 px-8 gap-2 transition-all hover:-translate-y-0.5">
+              <Plus className="h-5 w-5" /> ADD EXPENSE
             </Button>
           )}
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {[
-          { label: "Today's Expenses", value: `₨ ${todayExpenses.toLocaleString()}`, icon: Calendar, color: "bg-primary", sub: format(new Date(), "PP") },
+          { label: "Today's Burn Rate", value: `₨ ${todayExpenses.toLocaleString()}`, icon: Calendar, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20", sub: format(new Date(), "PP") },
           { 
-            label: viewType === "monthly" ? "This Month" : "Yearly Total", 
+            label: viewType === "monthly" ? "Current Month Burn" : "Annual Burn Rate", 
             value: `₨ ${(viewType === "monthly" ? monthExpenses : totalYearly).toLocaleString()}`, 
             icon: TrendingDown, 
-            color: "bg-destructive",
+            color: "from-orange-500 to-orange-700",
+            shadow: "shadow-orange-500/20",
             sub: viewType === "monthly" ? format(new Date(), "MMMM yyyy") : selectedYear
           },
-          { label: "Total Recorded", value: `₨ ${totalExpenses.toLocaleString()}`, icon: Receipt, color: "bg-secondary", sub: "All time" },
-        ].map(card => (
-          <div key={card.label} className="rounded-lg border border-border bg-card p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground truncate">{card.label}</p>
-                <p className="mt-1 text-lg sm:text-2xl font-bold text-card-foreground truncate">{card.value}</p>
-                <p className="mt-1 text-[10px] text-muted-foreground">{card.sub}</p>
+          { label: "Aggregate Burn", value: `₨ ${totalExpenses.toLocaleString()}`, icon: Receipt, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20", sub: "All time records" },
+        ].map((card, i) => (
+          <div key={card.label} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.color} p-6 text-white shadow-xl ${card.shadow} transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
+            <div className="relative z-10 flex flex-col gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+                <card.icon className="h-6 w-6 text-white" />
               </div>
-              <div className={`flex h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-lg ${card.color}`}>
-                <card.icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{card.label}</p>
+                <p className="text-2xl font-black truncate tracking-tight">{card.value}</p>
+                <p className="text-[10px] font-black opacity-70 mt-1 uppercase tracking-tighter">{card.sub}</p>
               </div>
+            </div>
+            <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
+              <card.icon size={140} className="text-white" />
             </div>
           </div>
         ))}
       </div>
 
       <Tabs defaultValue="entries" className="w-full">
-        <TabsList className="mb-4 w-full sm:w-auto grid grid-cols-2 sm:flex">
-          <TabsTrigger value="entries">Entries</TabsTrigger>
-          <TabsTrigger value="ledger">Ledger</TabsTrigger>
-          <TabsTrigger value="group-reports">Group Reports</TabsTrigger>
-          <TabsTrigger value="yearly">Yearly Reports</TabsTrigger>
+        <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
+          <TabsTrigger value="entries" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Monthly Log</TabsTrigger>
+          <TabsTrigger value="ledger" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Detailed Ledger</TabsTrigger>
+          <TabsTrigger value="group-reports" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Category Insights</TabsTrigger>
+          <TabsTrigger value="yearly" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Annual Analytics</TabsTrigger>
         </TabsList>
 
-        {/* Expense Entries */}
-        <TabsContent value="entries">
-          <div className="rounded-lg border border-border bg-card">
-            <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
-              <div className="relative flex-1 min-w-48">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search expenses..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+        <TabsContent value="entries" className="space-y-6 animate-in fade-in duration-500">
+          <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
+            <div className="p-6 border-b border-slate-50 flex flex-col sm:flex-row gap-4 items-center bg-slate-50/30">
+              <div className="relative flex-1 w-full group">
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                <Input placeholder="Search logs..." className="pl-11 h-12 bg-white border-slate-200 rounded-xl font-bold shadow-sm focus-visible:ring-blue-500/20" value={search} onChange={e => setSearch(e.target.value)} />
               </div>
-              <div className="flex items-center gap-2">
-                <Input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-40 h-9" />
+              <div className="flex flex-wrap items-center gap-3">
+                <Input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-44 h-12 bg-white border-slate-200 rounded-xl font-black text-sm shadow-sm" />
                 <Select value={filterHead} onValueChange={setFilterHead}>
-                  <SelectTrigger className="w-44"><SelectValue placeholder="Filter by head" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectTrigger className="w-48 h-12 rounded-xl border-slate-200 bg-white font-black text-sm shadow-sm"><SelectValue placeholder="All Categories" /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
                     <SelectItem value="all">All Categories</SelectItem>
                     {EXPENSE_HEADS.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                   </SelectContent>
@@ -334,46 +336,57 @@ const Expenses = () => {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px]">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40">
-                    {["Date", "Description", "Category", "Event", "Mode", "Amount"].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>
-                    ))}
+                  <tr className="bg-slate-50/80 text-left border-b border-slate-100">
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Description</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Category</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Payment Mode</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Amount</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-50">
                   {loading ? (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center">
-                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                          <Loader2 className="h-5 w-5 animate-spin" /> Loading expenses...
-                        </div>
-                      </td>
-                    </tr>
+                    Array(5).fill(0).map((_, i) => (
+                      <tr key={i}><td colSpan={5} className="px-6 py-8"><div className="h-12 w-full animate-pulse rounded-2xl bg-slate-100" /></td></tr>
+                    ))
                   ) : filtered.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No expenses found for this month.</td>
-                    </tr>
-                  ) : filtered.map(e => (
-                    <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{e.date}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-card-foreground">{e.description}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{e.head}</span>
+                    <tr><td colSpan={5} className="px-6 py-24 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center">
+                          <Search className="h-8 w-8 text-slate-200" />
+                        </div>
+                        <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No matching records found</p>
+                      </div>
+                    </td></tr>
+                  ) : filtered.map((e, idx) => (
+                    <tr key={e.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-rose-50/40 transition-all duration-200 group`}>
+                      <td className="px-6 py-6 text-sm font-black text-slate-500 whitespace-nowrap tracking-tight">{format(new Date(e.date), 'MMM d, yyyy')}</td>
+                      <td className="px-6 py-6">
+                        <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-rose-600 transition-colors">{e.description}</p>
+                        {e.event_id && <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter mt-2 flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-blue-300" /> Event: {e.event_id}</p>}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{e.event_id || "-"}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${e.payment_mode === "Cash" ? "bg-warning/10 text-warning border-warning/20" : "bg-secondary/10 text-secondary border-secondary/20"}`}>
+                      <td className="px-6 py-6">
+                        <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm">
+                          {e.head}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-6">
+                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${e.payment_mode === "Cash" ? "bg-amber-500 text-white" : "bg-blue-500 text-white"}`}>
                           {e.payment_mode}
-                        </span>
+                        </Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm font-bold text-destructive">₨ {e.amount.toLocaleString()}</td>
+                      <td className="px-6 py-6 text-sm font-black text-right text-rose-600 tracking-tight">₨ {e.amount.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr className="bg-muted/40">
-                    <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-card-foreground">Monthly Total</td>
-                    <td className="px-4 py-3 text-sm font-bold text-destructive">₨ {filtered.reduce((s, e) => s + (e.amount || 0), 0).toLocaleString()}</td>
+                <tfoot className="bg-slate-50/80 border-t border-slate-200">
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Monthly Aggregate Log</td>
+                    <td className="px-6 py-8 text-right">
+                      <span className="px-6 py-3 rounded-2xl bg-rose-500 text-white font-black text-xl shadow-xl shadow-rose-500/20">
+                        ₨ {filtered.reduce((s, e) => s + (e.amount || 0), 0).toLocaleString()}
+                      </span>
+                    </td>
                   </tr>
                 </tfoot>
               </table>

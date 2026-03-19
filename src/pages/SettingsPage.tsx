@@ -157,68 +157,68 @@ const SettingsPage = () => {
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Settings</h2>
-        <p className="text-sm text-muted-foreground">Manage your system preferences and configurations</p>
+    <div className="space-y-8 pb-10">
+      <div className="animate-in fade-in slide-in-from-left duration-500">
+        <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">System Settings</h1>
+        <p className="text-slate-500 font-bold mt-1">Manage your system preferences and configurations.</p>
       </div>
 
-      <Tabs defaultValue="company">
-        <TabsList className="mb-4">
-          <TabsTrigger value="company" className="gap-2"><Building2 className="h-4 w-4" /> Company</TabsTrigger>
-          <TabsTrigger value="profile" className="gap-2"><User className="h-4 w-4" /> Profile</TabsTrigger>
+      <Tabs defaultValue="company" className="w-full">
+        <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
+          <TabsTrigger value="company" className="rounded-xl px-6 py-3 font-black text-[11px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2"><Building2 className="h-4 w-4" /> Company</TabsTrigger>
+          <TabsTrigger value="profile" className="rounded-xl px-6 py-3 font-black text-[11px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2"><User className="h-4 w-4" /> Profile</TabsTrigger>
           {currentUser?.role === "admin" && (
             <>
-              <TabsTrigger value="users" className="gap-2"><Users className="h-4 w-4" /> User Management</TabsTrigger>
-              <TabsTrigger value="audit" className="gap-2"><History className="h-4 w-4" /> Audit Log</TabsTrigger>
+              <TabsTrigger value="users" className="rounded-xl px-6 py-3 font-black text-[11px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2"><Users className="h-4 w-4" /> Users</TabsTrigger>
+              <TabsTrigger value="audit" className="rounded-xl px-6 py-3 font-black text-[11px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2"><History className="h-4 w-4" /> Audit Log</TabsTrigger>
             </>
           )}
-          <TabsTrigger value="notifications" className="gap-2"><Bell className="h-4 w-4" /> Notifications</TabsTrigger>
-          <TabsTrigger value="security" className="gap-2"><Shield className="h-4 w-4" /> Security</TabsTrigger>
+          <TabsTrigger value="notifications" className="rounded-xl px-6 py-3 font-black text-[11px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2"><Bell className="h-4 w-4" /> Alerts</TabsTrigger>
+          <TabsTrigger value="security" className="rounded-xl px-6 py-3 font-black text-[11px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2"><Shield className="h-4 w-4" /> Security</TabsTrigger>
         </TabsList>
 
         {/* User Management Tab */}
         {currentUser?.role === "admin" && (
-          <TabsContent value="users" className="space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <TabsContent value="users" className="space-y-6 animate-in fade-in duration-500">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+              <div className="relative w-full sm:max-w-xs group">
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
                 <Input 
-                  placeholder="Search users..." 
-                  className="pl-9" 
+                  placeholder="Search system users..." 
+                  className="pl-11 h-12 bg-slate-50 border-none rounded-xl font-bold shadow-sm focus-visible:ring-blue-500/20" 
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
               </div>
               <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2 w-full sm:w-auto"><Plus className="h-4 w-4" /> Add User</Button>
+                  <Button className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-8 gap-2 shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5"><Plus className="h-5 w-5" /> CREATE USER</Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl">
                   <DialogHeader>
-                    <DialogTitle>Create New User Account</DialogTitle>
-                    <DialogDescription>Add a new staff member and configure their permissions.</DialogDescription>
+                    <DialogTitle className="text-2xl font-black tracking-tight">Create New User Account</DialogTitle>
+                    <DialogDescription className="font-medium">Add a new staff member and configure their permissions.</DialogDescription>
                   </DialogHeader>
-                  <div className="grid grid-cols-2 gap-4 py-4">
-                    <div className="space-y-1.5">
-                      <Label>Full Name</Label>
-                      <Input placeholder="Ahmed Khan" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
+                  <div className="grid grid-cols-2 gap-6 py-4">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Full Name</Label>
+                      <Input placeholder="Ahmed Khan" className="h-12 rounded-xl font-bold" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Email</Label>
-                      <Input type="email" placeholder="ahmed@octonus.com" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} />
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Email Address</Label>
+                      <Input type="email" placeholder="ahmed@octonus.com" className="h-12 rounded-xl font-bold" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Password</Label>
-                      <Input type="password" placeholder="••••••••" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} />
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Initial Password</Label>
+                      <Input type="password" placeholder="••••••••" className="h-12 rounded-xl font-bold" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Initial Role</Label>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Access Role</Label>
                       <Select value={newUser.role} onValueChange={(v: UserRole) => {
                         setNewUser({...newUser, role: v, permissions: ROLE_PERMISSIONS[v]});
                       }}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
+                        <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                        <SelectContent className="rounded-xl">
                           <SelectItem value="manager">Manager</SelectItem>
                           <SelectItem value="accountant">Accountant</SelectItem>
                           <SelectItem value="staff">Staff</SelectItem>
@@ -226,93 +226,105 @@ const SettingsPage = () => {
                       </Select>
                     </div>
 
-                    <div className="col-span-2 border-t border-border pt-4">
-                      <Label className="mb-2 block font-bold uppercase tracking-wider text-[10px] text-muted-foreground">Page Access</Label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="col-span-2 border-t border-slate-100 pt-6">
+                      <Label className="mb-4 block font-black uppercase tracking-[0.2em] text-[10px] text-slate-400">Page Access Control</Label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         {PAGES.map(p => (
-                          <div key={p.id} className="flex items-center space-x-2 bg-muted/30 p-2 rounded-md border border-border">
+                          <div key={p.id} className="flex items-center space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-100 transition-all hover:bg-white hover:shadow-sm">
                             <Checkbox 
                               id={`page-${p.id}`} 
                               checked={newUser.permissions.pages.includes(p.id)}
                               onCheckedChange={() => togglePagePermission(p.id)}
+                              className="rounded-md h-5 w-5"
                             />
-                            <Label htmlFor={`page-${p.id}`} className="text-xs cursor-pointer truncate">{p.label}</Label>
+                            <Label htmlFor={`page-${p.id}`} className="text-xs font-black cursor-pointer truncate">{p.label.toUpperCase()}</Label>
                           </div>
                         ))}
                       </div>
                     </div>
 
-                    <div className="col-span-2 border-t border-border pt-4">
-                      <Label className="mb-2 block font-bold uppercase tracking-wider text-[10px] text-muted-foreground">Actions Permissions</Label>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="col-span-2 border-t border-slate-100 pt-6">
+                      <Label className="mb-4 block font-black uppercase tracking-[0.2em] text-[10px] text-slate-400">Action Permissions</Label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                         {ACTIONS.map(a => (
-                          <div key={a.id} className="flex items-center space-x-2 bg-muted/30 p-2 rounded-md border border-border">
+                          <div key={a.id} className="flex items-center space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-100 transition-all hover:bg-white hover:shadow-sm">
                             <Checkbox 
                               id={`action-${a.id}`} 
                               checked={newUser.permissions.actions.includes(a.id)}
                               onCheckedChange={() => toggleActionPermission(a.id)}
+                              className="rounded-md h-5 w-5"
                             />
-                            <Label htmlFor={`action-${a.id}`} className="text-xs cursor-pointer">{a.label}</Label>
+                            <Label htmlFor={`action-${a.id}`} className="text-xs font-black cursor-pointer">{a.label.toUpperCase()}</Label>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setShowAddUserModal(false)}>Cancel</Button>
-                    <Button onClick={handleAddUser}>Create Account</Button>
+                  <DialogFooter className="gap-3">
+                    <Button variant="outline" className="h-12 rounded-xl font-black px-6" onClick={() => setShowAddUserModal(false)}>CANCEL</Button>
+                    <Button className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-8" onClick={handleAddUser}>CREATE ACCOUNT</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
             </div>
 
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full">
                   <thead>
-                    <tr className="border-b border-border bg-muted/50">
-                      <th className="px-4 py-3 text-left font-semibold">User</th>
-                      <th className="px-4 py-3 text-left font-semibold">Role</th>
-                      <th className="px-4 py-3 text-left font-semibold">Status</th>
-                      <th className="px-4 py-3 text-left font-semibold">Last Login</th>
-                      <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                    <tr className="bg-slate-50/80 text-left border-b border-slate-100">
+                      <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">User Profile</th>
+                      <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Role</th>
+                      <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                      <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Activity</th>
+                      <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
-                    {filteredUsers.map(u => (
-                      <tr key={u.id} className="hover:bg-muted/10 transition-colors group">
-                        <td className="px-4 py-3">
-                          <div>
-                            <p className="font-bold">{u.name}</p>
-                            <p className="text-xs text-muted-foreground">{u.email}</p>
+                  <tbody className="divide-y divide-slate-50">
+                    {filteredUsers.map((u, idx) => (
+                      <tr key={u.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
+                        <td className="px-6 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-blue-600 font-black text-sm shadow-sm border border-blue-100/50 group-hover:scale-110 transition-transform duration-300">
+                              {u.name[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{u.name}</p>
+                              <p className="text-[11px] font-bold text-slate-400 mt-2 tracking-tight">{u.email}</p>
+                            </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 capitalize">
-                          <Badge variant="secondary" className="font-medium">{u.role}</Badge>
+                        <td className="px-6 py-6">
+                          <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-widest bg-white border-slate-200 px-3 py-1 shadow-sm">
+                            {u.role}
+                          </Badge>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-6 py-6">
                           <Badge 
-                            variant="outline" 
-                            className={`capitalize ${u.status === 'active' ? 'bg-success/10 text-success border-success/20' : 'bg-destructive/10 text-destructive border-destructive/20'}`}
+                            className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${u.status === 'active' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}
                           >
                             {u.status}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground">{u.lastLogin}</td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-8 w-8"><Edit2 className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Reset Password"><Key className="h-4 w-4" /></Button>
+                        <td className="px-6 py-6">
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-black text-slate-500 uppercase tracking-tighter">Last Login</span>
+                            <span className="text-xs font-bold text-slate-400 mt-1">{u.lastLogin}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-6 text-right">
+                          <div className="flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 shadow-sm"><Edit2 className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-amber-600 hover:bg-amber-100/50 shadow-sm" title="Reset Password"><Key className="h-4 w-4" /></Button>
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className={`h-8 w-8 ${u.status === 'active' ? 'text-destructive' : 'text-success'}`}
+                              className={`h-9 w-9 rounded-xl shadow-sm ${u.status === 'active' ? 'text-rose-500 hover:bg-rose-100/50' : 'text-emerald-500 hover:bg-emerald-100/50'}`}
                               onClick={() => handleUpdateUserStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
-                              title={u.status === 'active' ? 'Deactivate' : 'Activate'}
                             >
                               {u.status === 'active' ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteUser(u.id)}>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 shadow-sm" onClick={() => handleDeleteUser(u.id)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>

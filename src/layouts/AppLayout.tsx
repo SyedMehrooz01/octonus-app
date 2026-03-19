@@ -5,6 +5,7 @@ import { Sheet, SheetClose, SheetContent } from "@/components/ui/sheet";
 import { BRAND_INITIALS, BRAND_NAME } from "@/constants";
 import TopHeader from "@/components/TopHeader";
 import { useAuth } from "@/contexts/AuthContext";
+import Logo from "@/components/Logo";
 
 export const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, page: "dashboard" },
@@ -37,86 +38,83 @@ const AppLayout = () => {
   const accessibleNav = navItems.filter(item => hasAccess(item.page));
 
   const SidebarContent = ({ onClose }: { onClose?: () => void }) => (
-    <>
-      <div className="flex h-14 items-center gap-3 border-b border-sidebar-border px-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary flex-shrink-0">
-          <span className="text-sm font-bold text-primary-foreground">{BRAND_INITIALS}</span>
-        </div>
-        <div className="min-w-0">
-          <h1 className="truncate text-sm font-bold text-primary">{BRAND_NAME}</h1>
-          <p className="text-[10px] text-sidebar-foreground/60">HRMS & Events</p>
+    <div className="flex flex-col h-full">
+      <div className="flex flex-col items-center justify-center pt-8 pb-4 px-6 mb-4">
+        <Logo size="sm" className="mb-2" />
+        <div className="text-center">
+          <h1 className="text-lg font-black text-white tracking-tight leading-tight">{BRAND_NAME}</h1>
+          <p className="text-[10px] font-bold text-blue-200/50 uppercase tracking-widest mt-1">Management Suite</p>
         </div>
       </div>
 
-      {/* User info */}
+      {/* User info section */}
       {user && (
-        <div className="border-b border-sidebar-border px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary flex-shrink-0">
-              {user.avatar}
+        <div className="mx-4 mb-6 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm shadow-inner">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-400 to-indigo-600 text-white font-black shadow-lg border border-white/20">
+                {user.name?.[0]?.toUpperCase() || "U"}
+              </div>
+              <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-emerald-500 border-2 border-[#0f172a] shadow-sm" />
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-sidebar-foreground">{user.name}</p>
-              <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${ROLE_COLORS[user.role]}`}>
-                <ShieldCheck className="h-2.5 w-2.5" />
-                {user.role}
-              </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-black text-white">{user.name}</p>
+              <p className="text-[10px] font-bold text-blue-200/60 uppercase tracking-tighter truncate">{user.role}</p>
             </div>
           </div>
         </div>
       )}
 
-      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
+      <nav className="flex-1 space-y-1.5 px-4 overflow-y-auto custom-scrollbar">
         {accessibleNav.map((item) => {
           const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
-          const NavItem = (
+          return (
             <NavLink
               key={item.to}
               to={item.to}
               onClick={onClose}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition-all duration-300 group ${
                 isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  ? "bg-blue-600 text-white shadow-xl shadow-blue-600/30 translate-x-1"
+                  : "text-blue-100/70 hover:bg-white/5 hover:text-white hover:translate-x-1"
               }`}
             >
-              <item.icon className="h-4 w-4 flex-shrink-0" />
-              {item.label}
+              <item.icon className={`h-5 w-5 flex-shrink-0 transition-all duration-300 ${isActive ? "scale-110 rotate-3" : "group-hover:scale-110 group-hover:rotate-3"}`} />
+              <span className="tracking-wide">{item.label}</span>
             </NavLink>
           );
-          return NavItem;
         })}
       </nav>
 
-      <div className="border-t border-sidebar-border px-3 py-3">
+      <div className="p-4 mt-auto">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-rose-300/70 transition-all duration-300 hover:bg-rose-500/10 hover:text-rose-400 group"
         >
-          <LogOut className="h-4 w-4" />
-          Logout
+          <LogOut className="h-5 w-5 transition-transform duration-300 group-hover:-translate-x-1" />
+          Logout System
         </button>
       </div>
-    </>
+    </div>
   );
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-[#f8fafc]">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex md:w-52 flex-col bg-secondary text-sidebar-foreground fixed top-0 left-0 h-full z-40">
+      <aside className="hidden md:flex md:w-64 flex-col bg-[#0f172a] text-white fixed top-0 left-0 h-full z-40 border-r border-white/5">
         <SidebarContent />
       </aside>
 
-      <div className="flex flex-1 flex-col md:ml-52">
-        <TopHeader onMenuClick={() => setMobileNavOpen(true)} />
-        <main className="flex-1 p-4 md:p-6">
+      <div className="flex flex-1 flex-col md:ml-64">
+        <TopHeader onMenuClick={() => setMobileNavOpen(true)} user={user} onLogout={handleLogout} />
+        <main className="flex-1 p-4 md:p-8">
           <Outlet />
         </main>
       </div>
 
       {/* Mobile Sidebar */}
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-        <SheetContent side="left" className="w-72 bg-secondary p-0 text-sidebar-foreground sm:max-w-sm flex flex-col">
+        <SheetContent side="left" className="w-72 bg-[#0f172a] p-0 text-white border-none flex flex-col">
           <SidebarContent onClose={() => setMobileNavOpen(false)} />
         </SheetContent>
       </Sheet>

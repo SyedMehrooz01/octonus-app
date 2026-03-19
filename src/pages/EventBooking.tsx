@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef, memo } from "react";
-import { Plus, Search, Eye, Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Edit, Loader2, Printer, Save, CheckCircle2, User, Wallet, History } from "lucide-react";
+import { useState, useEffect, useRef, memo, useMemo } from "react";
+import { Plus, Search, Eye, Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Edit, Loader2, Printer, Save, CheckCircle2, User, Wallet, History, CalendarDays, Clock, TrendingUp, Filter, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -64,13 +65,20 @@ const EVENT_TYPES = ["Wedding","Corporate","Birthday","Mehndi","Engagement","Con
 const VENUES = ["Main Hall","Banquet Hall","Garden","Lawn Area","Conference Room","Rooftop"];
 const PAYMENT_METHODS = ["Cash","Bank Transfer","Cheque","Online"];
 
-const sc = (s: BookingStatus) => s==="confirmed"?"bg-success/10 text-success border-success/20":s==="tentative"?"bg-warning/10 text-warning border-warning/20":s==="postponed"?"bg-secondary/10 text-secondary border-secondary/20":"bg-destructive/10 text-destructive border-destructive/20";
-const sd = (s: BookingStatus) => s==="confirmed"?"bg-success":s==="tentative"?"bg-warning":s==="postponed"?"bg-secondary":"bg-destructive";
+const sc = (status: BookingStatus) => {
+  const s = status?.toLowerCase();
+  if (s === 'confirmed') return "bg-emerald-500 hover:bg-emerald-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold";
+  if (s === 'tentative') return "bg-gray-400 hover:bg-gray-500 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold";
+  if (s === 'pending') return "bg-blue-500 hover:bg-blue-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold";
+  if (s === 'cancelled' || s === 'postponed') return "bg-rose-500 hover:bg-rose-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold";
+  return "bg-muted text-muted-foreground border-border px-3 py-1 rounded-lg font-bold";
+};
 
 const EMPTY = { clientName:"",phone:"",eventType:"",eventDate:"",bookingDate:new Date().toISOString().split("T")[0],venue:"",guests:"",totalAmount:"",advance:"",paymentMethod:"Cash",status:"tentative" as BookingStatus,menu:"Menu A - Desi",notes:"",thirdParty:false,supplierCost:"",sellingRate:"" };
 
 const EventBooking = () => {
   const { canDo, logAction } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [menus, setMenus] = useState<Menu[]>(INITIAL_MENUS);
   const [loadingMenus, setLoadingMenus] = useState(false);
   const [showItemModal, setShowItemModal] = useState(false);
@@ -96,10 +104,23 @@ const EventBooking = () => {
   const [proceedWithBooking, setProceedWithBooking] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
+  const [bookings, setBookings] = useState<Booking[]>(DUMMY_BOOKINGS);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [showAdd, setShowAdd] = useState(false);
+  const [showView, setShowView] = useState(false);
+  const [showKitchen, setShowKitchen] = useState(false);
+  const [selected, setSelected] = useState<Booking|null>(null);
+  const [calMonth, setCalMonth] = useState(new Date());
+  const [nb, setNb] = useState(EMPTY);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const fetchMenus = async () => {
     setLoadingMenus(true);
     try {
-      // 1. Fetch menus
       const { data: menusData, error: menusError } = await supabase
         .from('menus')
         .select('*')
@@ -108,7 +129,6 @@ const EventBooking = () => {
       if (menusError) throw menusError;
 
       if (menusData && menusData.length > 0) {
-        // 2. Fetch items for each menu
         const { data: itemsData, error: itemsError } = await supabase
           .from('menu_items')
           .select('*')
@@ -122,13 +142,12 @@ const EventBooking = () => {
         }));
         setMenus(formattedMenus);
       } else {
-        // Fallback to initial menus if DB is empty
         setMenus(INITIAL_MENUS);
       }
     } catch (error: any) {
       console.error("Error fetching menus:", error);
       toast.error("Failed to load menus from database");
-      setMenus(INITIAL_MENUS); // Fallback
+      setMenus(INITIAL_MENUS);
     } finally {
       setLoadingMenus(false);
     }
@@ -145,6 +164,15 @@ const EventBooking = () => {
       console.error("Error fetching suppliers:", err);
     }
   };
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      await Promise.all([fetchMenus(), fetchSuppliers()]);
+      setLoading(false);
+    };
+    init();
+  }, []);
 
   const handleAddSupplier = async () => {
     if (!supplierForm.name) return;
@@ -205,7 +233,6 @@ const EventBooking = () => {
     const totalPaid = clientBookings.reduce((sum, b) => sum + b.advance, 0);
     const remainingBalance = clientBookings.reduce((sum, b) => sum + b.balanceRemaining, 0);
     
-    // Mock client payments for now since we don't have a separate client_payments table yet
     const clientPayments = clientBookings.map(b => ({
       date: b.bookingDate,
       amount: b.advance,
@@ -222,11 +249,6 @@ const EventBooking = () => {
     });
     setShowClientProfile(true);
   };
-
-  useEffect(() => {
-    fetchMenus();
-    fetchSuppliers();
-  }, []);
 
   const handleEditClick = (item: MenuItem, menuId: number | string) => {
     setEditingItem(item);
@@ -251,7 +273,6 @@ const EventBooking = () => {
     setIsSaving(true);
     try {
       if (editingItem) {
-        // Update existing item
         const { error } = await supabase
           .from('menu_items')
           .update({
@@ -265,7 +286,6 @@ const EventBooking = () => {
         logAction(`Updated menu item: ${itemForm.item}`, "Event Booking");
         toast.success("Item updated successfully");
       } else {
-        // Add new item
         const { error } = await supabase
           .from('menu_items')
           .insert([{
@@ -281,26 +301,10 @@ const EventBooking = () => {
       }
       
       setShowItemModal(false);
-      fetchMenus(); // Refresh state
+      fetchMenus();
     } catch (error: any) {
       console.error("Error saving menu item:", error);
       toast.error(error.message || "Failed to save item");
-      
-      // Local state update fallback if Supabase fails (e.g. table doesn't exist)
-      if (editingItem) {
-        setMenus(prev => prev.map(m => 
-          m.id === activeMenuId 
-            ? { ...m, items: m.items.map(i => i.id === editingItem.id ? { ...itemForm } : i) }
-            : m
-        ));
-      } else {
-        setMenus(prev => prev.map(m => 
-          m.id === activeMenuId 
-            ? { ...m, items: [...m.items, { ...itemForm, id: Date.now() }] }
-            : m
-        ));
-      }
-      setShowItemModal(false);
     } finally {
       setIsSaving(false);
     }
@@ -314,7 +318,6 @@ const EventBooking = () => {
       if (kiData && kiData.length > 0) {
         setKitchenItems(kiData);
       } else {
-        // Generate from menu
         const booking = bookings.find(b => b.id === eventId);
         if (booking) {
           const menu = menus.find(m => m.name === booking.menu);
@@ -328,18 +331,13 @@ const EventBooking = () => {
               is_adjusted: false
             }));
             setKitchenItems(items);
-          } else {
-            setKitchenItems([]);
           }
-        } else {
-          setKitchenItems([]);
         }
       }
 
       if (rmData && rmData.length > 0) {
         setRawMaterials(rmData);
       } else {
-        // Generate from kitchen items & menu requirements
         const booking = bookings.find(b => b.id === eventId);
         if (booking) {
           const menu = menus.find(m => m.name === booking.menu);
@@ -362,17 +360,11 @@ const EventBooking = () => {
               actual_qty: m.qty
             }));
             setRawMaterials(materials);
-          } else {
-            setRawMaterials([]);
           }
-        } else {
-          setRawMaterials([]);
         }
       }
     } catch (err) {
       console.error("Error fetching kitchen data:", err);
-      setKitchenItems([]);
-      setRawMaterials([]);
     }
   };
 
@@ -380,14 +372,12 @@ const EventBooking = () => {
     if (!selected) return;
     setIsSaving(true);
     try {
-      // Upsert kitchen items
       const { error: kiErr } = await supabase.from('kitchen_items').upsert(
         kitchenItems.map(item => ({ ...item, event_id: selected.id })),
         { onConflict: 'event_id,item_name' }
       );
       if (kiErr) throw kiErr;
 
-      // Upsert raw materials
       const { error: rmErr } = await supabase.from('raw_materials').upsert(
         rawMaterials.map(item => ({ ...item, event_id: selected.id })),
         { onConflict: 'event_id,material_name' }
@@ -396,7 +386,6 @@ const EventBooking = () => {
 
       toast.success("Kitchen data saved successfully");
     } catch (err: any) {
-      console.error("Error saving kitchen data:", err);
       toast.error(err.message || "Failed to save kitchen data");
     } finally {
       setIsSaving(false);
@@ -407,21 +396,14 @@ const EventBooking = () => {
     window.print();
   };
 
-  const [bookings, setBookings] = useState<Booking[]>(DUMMY_BOOKINGS);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [showAdd, setShowAdd] = useState(false);
-  const [showView, setShowView] = useState(false);
-  const [showKitchen, setShowKitchen] = useState(false);
-  const [selected, setSelected] = useState<Booking|null>(null);
-  const [calMonth, setCalMonth] = useState(new Date());
-  const [nb, setNb] = useState(EMPTY);
-
   const filtered = bookings.filter(b => {
     const ms = b.clientName.toLowerCase().includes(search.toLowerCase()) || b.eventType.toLowerCase().includes(search.toLowerCase());
     const mf = statusFilter==="all" || b.status===statusFilter;
     return ms && mf;
   });
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginatedBookings = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const checkAvailability = () => {
     if (!nb.eventDate || !nb.venue) return true;
@@ -436,15 +418,10 @@ const EventBooking = () => {
 
   const handleAdd = () => {
     if (!nb.clientName || !nb.eventDate) return;
-    
-    if (!proceedWithBooking) {
-      const isAvailable = checkAvailability();
-      if (!isAvailable) {
-        setProceedWithBooking(true);
-        return;
-      }
+    if (!proceedWithBooking && !checkAvailability()) {
+      setProceedWithBooking(true);
+      return;
     }
-
     const total = Number(nb.totalAmount), adv = Number(nb.advance);
     setBookings([...bookings,{id:bookings.length+1,...nb,guests:Number(nb.guests),totalAmount:total,advance:adv,balanceRemaining:total-adv,supplierCost:Number(nb.supplierCost),sellingRate:Number(nb.sellingRate)}]);
     setNb(EMPTY); setShowAdd(false); setAvailabilityWarning(null); setProceedWithBooking(false);
@@ -458,128 +435,235 @@ const EventBooking = () => {
   const tp = bookings.filter(b=>b.thirdParty).reduce((s,b)=>s+(b.sellingRate-b.supplierCost),0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h2 className="text-2xl font-bold text-foreground">Event Booking & Scheduling</h2><p className="text-sm text-muted-foreground">All bookings, menus, kitchen production, third-party sourcing</p></div>
-        <Button onClick={()=>setShowAdd(true)} className="gap-2"><Plus className="h-4 w-4"/>New Booking</Button>
+    <div className="space-y-8 pb-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="animate-in fade-in slide-in-from-left duration-500">
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Event Booking & Scheduling</h1>
+          <p className="text-slate-500 font-bold mt-1">Manage bookings, menus, and production from one central hub.</p>
+        </div>
+        <Button onClick={()=>setShowAdd(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-600/20 gap-2 h-12 px-8 transition-all hover:scale-[1.02] active:scale-95 animate-in fade-in slide-in-from-right duration-500">
+          <Plus className="h-5 w-5"/> NEW BOOKING
+        </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {[{l:"Total",v:bookings.length,c:"text-foreground"},{l:"Confirmed",v:bookings.filter(b=>b.status==="confirmed").length,c:"text-success"},{l:"Tentative",v:bookings.filter(b=>b.status==="tentative").length,c:"text-warning"},{l:"Postponed",v:bookings.filter(b=>b.status==="postponed").length,c:"text-secondary"},{l:"Cancelled",v:bookings.filter(b=>b.status==="cancelled").length,c:"text-destructive"},{l:"3rd Party Profit",v:`₨ ${tp.toLocaleString()}`,c:"text-primary"}].map(c=>(
-          <div key={c.l} className="rounded-lg border border-border bg-card p-3"><p className="text-[10px] uppercase font-bold text-muted-foreground">{c.l}</p><p className={`mt-1 text-base sm:text-lg font-bold ${c.c}`}>{c.v}</p></div>
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+        {[
+          {l:"Total Bookings",v:bookings.length,c:"from-blue-500 to-blue-700",s:"shadow-blue-500/20",i:CalendarDays},
+          {l:"Confirmed",v:bookings.filter(b=>b.status==="confirmed").length,c:"from-emerald-500 to-emerald-700",s:"shadow-emerald-500/20",i:CheckCircle2},
+          {l:"Tentative",v:bookings.filter(b=>b.status==="tentative").length,c:"from-slate-400 to-slate-600",s:"shadow-slate-400/20",i:Clock},
+          {l:"Cancelled",v:bookings.filter(b=>b.status==="cancelled").length,c:"from-rose-500 to-rose-700",s:"shadow-rose-500/20",i:Trash2},
+          {l:"3rd Party Profit",v:`₨ ${tp.toLocaleString()}`,c:"from-indigo-500 to-indigo-700",s:"shadow-indigo-500/20",i:TrendingUp},
+          {l:"Outstanding",v:`₨ ${bookings.reduce((s,b)=>s+b.balanceRemaining,0).toLocaleString()}`,c:"from-amber-500 to-amber-700",s:"shadow-amber-500/20",i:Wallet}
+        ].map((c, idx)=>(
+          <div key={c.l} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${c.c} p-5 text-white shadow-xl ${c.s} transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${idx * 50}`}>
+            <div className="relative z-10 flex flex-col gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+                <c.i className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-80">{c.l}</p>
+                <p className="text-xl font-black truncate mt-0.5 tracking-tight">{c.v}</p>
+              </div>
+            </div>
+            <div className="absolute -right-4 -bottom-4 opacity-10 transition-transform duration-500 group-hover:scale-125">
+              <c.i size={80} className="text-white" />
+            </div>
+          </div>
         ))}
       </div>
 
-      <Tabs defaultValue="list">
-        <TabsList className="mb-4 flex-wrap h-auto gap-1">
-          <TabsTrigger value="list">All Bookings</TabsTrigger>
-          <TabsTrigger value="calendar">Calendar</TabsTrigger>
-          <TabsTrigger value="menu">Menu Management</TabsTrigger>
-          <TabsTrigger value="kitchen">Kitchen Sheet</TabsTrigger>
-          <TabsTrigger value="thirdparty">Third-Party Sourcing</TabsTrigger>
-          <TabsTrigger value="suppliers">Supplier Ledger</TabsTrigger>
+      <Tabs defaultValue="list" className="w-full">
+        <TabsList className="mb-8 flex-wrap h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
+          {["list", "calendar", "menu", "kitchen", "thirdparty", "suppliers"].map(tab => (
+            <TabsTrigger 
+              key={tab}
+              value={tab} 
+              className="rounded-xl px-6 py-3 font-black text-[11px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all"
+            >
+              {tab === 'list' ? 'All Bookings' : tab === 'thirdparty' ? 'Third-Party' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="list">
-          <div className="rounded-lg border border-border bg-card">
-            <div className="flex flex-wrap gap-3 border-b border-border p-4">
-              <div className="relative flex-1 min-w-40"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><Input placeholder="Search..." className="pl-9" value={search} onChange={e=>setSearch(e.target.value)}/></div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-36"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">All Status</SelectItem><SelectItem value="confirmed">Confirmed</SelectItem><SelectItem value="tentative">Tentative</SelectItem><SelectItem value="postponed">Postponed</SelectItem><SelectItem value="cancelled">Cancelled</SelectItem></SelectContent></Select>
+        <TabsContent value="list" className="space-y-6 animate-in fade-in duration-500">
+          <div className="flex flex-col sm:flex-row gap-4 items-center bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="relative flex-1 w-full group">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+              <Input 
+                placeholder="Search bookings, clients or venues..." 
+                className="pl-12 h-12 bg-slate-50 border-none rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500/20 font-bold transition-all" 
+                value={search}
+                onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+              />
             </div>
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <Select value={statusFilter} onValueChange={s => { setStatusFilter(s); setCurrentPage(1); }}>
+                <SelectTrigger className="w-full sm:w-56 h-12 rounded-xl border-slate-200 bg-white font-black text-[11px] uppercase tracking-widest shadow-sm">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-slate-100 shadow-2xl p-2">
+                  <SelectItem value="all" className="rounded-lg font-bold">All Status</SelectItem>
+                  <SelectItem value="confirmed" className="rounded-lg font-bold text-emerald-600">Confirmed</SelectItem>
+                  <SelectItem value="tentative" className="rounded-lg font-bold text-slate-500">Tentative</SelectItem>
+                  <SelectItem value="postponed" className="rounded-lg font-bold text-amber-600">Postponed</SelectItem>
+                  <SelectItem value="cancelled" className="rounded-lg font-bold text-rose-600">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" className="h-12 rounded-xl border-slate-200 font-black px-6 gap-2 hover:bg-slate-50 transition-all shadow-sm">
+                <Filter className="h-4 w-4 text-slate-500" /> FILTER
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px]">
-                <thead><tr className="border-b border-border bg-muted/40">{["Client","Type","Date","Venue","Guests","Total","Advance","Balance","Status","Actions"].map(h=><th key={h} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}</tr></thead>
-                <tbody>
-                  {filtered.map(b=>(
-                    <tr key={b.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-3 py-3 text-sm font-medium text-card-foreground whitespace-nowrap">
-                        <button onClick={() => openClientProfile(b.clientName, b.phone)} className="hover:text-primary hover:underline transition-colors flex items-center gap-1.5">
-                          <User className="h-3 w-3" />
-                          {b.clientName}
-                        </button>
+              <table className="w-full border-collapse min-w-[1000px]">
+                <thead>
+                  <tr className="bg-slate-50/80 text-left border-b border-slate-100">
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Client Identity</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Event Type</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Schedule & Venue</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">PAX</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Financials</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {loading ? (
+                    Array(5).fill(0).map((_, i) => (
+                      <tr key={i}><td colSpan={7} className="px-8 py-10"><div className="h-14 w-full animate-pulse rounded-2xl bg-slate-50" /></td></tr>
+                    ))
+                  ) : paginatedBookings.length > 0 ? (
+                    paginatedBookings.map((b, idx) => (
+                      <tr key={b.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'} hover:bg-blue-50/50 transition-colors group`}>
+                        <td className="px-8 py-6">
+                          <button onClick={() => openClientProfile(b.clientName, b.phone)} className="text-left group/client">
+                            <p className="text-base font-black text-[#0f172a] leading-none group-hover/client:text-blue-600 transition-colors">{b.clientName}</p>
+                            <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">{b.phone}</p>
+                          </button>
+                        </td>
+                        <td className="px-8 py-6">
+                          <Badge variant="outline" className="rounded-lg font-black text-[9px] uppercase tracking-widest bg-white border-slate-200 text-slate-600 px-2.5 py-1 shadow-sm">
+                            {b.eventType}
+                          </Badge>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-black text-slate-700 tracking-tight">{format(new Date(b.eventDate), 'MMM dd, yyyy')}</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{b.venue}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6 text-center">
+                          <span className="inline-flex items-center justify-center h-9 w-14 rounded-xl bg-slate-50 font-black text-[11px] text-slate-600 border border-slate-200/50 shadow-sm">
+                            {b.guests}
+                          </span>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex flex-col">
+                            <p className="text-sm font-black text-blue-600 tracking-tight">₨ {b.totalAmount.toLocaleString()}</p>
+                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-tighter mt-1">{b.balanceRemaining > 0 ? `Due: ₨ ${b.balanceRemaining.toLocaleString()}` : 'FULLY PAID'}</p>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <Badge className={`${sc(b.status)} rounded-xl px-3 py-1.5 text-[10px] font-black uppercase tracking-widest border-none shadow-md`}>
+                            {b.status}
+                          </Badge>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
+                            <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 hover:text-blue-700 shadow-sm" onClick={() => { setSelected(b); setShowView(true); }}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-100/50 hover:text-emerald-700 shadow-sm" onClick={() => { setSelected(b); setShowAdd(true); setNb({...b, guests: b.guests.toString(), totalAmount: b.totalAmount.toString(), advance: b.advance.toString(), supplierCost: b.supplierCost.toString(), sellingRate: b.sellingRate.toString()}); }}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 hover:text-rose-600 shadow-sm" onClick={() => { if(confirm("Permanently delete this booking record?")) setBookings(bookings.filter(bk => bk.id !== b.id)); }}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="px-8 py-24 text-center">
+                        <div className="flex flex-col items-center gap-4">
+                          <div className="h-16 w-16 rounded-3xl bg-slate-50 flex items-center justify-center border border-slate-100">
+                            <CalendarDays className="h-8 w-8 text-slate-200" />
+                          </div>
+                          <p className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">No matching bookings found</p>
+                        </div>
                       </td>
-                      <td className="px-3 py-3 text-sm text-muted-foreground">{b.eventType}</td>
-                      <td className="px-3 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.eventDate}</td>
-                      <td className="px-3 py-3 text-sm text-muted-foreground">{b.venue}</td>
-                      <td className="px-3 py-3 text-sm text-muted-foreground">{b.guests}</td>
-                      <td className="px-3 py-3 text-sm font-medium text-card-foreground whitespace-nowrap">₨ {b.totalAmount.toLocaleString()}</td>
-                      <td className="px-3 py-3 text-sm text-success whitespace-nowrap">₨ {b.advance.toLocaleString()}</td>
-                      <td className="px-3 py-3 text-sm font-medium text-destructive whitespace-nowrap">₨ {b.balanceRemaining.toLocaleString()}</td>
-                      <td className="px-3 py-3"><span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${sc(b.status)}`}><span className={`h-1.5 w-1.5 rounded-full ${sd(b.status)}`}/>{b.status}</span></td>
-                      <td className="px-3 py-3"><div className="flex gap-1">
-                        <button onClick={()=>{setSelected(b);setShowView(true);}} className="rounded p-1 hover:bg-muted"><Eye className="h-3.5 w-3.5 text-muted-foreground"/></button>
-                        <button onClick={()=>{setSelected(b);setShowKitchen(true);}} className="rounded p-1 hover:bg-muted" title="Kitchen Sheet"><UtensilsCrossed className="h-3.5 w-3.5 text-muted-foreground"/></button>
-                        <button onClick={()=>setBookings(bookings.filter(x=>x.id!==b.id))} className="rounded p-1 hover:bg-muted"><Trash2 className="h-3.5 w-3.5 text-destructive"/></button>
-                      </div></td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
-                <tfoot><tr className="border-t-2 border-border bg-muted/40">
-                  <td colSpan={5} className="px-3 py-2 text-xs font-semibold text-muted-foreground">Totals ({filtered.length})</td>
-                  <td className="px-3 py-2 text-xs font-bold">₨ {filtered.reduce((s,b)=>s+b.totalAmount,0).toLocaleString()}</td>
-                  <td className="px-3 py-2 text-xs font-bold text-success">₨ {filtered.reduce((s,b)=>s+b.advance,0).toLocaleString()}</td>
-                  <td className="px-3 py-2 text-xs font-bold text-destructive">₨ {filtered.reduce((s,b)=>s+b.balanceRemaining,0).toLocaleString()}</td>
-                  <td colSpan={2}/>
-                </tr></tfoot>
               </table>
             </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-8 py-6 bg-slate-50/50 border-t border-slate-100">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                  Showing {Math.min(filtered.length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(filtered.length, currentPage * itemsPerPage)} of {filtered.length} results
+                </p>
+                <div className="flex gap-3">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    className="rounded-xl border-slate-200 bg-white font-black h-10 px-6 disabled:opacity-40 transition-all hover:bg-slate-50 active:scale-95 shadow-sm"
+                  >
+                    PREVIOUS
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    className="rounded-xl border-slate-200 bg-white font-black h-10 px-6 disabled:opacity-40 transition-all hover:bg-slate-50 active:scale-95 shadow-sm"
+                  >
+                    NEXT
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="calendar">
-          <div className="rounded-lg border border-border bg-card p-4">
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-              <div className="flex items-center gap-2">
-                <button onClick={()=>setCalMonth(subMonths(calMonth,1))} className="rounded p-1 hover:bg-muted"><ChevronLeft className="h-5 w-5"/></button>
-                <h3 className="text-lg font-bold text-card-foreground min-w-[140px] text-center">{format(calMonth, calView === 'month' ? "MMMM yyyy" : "MMM d, yyyy")}</h3>
-                <button onClick={()=>setCalMonth(addMonths(calMonth,1))} className="rounded p-1 hover:bg-muted"><ChevronRight className="h-5 w-5"/></button>
+          <div className="rounded-2xl border border-border bg-white p-8 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-6 mb-8">
+              <div className="flex items-center gap-4 bg-muted/50 p-1 rounded-xl border border-border/50">
+                <button onClick={()=>setCalMonth(subMonths(calMonth,1))} className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm transition-all"><ChevronLeft className="h-5 w-5"/></button>
+                <h3 className="text-lg font-black text-foreground min-w-[160px] text-center tracking-tight">{format(calMonth, calView === 'month' ? "MMMM yyyy" : "MMM d, yyyy")}</h3>
+                <button onClick={()=>setCalMonth(addMonths(calMonth,1))} className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm transition-all"><ChevronRight className="h-5 w-5"/></button>
               </div>
 
-              <div className="flex bg-muted p-1 rounded-lg">
+              <div className="flex bg-muted/50 p-1 rounded-xl border border-border/50">
                 {(["day", "week", "month"] as const).map(v => (
-                  <button 
-                    key={v} 
-                    onClick={() => setCalView(v)} 
-                    className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${calView === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                  >
-                    {v.charAt(0).toUpperCase() + v.slice(1)}
-                  </button>
+                  <button key={v} onClick={() => setCalView(v)} className={`px-5 py-2 text-xs font-black rounded-lg transition-all uppercase tracking-widest ${calView === v ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{v}</button>
                 ))}
-              </div>
-
-              <div className="flex flex-wrap gap-4 px-4 py-2 bg-muted/30 rounded-lg border border-border/50">
-                {(["confirmed", "tentative", "postponed", "cancelled"] as const).map(s => {
-                  const count = bookings.filter(b => b.status === s && b.eventDate.startsWith(format(calMonth, "yyyy-MM"))).length;
-                  return (
-                    <div key={s} className="flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${s === 'confirmed' ? 'bg-success' : s === 'tentative' ? 'bg-warning' : s === 'cancelled' ? 'bg-destructive' : 'bg-orange-500'}`} />
-                      <span className="text-xs font-semibold capitalize">{s}: <span className="text-foreground">{count}</span></span>
-                    </div>
-                  );
-                })}
               </div>
             </div>
 
             {calView === "month" && (
-              <div className="grid grid-cols-7 gap-1">
-                {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div key={d} className="py-2 text-center text-xs font-semibold text-muted-foreground">{d}</div>)}
-                {Array.from({length:startDow}).map((_,i)=><div key={`e${i}`}/>)}
+              <div className="grid grid-cols-7 gap-2">
+                {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div key={d} className="py-3 text-center text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">{d}</div>)}
+                {Array.from({length:startDow}).map((_,i)=><div key={`e${i}`} className="bg-muted/5 rounded-xl border border-dashed border-border/20"/>)}
                 {days.map(day=>{
                   const db = getDayB(day);
-                  return <div key={day.toISOString()} className={`min-h-[100px] rounded-lg border p-1 text-xs ${db.length>0?"border-primary/30 bg-primary/5":"border-border hover:bg-muted/30"}`}>
-                    <div className="mb-1 font-medium text-card-foreground">{format(day,"d")}</div>
+                  const isToday = isSameDay(day, new Date());
+                  return <div key={day.toISOString()} className={`min-h-[120px] rounded-xl border p-2 transition-all ${isToday ? "border-primary bg-primary/5 shadow-sm" : db.length>0?"border-blue-100 bg-blue-50/30":"border-border/50 hover:bg-muted/30"}`}>
+                    <div className={`mb-2 text-xs font-black ${isToday ? "text-primary" : "text-muted-foreground"}`}>{format(day,"d")}</div>
                     <div className="space-y-1">
                       {db.map((b,i)=>(
-                        <div 
-                          key={i} 
-                          className="truncate rounded px-1.5 py-0.5 text-[10px] font-bold border shadow-sm cursor-pointer hover:brightness-95 transition-all" 
-                          onClick={() => { setSelected(bookings.find(x => x.clientName === b.name) || null); setShowView(true); }}
+                        <div key={i} className="truncate rounded-lg px-2 py-1.5 text-[9px] font-black border shadow-sm cursor-pointer hover:brightness-95 transition-all uppercase tracking-tighter" onClick={() => { setSelected(bookings.find(x => x.clientName === b.name) || null); setShowView(true); }}
                           style={{
                             backgroundColor: b.status === "confirmed" ? "#dcfce7" : b.status === "tentative" ? "#fef9c3" : b.status === "cancelled" ? "#fee2e2" : "#ffedd5",
                             color: b.status === "confirmed" ? "#166534" : b.status === "tentative" ? "#854f0b" : b.status === "cancelled" ? "#991b1b" : "#9a3412",
                             borderColor: b.status === "confirmed" ? "#bbf7d0" : b.status === "tentative" ? "#fef08a" : b.status === "cancelled" ? "#fecaca" : "#fed7aa"
-                          }}
-                        >
+                          }}>
                           {b.name}
                         </div>
                       ))}
@@ -588,672 +672,524 @@ const EventBooking = () => {
                 })}
               </div>
             )}
-
-            {calView === "week" && (
-              <div className="space-y-4">
-                {Array.from({ length: 7 }).map((_, i) => {
-                  const d = new Date(calMonth);
-                  d.setDate(d.getDate() - d.getDay() + i);
-                  const db = getDayB(d);
-                  return (
-                    <div key={i} className="flex gap-4 p-3 rounded-lg border border-border bg-muted/10 hover:bg-muted/20 transition-colors">
-                      <div className="w-24 flex flex-col items-center justify-center border-r border-border pr-4">
-                        <span className="text-xs font-bold text-muted-foreground uppercase">{format(d, "EEE")}</span>
-                        <span className="text-2xl font-black">{format(d, "d")}</span>
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        {db.length > 0 ? db.map((b, idx) => (
-                          <div 
-                            key={idx} 
-                            onClick={() => { setSelected(bookings.find(x => x.clientName === b.name) || null); setShowView(true); }}
-                            className="flex items-center justify-between p-2 rounded-md border shadow-sm cursor-pointer hover:scale-[1.01] transition-transform"
-                            style={{
-                              backgroundColor: b.status === "confirmed" ? "#dcfce7" : b.status === "tentative" ? "#fef9c3" : b.status === "cancelled" ? "#fee2e2" : "#ffedd5",
-                              color: b.status === "confirmed" ? "#166534" : b.status === "tentative" ? "#854f0b" : b.status === "cancelled" ? "#991b1b" : "#9a3412",
-                              borderColor: b.status === "confirmed" ? "#bbf7d0" : b.status === "tentative" ? "#fef08a" : b.status === "cancelled" ? "#fecaca" : "#fed7aa"
-                            }}
-                          >
-                            <span className="font-bold text-sm">{b.name} — {bookings.find(x => x.clientName === b.name)?.eventType}</span>
-                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-white/50">{b.status}</span>
-                          </div>
-                        )) : (
-                          <div className="h-full flex items-center text-muted-foreground text-xs italic">No events scheduled</div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {calView === "day" && (
-              <div className="p-6 rounded-xl border border-border bg-muted/10">
-                <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
-                  <div>
-                    <h4 className="text-2xl font-black text-foreground">{format(calMonth, "EEEE")}</h4>
-                    <p className="text-sm text-muted-foreground">{format(calMonth, "MMMM d, yyyy")}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Daily Events</p>
-                    <p className="text-3xl font-black text-primary">{getDayB(calMonth).length}</p>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  {getDayB(calMonth).length > 0 ? getDayB(calMonth).map((b, i) => (
-                    <div 
-                      key={i} 
-                      onClick={() => { setSelected(bookings.find(x => x.clientName === b.name) || null); setShowView(true); }}
-                      className="p-4 rounded-xl border shadow-md flex items-center justify-between cursor-pointer hover:translate-x-1 transition-transform"
-                      style={{
-                        backgroundColor: b.status === "confirmed" ? "#dcfce7" : b.status === "tentative" ? "#fef9c3" : b.status === "cancelled" ? "#fee2e2" : "#ffedd5",
-                        color: b.status === "confirmed" ? "#166534" : b.status === "tentative" ? "#854f0b" : b.status === "cancelled" ? "#991b1b" : "#9a3412",
-                        borderColor: b.status === "confirmed" ? "#bbf7d0" : b.status === "tentative" ? "#fef08a" : b.status === "cancelled" ? "#fecaca" : "#fed7aa"
-                      }}
-                    >
-                      <div className="flex flex-col">
-                        <span className="text-lg font-black">{b.name}</span>
-                        <span className="text-sm font-bold opacity-80">{bookings.find(x => x.clientName === b.name)?.eventType} at {bookings.find(x => x.clientName === b.name)?.venue}</span>
-                      </div>
-                      <span className="text-xs font-black uppercase px-3 py-1 rounded-full bg-white/40 shadow-inner">{b.status}</span>
-                    </div>
-                  )) : (
-                    <div className="py-20 text-center text-muted-foreground border-2 border-dashed border-border rounded-xl">
-                      <p className="text-lg font-bold">No bookings for this day</p>
-                      <p className="text-sm">Click "New Booking" to schedule an event</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </TabsContent>
 
-        <TabsContent value="menu">
-          <div className="space-y-4">
+        <TabsContent value="menu" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {loadingMenus ? (
-              <div className="flex h-40 items-center justify-center rounded-lg border border-border bg-card">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
+              Array(2).fill(0).map((_, i) => <div key={i} className="h-64 w-full animate-pulse rounded-2xl bg-muted" />)
             ) : (
               menus.filter(m=>m.name!=="Custom").map(menu=>(
-                <div key={menu.id} className="rounded-lg border border-border bg-card">
-                  <div className="flex items-center justify-between border-b border-border p-4">
-                    <h3 className="font-semibold text-card-foreground">{menu.name}</h3>
+                <div key={menu.id} className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between border-b border-border p-6 bg-muted/5">
+                    <div>
+                      <h3 className="text-lg font-black text-foreground tracking-tight">{menu.name}</h3>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-1">{menu.items.length} Production Items</p>
+                    </div>
                     {canDo("add") && (
-                      <Button variant="outline" size="sm" onClick={() => handleAddClick(menu.id)}>+ Add Item</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleAddClick(menu.id)} className="rounded-xl font-bold border-primary/20 text-primary hover:bg-primary/5 h-9">
+                        <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item
+                      </Button>
                     )}
                   </div>
-                  <table className="w-full min-w-[600px]">
-                    <thead><tr className="border-b border-border bg-muted/40"><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Item</th><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Unit</th><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Rate (₨)</th><th className="px-4 py-2 text-xs text-muted-foreground text-center">Edit</th></tr></thead>
-                    <tbody>{menu.items.map((item,idx)=><tr key={item.id || idx} className="border-b border-border last:border-0"><td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item}</td><td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td><td className="px-4 py-2 text-sm">₨ {item.rate}</td><td className="px-4 py-2 text-center">{canDo("edit") && <button onClick={() => handleEditClick(item, menu.id)} className="rounded p-1 hover:bg-muted"><Edit className="h-3.5 w-3.5 text-muted-foreground"/></button>}</td></tr>)}</tbody>
-                  </table>
+                  <div className="flex-1 overflow-x-auto">
+                    <table className="w-full min-w-[400px]">
+                      <thead>
+                        <tr className="bg-muted/20 text-left">
+                          <th className="px-6 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Item Name</th>
+                          <th className="px-6 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Unit</th>
+                          <th className="px-6 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Rate</th>
+                          <th className="px-6 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Edit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {menu.items.map((item,idx)=>(
+                          <tr key={item.id || idx} className="hover:bg-muted/10 transition-colors group">
+                            <td className="px-6 py-4 text-sm font-bold text-foreground">{item.item}</td>
+                            <td className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase">{item.unit}</td>
+                            <td className="px-6 py-4 text-sm font-black text-primary">₨ {item.rate}</td>
+                            <td className="px-6 py-4 text-right">
+                              {canDo("edit") && (
+                                <button onClick={() => handleEditClick(item, menu.id)} className="rounded-lg p-2 hover:bg-emerald-50 text-emerald-600 transition-colors opacity-0 group-hover:opacity-100">
+                                  <Edit className="h-4 w-4"/>
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ))
             )}
           </div>
         </TabsContent>
 
-        <TabsContent value="kitchen">
-          <div className="rounded-lg border border-border bg-card p-4">
-            <h3 className="mb-4 font-semibold text-card-foreground">Kitchen Production Sheet</h3>
-            <div className="flex flex-wrap gap-3 mb-4">
-              <Select onValueChange={v=>{const b=bookings.find(x=>x.id===Number(v));setSelected(b||null); if(b) fetchKitchenData(b.id);}}>
-                <SelectTrigger className="w-72"><SelectValue placeholder="Select event..."/></SelectTrigger>
-                <SelectContent>{bookings.filter(b=>b.status!=="cancelled").map(b=><SelectItem key={b.id} value={String(b.id)}>{b.clientName} — {b.eventDate}</SelectItem>)}</SelectContent>
-              </Select>
-              {selected && (
-                <div className="flex gap-2">
-                  {canDo("edit") && (
-                    <Button variant="outline" size="sm" onClick={handleSaveKitchen} disabled={isSaving}>
-                      {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
-                      Save Progress
+        <TabsContent value="kitchen" className="space-y-6">
+          <div className="rounded-2xl border border-border bg-white p-8 shadow-sm">
+            <div className="flex flex-col gap-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-2xl font-black text-foreground tracking-tight">Kitchen Production Hub</h3>
+                  <p className="text-sm text-muted-foreground font-medium mt-1">Real-time inventory mapping and consumption tracking</p>
+                </div>
+                <Button variant="outline" className="rounded-xl font-bold h-11 px-6 border-border shadow-sm hover:bg-muted" onClick={handlePrint}>
+                  <Printer className="h-4 w-4 mr-2"/> Export Production Sheet
+                </Button>
+              </div>
+
+              <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-end p-8 bg-muted/5 rounded-2xl border border-border">
+                <div className="flex-1 w-full space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Target Event Selection</Label>
+                  <Select onValueChange={v=>{const b=bookings.find(x=>x.id===Number(v));setSelected(b||null); if(b) fetchKitchenData(b.id);}}>
+                    <SelectTrigger className="w-full h-14 rounded-xl border-border bg-white font-black text-lg shadow-sm">
+                      <SelectValue placeholder="Select an upcoming event schedule..."/>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-border shadow-2xl p-2">
+                      {bookings.filter(b=>b.status!=="cancelled").map(b=><SelectItem key={b.id} value={String(b.id)} className="py-3 rounded-xl font-bold">{b.clientName} — {format(new Date(b.eventDate), 'MMMM dd, yyyy')}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selected && (
+                  <div className="flex gap-3 w-full lg:w-auto">
+                    <Button className="h-14 px-8 rounded-xl bg-primary text-white font-black shadow-xl shadow-primary/20 flex-1 lg:flex-none" onClick={handleSaveKitchen} disabled={isSaving}>
+                      {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Save className="h-5 w-5 mr-2"/>}
+                      Commit Changes
                     </Button>
-                  )}
-                  {canDo("add") && (
-                    <Button variant="outline" size="sm" onClick={() => setShowConsumptionModal(true)}>
-                      <CheckCircle2 className="h-4 w-4 mr-2"/>
-                      Track Consumption
+                    <Button variant="outline" className="h-14 px-8 rounded-xl border-border bg-white font-black shadow-sm flex-1 lg:flex-none" onClick={() => setShowConsumptionModal(true)}>
+                      <CheckCircle2 className="h-5 w-5 mr-2 text-emerald-500"/> Track Usage
                     </Button>
-                  )}
+                  </div>
+                )}
+              </div>
+
+              {selected ? (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    <div className="p-6 rounded-2xl bg-blue-50 border border-blue-100 shadow-sm transition-transform hover:scale-[1.02]">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-blue-600/60 mb-1">Host Identity</p>
+                      <p className="text-xl font-black text-blue-900 leading-tight">{selected.clientName}</p>
+                    </div>
+                    <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-100 shadow-sm transition-transform hover:scale-[1.02]">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600/60 mb-1">Production Date</p>
+                      <p className="text-xl font-black text-emerald-900 leading-tight">{format(new Date(selected.eventDate), 'MMMM d, yyyy')}</p>
+                    </div>
+                    <div className="p-6 rounded-2xl bg-amber-50 border border-amber-100 shadow-sm transition-transform hover:scale-[1.02]">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-600/60 mb-1">Guest Capacity</p>
+                      <p className="text-xl font-black text-amber-900 leading-tight">{selected.guests} PAX SCHEDULED</p>
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-2xl border border-border overflow-hidden bg-white shadow-sm">
+                    <table className="w-full min-w-[700px]">
+                      <thead>
+                        <tr className="bg-muted/30 text-left border-b border-border">
+                          <th className="px-8 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Menu Component</th>
+                          <th className="px-8 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Measurement</th>
+                          <th className="px-8 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-center">Standard Yield</th>
+                          <th className="px-8 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-right">Kitchen Override</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {kitchenItems.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-primary/5 transition-colors group">
+                            <td className="px-8 py-5 text-sm font-black text-foreground">{item.item_name}</td>
+                            <td className="px-8 py-5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{item.unit}</td>
+                            <td className="px-8 py-5 text-center">
+                              <span className="inline-flex items-center justify-center px-4 py-1.5 rounded-xl bg-muted font-black text-xs text-muted-foreground">
+                                {item.estimated_qty} Units
+                              </span>
+                            </td>
+                            <td className="px-8 py-5">
+                              <div className="flex justify-end">
+                                <Input type="number" className="w-32 h-11 rounded-xl border-border text-right font-black focus:ring-primary/20" value={item.actual_qty} onChange={e => {
+                                    const val = Number(e.target.value);
+                                    setKitchenItems(prev => prev.map((ki, i) => i === idx ? { ...ki, actual_qty: val, is_adjusted: val !== ki.estimated_qty } : ki));
+                                  }}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button variant="ghost" className="text-primary font-black uppercase tracking-widest text-[11px] hover:bg-primary/5 gap-2" onClick={() => setShowRawMaterialsModal(true)}>
+                      <TrendingUp className="h-4 w-4"/> Analyze Raw Material Efficiency
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-32 text-center border-2 border-dashed border-border rounded-3xl bg-muted/5">
+                  <UtensilsCrossed className="h-16 w-16 text-muted-foreground/10 mx-auto mb-6" />
+                  <p className="text-xl font-black text-muted-foreground tracking-tight">Ready for production schedule</p>
+                  <p className="text-sm text-muted-foreground/60 mt-2 font-medium max-w-xs mx-auto">Please select an active event booking from the control panel above to begin kitchen mapping.</p>
                 </div>
               )}
             </div>
-
-            {selected&&(
-              <>
-                <div className="mb-4 grid grid-cols-3 gap-3 rounded-lg bg-muted/40 p-3 text-sm">
-                  <div><p className="text-xs text-muted-foreground">Event</p><p className="font-medium">{selected.clientName}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Date</p><p className="font-medium">{selected.eventDate}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Guests</p><p className="font-medium">{selected.guests}</p></div>
-                </div>
-                
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[700px]">
-                    <thead><tr className="border-b border-border bg-muted/40">{["Item","Unit","Estimated Qty","Manual Adjustment"].map(h=><th key={h} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
-                    <tbody>
-                      {kitchenItems.map((item, idx) => (
-                        <tr key={idx} className="border-b border-border last:border-0">
-                          <td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item_name}</td>
-                          <td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td>
-                          <td className="px-4 py-2 text-sm">{item.estimated_qty}</td>
-                          <td className="px-4 py-2 text-sm">
-                            <Input 
-                              type="number" 
-                              className="w-24 h-8" 
-                              value={item.actual_qty} 
-                              onChange={e => {
-                                const val = Number(e.target.value);
-                                setKitchenItems(prev => prev.map((ki, i) => i === idx ? { ...ki, actual_qty: val, is_adjusted: val !== ki.estimated_qty } : ki));
-                              }}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="mt-4 flex justify-end gap-2 print:hidden">
-                  <Button variant="outline" size="sm" onClick={handlePrint}><Printer className="h-4 w-4 mr-2"/>Print Sheet</Button>
-                  <Button variant="outline" size="sm" onClick={() => setShowRawMaterialsModal(true)}>Raw Material List</Button>
-                </div>
-              </>
-            )}
           </div>
         </TabsContent>
 
-        <TabsContent value="thirdparty">
-          <div className="rounded-lg border border-border bg-card">
-            <div className="border-b border-border p-4"><h3 className="font-semibold text-card-foreground">Third-Party Sourcing</h3><p className="text-xs text-muted-foreground mt-1">Supplier rate vs selling rate with auto profit calculation and supplier ledger update</p></div>
+        <TabsContent value="thirdparty" className="space-y-6">
+          <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
+            <div className="p-8 border-b border-border bg-muted/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-foreground tracking-tight">Market Sourcing Intelligence</h3>
+                <p className="text-sm text-muted-foreground font-medium mt-1">Vendor cost analysis and dynamic profit margin tracking</p>
+              </div>
+              <Badge className="bg-primary/10 text-primary border-none rounded-xl px-4 py-2 font-black uppercase tracking-widest text-[10px]">Real-time Sync Active</Badge>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px]">
-                <thead><tr className="border-b border-border bg-muted/40">{["Event","Date","Supplier Cost","Selling Rate","Profit","Margin %","Ledger Updated"].map(h=><th key={h} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">{h}</th>)}</tr></thead>
-                <tbody>{bookings.filter(b=>b.thirdParty).map(b=>{const profit=b.sellingRate-b.supplierCost;const margin=b.sellingRate>0?Math.round((profit/b.sellingRate)*100):0;return(
-                  <tr key={b.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="px-4 py-3 text-sm font-medium text-card-foreground">{b.clientName}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{b.eventDate}</td>
-                    <td className="px-4 py-3 text-sm text-destructive">₨ {b.supplierCost.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-card-foreground">₨ {b.sellingRate.toLocaleString()}</td>
-                    <td className={`px-4 py-3 text-sm font-bold ${profit>=0?"text-success":"text-destructive"}`}>₨ {profit.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-success">{margin}%</td>
-                    <td className="px-4 py-3"><span className="inline-flex rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success border border-success/20">Updated</span></td>
+                <thead>
+                  <tr className="bg-muted/30 text-left border-b border-border">
+                    <th className="px-8 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Sourcing Assignment</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Market Cost</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Client Rate</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Net Yield</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Margin %</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Audit</th>
                   </tr>
-                );})}
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {bookings.filter(b=>b.thirdParty).map(b=>{
+                    const profit=b.sellingRate-b.supplierCost;
+                    const margin=b.sellingRate>0?Math.round((profit/b.sellingRate)*100):0;
+                    return(
+                      <tr key={b.id} className="hover:bg-primary/5 transition-colors">
+                        <td className="px-8 py-6">
+                          <p className="text-sm font-black text-foreground">{b.clientName}</p>
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter mt-1">{format(new Date(b.eventDate), 'MMMM dd, yyyy')}</p>
+                        </td>
+                        <td className="px-8 py-6 text-sm font-black text-rose-500">₨ {b.supplierCost.toLocaleString()}</td>
+                        <td className="px-8 py-6 text-sm font-black text-foreground">₨ {b.sellingRate.toLocaleString()}</td>
+                        <td className="px-8 py-6 text-center">
+                          <span className={`inline-flex px-4 py-1.5 rounded-xl font-black text-xs shadow-sm ${profit>=0?"bg-emerald-50 text-emerald-700 border border-emerald-100":"bg-rose-50 text-rose-700 border border-rose-100"}`}>
+                            ₨ {profit.toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-8 py-6 text-center">
+                          <div className="flex flex-col items-center gap-1.5">
+                            <span className="text-xs font-black text-emerald-600">{margin}% Margin</span>
+                            <div className="h-1 w-16 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, margin)}%` }} />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <Badge variant="outline" className="rounded-xl bg-muted/50 text-muted-foreground border-border text-[9px] font-black uppercase tracking-widest px-3 py-1">Verified</Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
-                <tfoot><tr className="border-t-2 border-border bg-muted/40">
-                  <td colSpan={2} className="px-4 py-2 text-xs font-semibold text-muted-foreground">Totals</td>
-                  <td className="px-4 py-2 text-xs font-bold text-destructive">₨ {bookings.filter(b=>b.thirdParty).reduce((s,b)=>s+b.supplierCost,0).toLocaleString()}</td>
-                  <td className="px-4 py-2 text-xs font-bold">₨ {bookings.filter(b=>b.thirdParty).reduce((s,b)=>s+b.sellingRate,0).toLocaleString()}</td>
-                  <td className="px-4 py-2 text-xs font-bold text-success">₨ {tp.toLocaleString()}</td>
-                  <td colSpan={2}/>
-                </tr></tfoot>
+                <tfoot className="bg-muted/40 border-t-2 border-border">
+                  <tr>
+                    <td className="px-8 py-8 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Consolidated Portfolio Performance</td>
+                    <td className="px-8 py-8 text-sm font-black text-rose-600">₨ {bookings.filter(b=>b.thirdParty).reduce((s,b)=>s+b.supplierCost,0).toLocaleString()}</td>
+                    <td className="px-8 py-8 text-sm font-black text-foreground">₨ {bookings.filter(b=>b.thirdParty).reduce((s,b)=>s+b.sellingRate,0).toLocaleString()}</td>
+                    <td className="px-8 py-8 text-center">
+                      <div className="px-6 py-3 rounded-2xl bg-emerald-500 text-white font-black shadow-xl shadow-emerald-500/20 text-lg">
+                        ₨ {tp.toLocaleString()}
+                      </div>
+                    </td>
+                    <td colSpan={2}/>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="suppliers">
-          <div className="mb-4 flex justify-end">
-            <Button onClick={() => setShowAddSupplierModal(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Supplier
+        <TabsContent value="suppliers" className="space-y-6">
+          <div className="flex justify-end mb-4">
+            <Button onClick={() => setShowAddSupplierModal(true)} className="bg-primary text-white font-black rounded-xl shadow-lg shadow-primary/20 h-12 px-8 gap-2">
+              <Plus className="h-5 w-5" /> Onboard New Vendor
             </Button>
           </div>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {suppliers.map(s => (
-              <div key={s.id} className="rounded-lg border border-border bg-card">
-                <div className="flex items-center justify-between border-b border-border p-4">
-                  <div>
-                    <h3 className="font-semibold text-card-foreground">{s.name}</h3>
-                    <p className="text-xs text-muted-foreground">{s.service_type} | {s.contact_number}</p>
+              <div key={s.id} className="rounded-3xl border border-border bg-white shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-xl hover:-translate-y-1">
+                <div className="flex items-center justify-between border-b border-border p-8 bg-muted/5">
+                  <div className="flex items-center gap-5">
+                    <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-primary to-blue-400 flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-primary/20">
+                      {s.name[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-foreground tracking-tight">{s.name}</h3>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mt-1">{s.service_type} • {s.contact_number}</p>
+                    </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Current Balance</p>
-                    <p className="text-lg font-bold text-destructive">₨ {s.current_balance.toLocaleString()}</p>
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Net Payable</p>
+                    <p className="text-2xl font-black text-rose-500">₨ {s.current_balance.toLocaleString()}</p>
                   </div>
                 </div>
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2"><History className="h-4 w-4"/>Payment History</h4>
-                    <div className="max-h-40 overflow-y-auto space-y-2">
+                <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8 flex-1">
+                  <div className="space-y-5">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                      <History className="h-4 w-4 text-primary"/> Sourcing Ledger
+                    </h4>
+                    <div className="space-y-2.5 max-h-56 overflow-y-auto pr-3 custom-scrollbar">
                       {supplierPayments.filter(p => p.supplier_id === s.id).map(p => (
-                        <div key={p.id} className="flex justify-between text-xs border-b border-border pb-1">
-                          <span className="text-muted-foreground">{p.date}</span>
-                          <span className="font-medium">₨ {p.amount.toLocaleString()} ({p.method})</span>
+                        <div key={p.id} className="flex justify-between items-center p-3 rounded-xl bg-muted/30 border border-border/50 transition-all hover:bg-white hover:shadow-sm">
+                          <span className="text-[10px] font-black text-muted-foreground uppercase">{format(new Date(p.date), 'MMM d, yyyy')}</span>
+                          <span className="text-xs font-black text-foreground">₨ {p.amount.toLocaleString()} <span className="text-[9px] font-bold text-muted-foreground/60 uppercase ml-1">[{p.method}]</span></span>
                         </div>
                       ))}
-                      {supplierPayments.filter(p => p.supplier_id === s.id).length === 0 && <p className="text-xs text-muted-foreground">No payment history found.</p>}
+                      {supplierPayments.filter(p => p.supplier_id === s.id).length === 0 && (
+                        <div className="py-12 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic border-2 border-dashed border-border/50 rounded-2xl">
+                          Zero transaction history
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Opening Balance:</span>
-                        <span className="font-medium">₨ {s.opening_balance.toLocaleString()}</span>
+                    <div className="p-6 rounded-2xl bg-muted/20 border border-border/50 space-y-4 shadow-inner">
+                      <div className="flex justify-between text-[11px] font-black">
+                        <span className="text-muted-foreground uppercase tracking-widest">Opening Bal:</span>
+                        <span className="text-foreground">₨ {s.opening_balance.toLocaleString()}</span>
+                      </div>
+                      <div className="h-[1px] bg-border/50 w-full" />
+                      <div className="flex justify-between text-[11px] font-black">
+                        <span className="text-muted-foreground uppercase tracking-widest text-emerald-600">Total Settled:</span>
+                        <span className="text-emerald-600">₨ {(s.opening_balance - s.current_balance).toLocaleString()}</span>
                       </div>
                     </div>
-                    <Button className="mt-4 w-full" onClick={() => { setSelectedSupplier(s); setSupplierPaymentForm({ ...supplierPaymentForm, amount: 0 }); setShowSupplierPaymentModal(true); }}>
-                      <Wallet className="h-4 w-4 mr-2"/>
-                      Add Payment
+                    <Button className="mt-6 w-full h-12 rounded-xl bg-white border border-border text-foreground font-black hover:bg-muted shadow-sm uppercase tracking-widest text-[11px] gap-2" onClick={() => { setSelectedSupplier(s); setSupplierPaymentForm({ ...supplierPaymentForm, amount: 0 }); setShowSupplierPaymentModal(true); }}>
+                      <Wallet className="h-4 w-4 text-primary"/> Disburse Payment
                     </Button>
                   </div>
                 </div>
               </div>
             ))}
-            {suppliers.length === 0 && (
-              <div className="text-center py-10 border border-dashed border-border rounded-lg">
-                <p className="text-muted-foreground">No suppliers found in the database.</p>
-              </div>
-            )}
           </div>
         </TabsContent>
       </Tabs>
 
       {/* ADD MODAL */}
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>New Event Booking</DialogTitle></DialogHeader>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 space-y-1.5"><Label>Client Name *</Label><Input placeholder="e.g. Ahmed & Sara Wedding" value={nb.clientName} onChange={e=>setNb({...nb,clientName:e.target.value})}/></div>
-            <div className="space-y-1.5"><Label>Phone</Label><Input placeholder="0300-0000000" value={nb.phone} onChange={e=>setNb({...nb,phone:e.target.value})}/></div>
-            <div className="space-y-1.5"><Label>Event Type</Label><Select value={nb.eventType} onValueChange={v=>setNb({...nb,eventType:v})}><SelectTrigger><SelectValue placeholder="Select"/></SelectTrigger><SelectContent>{EVENT_TYPES.map(t=><SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-1.5"><Label>Event Date *</Label><Input type="date" value={nb.eventDate} onChange={e=>setNb({...nb,eventDate:e.target.value})}/></div>
-            <div className="space-y-1.5"><Label>Booking Date</Label><Input type="date" value={nb.bookingDate} onChange={e=>setNb({...nb,bookingDate:e.target.value})}/></div>
-            <div className="space-y-1.5"><Label>Venue</Label><Select value={nb.venue} onValueChange={v=>setNb({...nb,venue:v})}><SelectTrigger><SelectValue placeholder="Select"/></SelectTrigger><SelectContent>{VENUES.map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-1.5"><Label>No. of Guests</Label><Input type="number" placeholder="300" value={nb.guests} onChange={e=>setNb({...nb,guests:e.target.value})}/></div>
-            <div className="space-y-1.5"><Label>Total Amount (₨)</Label><Input type="number" value={nb.totalAmount} onChange={e=>setNb({...nb,totalAmount:e.target.value})}/></div>
-            <div className="space-y-1.5"><Label>Advance Paid (₨)</Label><Input type="number" value={nb.advance} onChange={e=>setNb({...nb,advance:e.target.value})}/></div>
-            {nb.advance&&nb.totalAmount&&<div className="col-span-2 rounded-lg bg-muted/40 p-2 text-xs text-muted-foreground">Balance Remaining: <strong className="text-destructive">₨ {(Number(nb.totalAmount)-Number(nb.advance)).toLocaleString()}</strong></div>}
-            <div className="space-y-1.5"><Label>Payment Method</Label><Select value={nb.paymentMethod} onValueChange={v=>setNb({...nb,paymentMethod:v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{PAYMENT_METHODS.map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-1.5"><Label>Status</Label><Select value={nb.status} onValueChange={v=>setNb({...nb,status:v as BookingStatus})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="tentative">Tentative</SelectItem><SelectItem value="confirmed">Confirmed</SelectItem><SelectItem value="postponed">Postponed</SelectItem><SelectItem value="cancelled">Cancelled</SelectItem></SelectContent></Select></div>
-            <div className="space-y-1.5"><Label>Menu</Label><Select value={nb.menu} onValueChange={v=>setNb({...nb,menu:v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{menus.map(m=><SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}</SelectContent></Select></div>
-            <div className="flex items-center gap-2 pt-4"><input type="checkbox" id="tp" checked={nb.thirdParty} onChange={e=>setNb({...nb,thirdParty:e.target.checked})} className="accent-primary"/><Label htmlFor="tp">Third-Party Sourcing</Label></div>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border-none shadow-2xl">
+          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">Create New Event Booking</DialogTitle><DialogDescription className="font-medium">Enter client requirements and scheduling details below.</DialogDescription></DialogHeader>
+          <div className="grid grid-cols-2 gap-6 py-4">
+            <div className="col-span-2 space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Client Full Identity *</Label><Input placeholder="e.g. Ahmed & Sara Wedding" className="h-12 rounded-xl font-bold" value={nb.clientName} onChange={e=>setNb({...nb,clientName:e.target.value})}/></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Phone Contact</Label><Input placeholder="0300-0000000" className="h-12 rounded-xl font-bold" value={nb.phone} onChange={e=>setNb({...nb,phone:e.target.value})}/></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Event Category</Label><Select value={nb.eventType} onValueChange={v=>setNb({...nb,eventType:v})}><SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue placeholder="Select Category"/></SelectTrigger><SelectContent className="rounded-xl">{EVENT_TYPES.map(t=><SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Scheduled Event Date *</Label><Input type="date" className="h-12 rounded-xl font-bold" value={nb.eventDate} onChange={e=>setNb({...nb,eventDate:e.target.value})}/></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Official Booking Date</Label><Input type="date" className="h-12 rounded-xl font-bold" value={nb.bookingDate} onChange={e=>setNb({...nb,bookingDate:e.target.value})}/></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Target Venue</Label><Select value={nb.venue} onValueChange={v=>setNb({...nb,venue:v})}><SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue placeholder="Select Venue"/></SelectTrigger><SelectContent className="rounded-xl">{VENUES.map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Anticipated Guests</Label><Input type="number" placeholder="300" className="h-12 rounded-xl font-bold" value={nb.guests} onChange={e=>setNb({...nb,guests:e.target.value})}/></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Contract Total (₨)</Label><Input type="number" className="h-12 rounded-xl font-bold" value={nb.totalAmount} onChange={e=>setNb({...nb,totalAmount:e.target.value})}/></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Advance Commitment (₨)</Label><Input type="number" className="h-12 rounded-xl font-bold" value={nb.advance} onChange={e=>setNb({...nb,advance:e.target.value})}/></div>
+            {nb.advance&&nb.totalAmount&&<div className="col-span-2 rounded-xl bg-rose-50 border border-rose-100 p-4 text-xs font-black uppercase tracking-widest text-rose-600 text-center shadow-inner">Remaining Liability: ₨ {(Number(nb.totalAmount)-Number(nb.advance)).toLocaleString()}</div>}
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Settlement Method</Label><Select value={nb.paymentMethod} onValueChange={v=>setNb({...nb,paymentMethod:v})}><SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue/></SelectTrigger><SelectContent className="rounded-xl">{PAYMENT_METHODS.map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Booking Lifecycle Status</Label><Select value={nb.status} onValueChange={v=>setNb({...nb,status:v as BookingStatus})}><SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue/></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="tentative">Tentative</SelectItem><SelectItem value="confirmed">Confirmed</SelectItem><SelectItem value="postponed">Postponed</SelectItem><SelectItem value="cancelled">Cancelled</SelectItem></SelectContent></Select></div>
+            <div className="col-span-2 space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Catering Configuration</Label><Select value={nb.menu} onValueChange={v=>setNb({...nb,menu:v})}><SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue/></SelectTrigger><SelectContent className="rounded-xl">{menus.map(m=><SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}</SelectContent></Select></div>
+            
+            <div className="col-span-2 flex items-center gap-3 p-4 rounded-xl bg-muted/30 border border-border/50"><input type="checkbox" id="tp" checked={nb.thirdParty} onChange={e=>setNb({...nb,thirdParty:e.target.checked})} className="h-5 w-5 accent-primary cursor-pointer"/><Label htmlFor="tp" className="text-sm font-black cursor-pointer">Activate External Vendor Sourcing (Third-Party)</Label></div>
+            
             {nb.thirdParty&&<>
-              <div className="space-y-1.5"><Label>Supplier Cost (₨)</Label><Input type="number" value={nb.supplierCost} onChange={e=>setNb({...nb,supplierCost:e.target.value})}/></div>
-              <div className="space-y-1.5"><Label>Selling Rate (₨)</Label><Input type="number" value={nb.sellingRate} onChange={e=>setNb({...nb,sellingRate:e.target.value})}/></div>
-              {nb.supplierCost&&nb.sellingRate&&<div className="col-span-2 rounded-lg bg-success/10 border border-success/20 p-2 text-sm">Auto Profit: <strong className="text-success">₨ {(Number(nb.sellingRate)-Number(nb.supplierCost)).toLocaleString()}</strong></div>}
+              <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Market Cost Basis (₨)</Label><Input type="number" className="h-12 rounded-xl font-bold" value={nb.supplierCost} onChange={e=>setNb({...nb,supplierCost:e.target.value})}/></div>
+              <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Arbitrage Selling Rate (₨)</Label><Input type="number" className="h-12 rounded-xl font-bold" value={nb.sellingRate} onChange={e=>setNb({...nb,sellingRate:e.target.value})}/></div>
+              {nb.supplierCost&&nb.sellingRate&&<div className="col-span-2 rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-sm font-black uppercase tracking-widest text-emerald-700 text-center shadow-inner">Anticipated Profit: ₨ {(Number(nb.sellingRate)-Number(nb.supplierCost)).toLocaleString()}</div>}
             </>}
-            <div className="col-span-2 space-y-1.5"><Label>Notes</Label><Input placeholder="Special requirements..." value={nb.notes} onChange={e=>setNb({...nb,notes:e.target.value})}/></div>
+            <div className="col-span-2 space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Logistics & Operational Notes</Label><Input placeholder="Specific table layouts, flower choices, or VIP requirements..." className="h-12 rounded-xl font-bold" value={nb.notes} onChange={e=>setNb({...nb,notes:e.target.value})}/></div>
             
             {availabilityWarning && (
-              <div className="col-span-2 p-3 rounded-lg bg-warning/10 border border-warning/20 text-warning text-sm flex flex-col gap-2">
-                <p className="font-semibold flex items-center gap-2"><Plus className="h-4 w-4 rotate-45"/> Double Booking Warning</p>
-                <p>{availabilityWarning}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <input type="checkbox" id="confirm-booking" checked={proceedWithBooking} onChange={e => setProceedWithBooking(e.target.checked)} className="accent-warning" />
-                  <Label htmlFor="confirm-booking" className="text-warning font-medium">I understand and want to proceed anyway</Label>
+              <div className="col-span-2 p-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-sm flex flex-col gap-3 shadow-sm">
+                <p className="font-black flex items-center gap-2 uppercase tracking-tight text-amber-700"><AlertTriangle className="h-5 w-5"/> Calendar Collision Detected</p>
+                <p className="font-medium opacity-80">{availabilityWarning}</p>
+                <div className="flex items-center gap-3 mt-2 p-3 bg-white/50 rounded-xl border border-amber-200/50">
+                  <input type="checkbox" id="confirm-booking" checked={proceedWithBooking} onChange={e => setProceedWithBooking(e.target.checked)} className="h-5 w-5 accent-amber-600 cursor-pointer" />
+                  <Label htmlFor="confirm-booking" className="text-amber-800 font-black text-xs uppercase tracking-widest cursor-pointer">Acknowledge Collision & Force Booking</Label>
                 </div>
               </div>
             )}
           </div>
-          <DialogFooter><Button variant="outline" onClick={()=>{setShowAdd(false); setAvailabilityWarning(null); setProceedWithBooking(false);}}>Cancel</Button><Button onClick={handleAdd}>{proceedWithBooking ? "Save Anyway" : "Save Booking"}</Button></DialogFooter>
+          <DialogFooter className="gap-3"><Button variant="ghost" className="rounded-xl font-black uppercase tracking-widest text-[11px]" onClick={()=>{setShowAdd(false); setAvailabilityWarning(null); setProceedWithBooking(false);}}>Discard</Button><Button className="h-12 px-8 rounded-xl bg-primary text-white font-black shadow-xl shadow-primary/20 uppercase tracking-widest text-[11px]" onClick={handleAdd}>{proceedWithBooking ? "Force Save Record" : "Confirm Booking"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* VIEW MODAL */}
       <Dialog open={showView} onOpenChange={setShowView}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Booking Details</DialogTitle></DialogHeader>
-          {selected&&<div className="space-y-2">{[{l:"Client",v:selected.clientName},{l:"Phone",v:selected.phone},{l:"Event Type",v:selected.eventType},{l:"Event Date",v:selected.eventDate},{l:"Booking Date",v:selected.bookingDate},{l:"Venue",v:selected.venue},{l:"Guests",v:selected.guests},{l:"Menu",v:selected.menu},{l:"Payment Method",v:selected.paymentMethod},{l:"Total Amount",v:`₨ ${selected.totalAmount.toLocaleString()}`},{l:"Advance Paid",v:`₨ ${selected.advance.toLocaleString()}`},{l:"Balance Remaining",v:`₨ ${selected.balanceRemaining.toLocaleString()}`},{l:"Status",v:selected.status},{l:"Third-Party",v:selected.thirdParty?`Yes (Profit: ₨ ${(selected.sellingRate-selected.supplierCost).toLocaleString()})`:"No"},{l:"Notes",v:selected.notes||"-"}].map(row=><div key={row.l} className="flex justify-between border-b border-border pb-2 text-sm last:border-0"><span className="text-muted-foreground">{row.l}</span><span className="font-medium text-card-foreground text-right">{String(row.v)}</span></div>)}</div>}
+        <DialogContent className="max-w-md rounded-3xl border-none shadow-2xl">
+          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">Booking Summary</DialogTitle></DialogHeader>
+          {selected&&<div className="space-y-3 py-4">{[{l:"Client",v:selected.clientName},{l:"Phone",v:selected.phone},{l:"Event Type",v:selected.eventType},{l:"Event Date",v:selected.eventDate},{l:"Booking Date",v:selected.bookingDate},{l:"Venue",v:selected.venue},{l:"Guests",v:selected.guests},{l:"Menu",v:selected.menu},{l:"Payment Method",v:selected.paymentMethod},{l:"Total Amount",v:`₨ ${selected.totalAmount.toLocaleString()}`},{l:"Advance Paid",v:`₨ ${selected.advance.toLocaleString()}`},{l:"Balance Remaining",v:`₨ ${selected.balanceRemaining.toLocaleString()}`},{l:"Status",v:selected.status},{l:"Third-Party",v:selected.thirdParty?`Yes (Profit: ₨ ${(selected.sellingRate-selected.supplierCost).toLocaleString()})`:"No"},{l:"Notes",v:selected.notes||"-"}].map(row=><div key={row.l} className="flex justify-between border-b border-border/50 pb-2.5 text-sm last:border-0"><span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{row.l}</span><span className="font-black text-foreground text-right">{String(row.v)}</span></div>)}</div>}
         </DialogContent>
       </Dialog>
 
       {/* KITCHEN MODAL */}
       <Dialog open={showKitchen} onOpenChange={setShowKitchen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Kitchen Sheet — {selected?.clientName}</DialogTitle></DialogHeader>
-          {selected&&<>
-            <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/40 p-3 text-sm mb-2">
-              <div><p className="text-xs text-muted-foreground">Date</p><p className="font-medium">{selected.eventDate}</p></div>
-              <div><p className="text-xs text-muted-foreground">Guests</p><p className="font-medium">{selected.guests}</p></div>
-              <div><p className="text-xs text-muted-foreground">Menu</p><p className="font-medium">{selected.menu}</p></div>
+        <DialogContent className="max-w-lg rounded-3xl border-none shadow-2xl">
+          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">Production Blueprint</DialogTitle></DialogHeader>
+          {selected&&<div className="space-y-6">
+            <div className="grid grid-cols-3 gap-3 rounded-2xl bg-muted/40 p-4 text-[10px] font-black uppercase tracking-widest">
+              <div><p className="text-muted-foreground mb-1">Date</p><p className="text-foreground">{selected.eventDate}</p></div>
+              <div><p className="text-muted-foreground mb-1">Yield</p><p className="text-foreground">{selected.guests} PAX</p></div>
+              <div><p className="text-muted-foreground mb-1">Plan</p><p className="text-foreground">{selected.menu}</p></div>
             </div>
-            {(menus.find(m=>m.name===selected.menu)?.items||[]).map((item,idx)=><div key={idx} className="flex justify-between border-b border-border py-2 text-sm last:border-0"><span className="font-medium text-card-foreground">{item.item}</span><span className="text-muted-foreground">{selected.guests} × ₨{item.rate} = <strong className="text-card-foreground">₨ {(selected.guests*item.rate).toLocaleString()}</strong></span></div>)}
-            <div className="flex justify-between border-t-2 border-border pt-2 text-sm font-bold"><span>Total Kitchen Cost</span><span className="text-primary">₨ {(menus.find(m=>m.name===selected.menu)?.items.reduce((s,i)=>s+selected.guests*i.rate,0)||0).toLocaleString()}</span></div>
-          </>}
+            <div className="space-y-2">
+              {(menus.find(m=>m.name===selected.menu)?.items||[]).map((item,idx)=><div key={idx} className="flex justify-between items-center border-b border-border/50 py-3 last:border-0"><span className="text-sm font-black text-foreground">{item.item}</span><span className="text-xs font-bold text-muted-foreground">{selected.guests} × ₨{item.rate} = <strong className="text-foreground ml-1">₨ {(selected.guests*item.rate).toLocaleString()}</strong></span></div>)}
+            </div>
+            <div className="flex justify-between border-t-2 border-border pt-4 text-sm font-black uppercase tracking-[0.2em]"><span>Aggregate Production Cost</span><span className="text-primary text-lg">₨ {(menus.find(m=>m.name===selected.menu)?.items.reduce((s,i)=>s+selected.guests*i.rate,0)||0).toLocaleString()}</span></div>
+          </div>}
         </DialogContent>
       </Dialog>
+
       {/* MENU ITEM MODAL */}
       <Dialog open={showItemModal} onOpenChange={setShowItemModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingItem ? "Edit Menu Item" : "Add Menu Item"}</DialogTitle>
-            <DialogDescription>
-              {editingItem ? "Update the name and price of this item." : "Enter the details for the new menu item."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="item-name">Item Name</Label>
-              <Input 
-                id="item-name" 
-                placeholder="e.g. Biryani" 
-                value={itemForm.item} 
-                onChange={e => setItemForm({ ...itemForm, item: e.target.value })} 
-              />
-            </div>
+        <DialogContent className="max-w-md rounded-3xl border-none shadow-2xl">
+          <DialogHeader><DialogTitle className="text-xl font-black tracking-tight">{editingItem ? "Update Production Item" : "New Production Item"}</DialogTitle></DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Item Nomenclature</Label><Input className="h-12 rounded-xl font-bold" placeholder="e.g. Traditional Beef Biryani" value={itemForm.item} onChange={e => setItemForm({ ...itemForm, item: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="item-unit">Unit</Label>
-                <Input 
-                  id="item-unit" 
-                  placeholder="e.g. per plate" 
-                  value={itemForm.unit} 
-                  onChange={e => setItemForm({ ...itemForm, unit: e.target.value })} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="item-rate">Rate (₨)</Label>
-                <Input 
-                  id="item-rate" 
-                  type="number" 
-                  placeholder="0" 
-                  value={itemForm.rate} 
-                  onChange={e => setItemForm({ ...itemForm, rate: Number(e.target.value) })} 
-                />
-              </div>
+              <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">UoM</Label><Input className="h-12 rounded-xl font-bold" placeholder="e.g. per plate" value={itemForm.unit} onChange={e => setItemForm({ ...itemForm, unit: e.target.value })} /></div>
+              <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Unit Yield Rate (₨)</Label><Input className="h-12 rounded-xl font-bold" type="number" value={itemForm.rate} onChange={e => setItemForm({ ...itemForm, rate: Number(e.target.value) })} /></div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowItemModal(false)}>Cancel</Button>
-            <Button onClick={handleSaveItem} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Item"
-              )}
-            </Button>
-          </DialogFooter>
+          <DialogFooter><Button variant="ghost" className="rounded-xl font-black uppercase tracking-widest text-[11px]" onClick={() => setShowItemModal(false)}>Cancel</Button><Button className="h-12 px-8 rounded-xl bg-primary text-white font-black shadow-xl shadow-primary/20 uppercase tracking-widest text-[11px]" onClick={handleSaveItem} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+
       {/* RAW MATERIALS MODAL */}
       <Dialog open={showRawMaterialsModal} onOpenChange={setShowRawMaterialsModal}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Raw Material Requirements — {selected?.clientName}</DialogTitle>
-            <DialogDescription>Auto-calculated based on menu and guest count ({selected?.guests} guests)</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl">
+          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">Raw Material Inventory Mapping</DialogTitle><DialogDescription className="font-medium">Algorithmically derived requirements for {selected?.guests} pax.</DialogDescription></DialogHeader>
           <div className="py-4" ref={printRef}>
-            <div className="hidden print:block mb-4">
-              <h2 className="text-xl font-bold">Raw Material List</h2>
-              <p>Event: {selected?.clientName} | Date: {selected?.eventDate} | Guests: {selected?.guests}</p>
+            <div className="hidden print:block mb-6">
+              <h2 className="text-2xl font-black">Production Inventory Sheet</h2>
+              <p className="text-sm font-bold text-muted-foreground mt-1">Assignment: {selected?.clientName} | Scheduled: {selected?.eventDate}</p>
             </div>
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Material</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Unit</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Required Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rawMaterials.map((rm, idx) => (
-                  <tr key={idx} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2 text-sm font-medium">{rm.material_name}</td>
-                    <td className="px-4 py-2 text-sm text-muted-foreground">{rm.unit}</td>
-                    <td className="px-4 py-2 text-sm font-bold">{rm.estimated_qty.toFixed(2)}</td>
+            <div className="rounded-2xl border border-border overflow-hidden bg-white shadow-sm">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-muted-foreground uppercase tracking-widest">Inventory Component</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-muted-foreground uppercase tracking-widest">UoM</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-muted-foreground uppercase tracking-widest">Calculated Need</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rawMaterials.map((rm, idx) => (
+                    <tr key={idx} className="hover:bg-muted/5">
+                      <td className="px-6 py-4 text-sm font-black text-foreground">{rm.material_name}</td>
+                      <td className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase">{rm.unit}</td>
+                      <td className="px-6 py-4 text-sm font-black text-primary">{rm.estimated_qty.toFixed(2)} {rm.unit}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <DialogFooter className="print:hidden">
-            <Button variant="outline" onClick={handlePrint}><Printer className="h-4 w-4 mr-2"/>Print / Export PDF</Button>
-            <Button onClick={() => setShowRawMaterialsModal(false)}>Close</Button>
-          </DialogFooter>
+          <DialogFooter className="print:hidden"><Button variant="outline" className="rounded-xl font-black uppercase tracking-widest text-[11px] gap-2 border-border" onClick={handlePrint}><Printer className="h-4 w-4"/> Generate PDF</Button><Button className="rounded-xl font-black uppercase tracking-widest text-[11px] bg-primary text-white" onClick={() => setShowRawMaterialsModal(false)}>Close Ledger</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* CONSUMPTION TRACKING MODAL */}
       <Dialog open={showConsumptionModal} onOpenChange={setShowConsumptionModal}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Consumption Tracking — {selected?.clientName}</DialogTitle>
-            <DialogDescription>Compare estimated raw materials with actual consumption</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-3xl rounded-3xl border-none shadow-2xl">
+          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">Post-Production Consumption Audit</DialogTitle><DialogDescription className="font-medium">Variance analysis between estimated yield and actual inventory usage.</DialogDescription></DialogHeader>
           <div className="py-4 overflow-y-auto max-h-[60vh]">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Material</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Unit</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Estimated</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Actual</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Diff</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rawMaterials.map((rm, idx) => {
-                  const diff = rm.actual_qty - rm.estimated_qty;
-                  return (
-                    <tr key={idx} className="border-b border-border last:border-0">
-                      <td className="px-4 py-2 text-sm font-medium">{rm.material_name}</td>
-                      <td className="px-4 py-2 text-sm text-muted-foreground">{rm.unit}</td>
-                      <td className="px-4 py-2 text-sm">{rm.estimated_qty.toFixed(2)}</td>
-                      <td className="px-4 py-2 text-sm">
-                        <Input 
-                          type="number" 
-                          className="w-24 h-8" 
-                          value={rm.actual_qty} 
-                          onChange={e => {
-                            const val = Number(e.target.value);
-                            setRawMaterials(prev => prev.map((item, i) => i === idx ? { ...item, actual_qty: val } : item));
-                          }}
-                        />
-                      </td>
-                      <td className={`px-4 py-2 text-sm font-bold ${diff > 0 ? 'text-destructive' : diff < 0 ? 'text-success' : 'text-muted-foreground'}`}>
-                        {diff > 0 ? '+' : ''}{diff.toFixed(2)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="rounded-2xl border border-border overflow-hidden bg-white">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-muted-foreground uppercase tracking-widest">Component</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-muted-foreground uppercase tracking-widest">Plan</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-muted-foreground uppercase tracking-widest">Actual</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-muted-foreground uppercase tracking-widest">Variance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rawMaterials.map((rm, idx) => {
+                    const diff = rm.actual_qty - rm.estimated_qty;
+                    return (
+                      <tr key={idx} className="hover:bg-muted/5 transition-colors group">
+                        <td className="px-6 py-4 text-sm font-black text-foreground">{rm.material_name}</td>
+                        <td className="px-6 py-4 text-xs font-bold text-muted-foreground">{rm.estimated_qty.toFixed(2)}</td>
+                        <td className="px-6 py-4">
+                          <Input type="number" className="w-28 h-9 rounded-lg border-border font-black text-right" value={rm.actual_qty} onChange={e => {
+                              const val = Number(e.target.value);
+                              setRawMaterials(prev => prev.map((item, i) => i === idx ? { ...item, actual_qty: val } : item));
+                            }}
+                          />
+                        </td>
+                        <td className={`px-6 py-4 text-xs font-black ${diff > 0 ? 'text-rose-600' : diff < 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                          {diff > 0 ? '↑' : diff < 0 ? '↓' : '—'} {Math.abs(diff).toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <DialogFooter>
-             <Button variant="outline" onClick={() => setShowConsumptionModal(false)}>Cancel</Button>
-             <Button onClick={handleSaveKitchen} disabled={isSaving}>
-               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
-               Save Consumption
-             </Button>
-           </DialogFooter>
-         </DialogContent>
-       </Dialog>
+          <DialogFooter><Button variant="ghost" className="rounded-xl font-black uppercase tracking-widest text-[11px]" onClick={() => setShowConsumptionModal(false)}>Discard</Button><Button className="h-12 px-8 rounded-xl bg-emerald-500 text-white font-black shadow-xl shadow-emerald-500/20 uppercase tracking-widest text-[11px]" onClick={handleSaveKitchen} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>} Sync Audit Results</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-       {/* SUPPLIER PAYMENT MODAL */}
-       <Dialog open={showSupplierPaymentModal} onOpenChange={setShowSupplierPaymentModal}>
-         <DialogContent className="max-w-md">
-           <DialogHeader>
-             <DialogTitle>Add Supplier Payment — {selectedSupplier?.name}</DialogTitle>
-             <DialogDescription>Enter the amount and method of payment for this supplier.</DialogDescription>
-           </DialogHeader>
-           <div className="space-y-4 py-4">
-             <div className="space-y-2">
-               <Label>Amount (₨)</Label>
-               <Input 
-                 type="number" 
-                 placeholder="0" 
-                 value={supplierPaymentForm.amount} 
-                 onChange={e => setSupplierPaymentForm({ ...supplierPaymentForm, amount: Number(e.target.value) })} 
-               />
-             </div>
-             <div className="space-y-2">
-               <Label>Payment Method</Label>
-               <Select value={supplierPaymentForm.method} onValueChange={v => setSupplierPaymentForm({ ...supplierPaymentForm, method: v })}>
-                 <SelectTrigger><SelectValue /></SelectTrigger>
-                 <SelectContent>
-                   {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                 </SelectContent>
-               </Select>
-             </div>
-             <div className="space-y-2">
-               <Label>Date</Label>
-               <Input 
-                 type="date" 
-                 value={supplierPaymentForm.date} 
-                 onChange={e => setSupplierPaymentForm({ ...supplierPaymentForm, date: e.target.value })} 
-               />
-             </div>
-             <div className="space-y-2">
-               <Label>Notes (Optional)</Label>
-               <Input 
-                 placeholder="Add any additional notes..." 
-                 value={supplierPaymentForm.notes} 
-                 onChange={e => setSupplierPaymentForm({ ...supplierPaymentForm, notes: e.target.value })} 
-               />
-             </div>
-           </div>
-           <DialogFooter>
-             <Button variant="outline" onClick={() => setShowSupplierPaymentModal(false)}>Cancel</Button>
-             <Button onClick={handleSupplierPayment} disabled={isSaving}>
-               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-               Save Payment
-             </Button>
-           </DialogFooter>
-         </DialogContent>
-       </Dialog>
+      {/* CLIENT PROFILE MODAL */}
+      <Dialog open={showClientProfile} onOpenChange={setShowClientProfile}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border-none shadow-2xl">
+          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3"><div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><User className="h-6 w-6"/></div>Client Dossier: {selectedClient?.clientName}</DialogTitle><DialogDescription className="font-medium">Strategic overview of lifetime booking value and financial commitments.</DialogDescription></DialogHeader>
+          {selectedClient && (
+            <div className="space-y-8 py-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-6 shadow-sm transition-transform hover:scale-[1.02]"><p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mb-2">Lifetime Settlement</p><p className="text-2xl font-black text-emerald-700">₨ {selectedClient.totalPaid.toLocaleString()}</p></div>
+                <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-6 shadow-sm transition-transform hover:scale-[1.02]"><p className="text-[10px] font-black text-rose-600/60 uppercase tracking-widest mb-2">Aggregate Liability</p><p className="text-2xl font-black text-rose-700">₨ {selectedClient.remainingBalance.toLocaleString()}</p></div>
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-6 shadow-sm transition-transform hover:scale-[1.02]"><p className="text-[10px] font-black text-blue-600/60 uppercase tracking-widest mb-2">Booking Frequency</p><p className="text-2xl font-black text-blue-700">{selectedClient.bookings.length} Events</p></div>
+              </div>
 
-       {/* ADD SUPPLIER MODAL */}
-       <Dialog open={showAddSupplierModal} onOpenChange={setShowAddSupplierModal}>
-         <DialogContent className="max-w-md">
-           <DialogHeader>
-             <DialogTitle>Add New Supplier</DialogTitle>
-             <DialogDescription>Enter the supplier details to add them to your ledger.</DialogDescription>
-           </DialogHeader>
-           <div className="space-y-4 py-4">
-             <div className="space-y-2">
-               <Label htmlFor="s-name">Supplier Name</Label>
-               <Input id="s-name" value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} placeholder="e.g. ABC Catering" />
-             </div>
-             <div className="grid grid-cols-2 gap-4">
-               <div className="space-y-2">
-                 <Label htmlFor="s-contact">Contact Number</Label>
-                 <Input id="s-contact" value={supplierForm.contact} onChange={e => setSupplierForm({...supplierForm, contact: e.target.value})} placeholder="e.g. 0300-1234567" />
-               </div>
-               <div className="space-y-2">
-                 <Label htmlFor="s-email">Email</Label>
-                 <Input id="s-email" type="email" value={supplierForm.email} onChange={e => setSupplierForm({...supplierForm, email: e.target.value})} placeholder="e.g. supplier@example.com" />
-               </div>
-             </div>
-             <div className="grid grid-cols-2 gap-4">
-               <div className="space-y-2">
-                 <Label htmlFor="s-category">Service Type</Label>
-                 <Select value={supplierForm.category} onValueChange={v => setSupplierForm({...supplierForm, category: v})}>
-                   <SelectTrigger id="s-category"><SelectValue /></SelectTrigger>
-                   <SelectContent>
-                     {["Food", "Decoration", "Logistics", "Photography", "Sound System", "Waiters", "Other"].map(cat => (
-                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                     ))}
-                   </SelectContent>
-                 </Select>
-               </div>
-               <div className="space-y-2">
-                 <Label htmlFor="s-balance">Opening Balance (₨)</Label>
-                 <Input id="s-balance" type="number" value={supplierForm.opening_balance} onChange={e => setSupplierForm({...supplierForm, opening_balance: Number(e.target.value)})} placeholder="0" />
-               </div>
-             </div>
-           </div>
-           <DialogFooter>
-             <Button variant="outline" onClick={() => setShowAddSupplierModal(false)}>Cancel</Button>
-             <Button onClick={handleAddSupplier} disabled={isSaving}>
-               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-               Add Supplier
-             </Button>
-           </DialogFooter>
-         </DialogContent>
-       </Dialog>
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-3 ml-1"><History className="h-4 w-4 text-primary"/> Event Engagement History</h4>
+                <div className="rounded-2xl border border-border overflow-hidden bg-white shadow-sm">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/30">
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-muted-foreground uppercase tracking-widest">Event Detail</th>
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-muted-foreground uppercase tracking-widest">Venue</th>
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status</th>
+                        <th className="px-6 py-4 text-right text-[10px] font-black text-muted-foreground uppercase tracking-widest">Investment</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {selectedClient.bookings.map((b, i) => (
+                        <tr key={i} className="hover:bg-muted/5 transition-colors">
+                          <td className="px-6 py-4"><p className="text-sm font-black text-foreground leading-tight">{b.eventType}</p><p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase">{format(new Date(b.eventDate), 'MMM d, yyyy')}</p></td>
+                          <td className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase">{b.venue}</td>
+                          <td className="px-6 py-4"><Badge className={`${sc(b.status)} rounded-lg px-2.5 py-1 text-[9px] font-black uppercase border-none`}>{b.status}</Badge></td>
+                          <td className="px-6 py-4 text-right font-black text-sm">₨ {b.totalAmount.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter><Button className="rounded-xl font-black uppercase tracking-widest text-[11px] bg-primary text-white" onClick={() => setShowClientProfile(false)}>Dismiss Profile</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-       {/* CLIENT PROFILE MODAL */}
-       <Dialog open={showClientProfile} onOpenChange={setShowClientProfile}>
-         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-           <DialogHeader>
-             <DialogTitle className="flex items-center gap-2"><User className="h-5 w-5"/>Client Profile: {selectedClient?.clientName}</DialogTitle>
-             <DialogDescription>Comprehensive booking and payment history for this client.</DialogDescription>
-           </DialogHeader>
-           {selectedClient && (
-             <div className="space-y-6 py-4">
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                 <div className="rounded-lg border border-border bg-card p-4">
-                   <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Total Paid</p>
-                   <p className="text-xl font-bold text-success">₨ {selectedClient.totalPaid.toLocaleString()}</p>
-                 </div>
-                 <div className="rounded-lg border border-border bg-card p-4">
-                   <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Outstanding Balance</p>
-                   <p className="text-xl font-bold text-destructive">₨ {selectedClient.remainingBalance.toLocaleString()}</p>
-                 </div>
-                 <div className="rounded-lg border border-border bg-card p-4">
-                   <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Total Bookings</p>
-                   <p className="text-xl font-bold">{selectedClient.bookings.length}</p>
-                 </div>
-               </div>
-
-               <div className="space-y-4">
-                 <h4 className="text-sm font-bold flex items-center gap-2 border-b border-border pb-2"><History className="h-4 w-4"/>Booking History</h4>
-                 <div className="overflow-x-auto">
-                   <table className="w-full text-sm">
-                     <thead>
-                       <tr className="border-b border-border bg-muted/40">
-                         <th className="px-3 py-2 text-left font-semibold">Date</th>
-                         <th className="px-3 py-2 text-left font-semibold">Event</th>
-                         <th className="px-3 py-2 text-left font-semibold">Venue</th>
-                         <th className="px-3 py-2 text-left font-semibold">Status</th>
-                         <th className="px-3 py-2 text-right font-semibold">Total</th>
-                       </tr>
-                     </thead>
-                     <tbody>
-                       {selectedClient.bookings.map(b => (
-                         <tr key={b.id} className="border-b border-border last:border-0">
-                           <td className="px-3 py-2">{b.eventDate}</td>
-                           <td className="px-3 py-2">{b.eventType}</td>
-                           <td className="px-3 py-2">{b.venue}</td>
-                           <td className="px-3 py-2">
-                             <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${sc(b.status)}`}>
-                               {b.status}
-                             </span>
-                           </td>
-                           <td className="px-3 py-2 text-right font-medium">₨ {b.totalAmount.toLocaleString()}</td>
-                         </tr>
-                       ))}
-                     </tbody>
-                   </table>
-                 </div>
-               </div>
-
-               <div className="space-y-4">
-                 <h4 className="text-sm font-bold flex items-center gap-2 border-b border-border pb-2"><Wallet className="h-4 w-4"/>Payment Summary</h4>
-                 <div className="overflow-x-auto">
-                   <table className="w-full text-sm">
-                     <thead>
-                       <tr className="border-b border-border bg-muted/40">
-                         <th className="px-3 py-2 text-left font-semibold">Date</th>
-                         <th className="px-3 py-2 text-left font-semibold">Amount</th>
-                         <th className="px-3 py-2 text-left font-semibold">Method</th>
-                       </tr>
-                     </thead>
-                     <tbody>
-                       {selectedClient.payments.map((p, idx) => (
-                         <tr key={idx} className="border-b border-border last:border-0">
-                           <td className="px-3 py-2">{p.date}</td>
-                           <td className="px-3 py-2 font-medium text-success">₨ {p.amount.toLocaleString()}</td>
-                           <td className="px-3 py-2">{p.method}</td>
-                         </tr>
-                       ))}
-                     </tbody>
-                   </table>
-                 </div>
-               </div>
-             </div>
-           )}
-           <DialogFooter>
-             <Button onClick={() => setShowClientProfile(false)}>Close Profile</Button>
-           </DialogFooter>
-         </DialogContent>
-       </Dialog>
-     </div>
-   );
- };
+      {/* SUPPLIER PAYMENT MODAL */}
+      <Dialog open={showSupplierPaymentModal} onOpenChange={setShowSupplierPaymentModal}>
+        <DialogContent className="max-w-md rounded-3xl border-none shadow-2xl">
+          <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">Vendor Settlement</DialogTitle><DialogDescription className="font-medium">Record a financial disbursement to {selectedSupplier?.name}.</DialogDescription></DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Disbursement Amount (₨)</Label><Input type="number" className="h-12 rounded-xl font-black text-lg focus:ring-emerald-500/20" value={supplierPaymentForm.amount} onChange={e => setSupplierPaymentForm({ ...supplierPaymentForm, amount: Number(e.target.value) })} /></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Payment Protocol</Label><Select value={supplierPaymentForm.method} onValueChange={v => setSupplierPaymentForm({ ...supplierPaymentForm, method: v })}><SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl">{PAYMENT_METHODS.map(m => <SelectItem key={m} value={m} className="font-bold">{m}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Execution Date</Label><Input type="date" className="h-12 rounded-xl font-bold" value={supplierPaymentForm.date} onChange={e => setSupplierPaymentForm({ ...supplierPaymentForm, date: e.target.value })} /></div>
+            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Internal Reference / Notes</Label><Input className="h-12 rounded-xl font-bold" placeholder="Reference invoice or check number..." value={supplierPaymentForm.notes} onChange={e => setSupplierPaymentForm({ ...supplierPaymentForm, notes: e.target.value })} /></div>
+          </div>
+          <DialogFooter className="gap-3"><Button variant="ghost" className="rounded-xl font-black uppercase tracking-widest text-[11px]" onClick={() => setShowSupplierPaymentModal(false)}>Cancel</Button><Button className="h-12 px-8 rounded-xl bg-primary text-white font-black shadow-xl shadow-primary/20 uppercase tracking-widest text-[11px]" onClick={handleSupplierPayment} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Finalize Disbursal</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
 
 export default memo(EventBooking);
