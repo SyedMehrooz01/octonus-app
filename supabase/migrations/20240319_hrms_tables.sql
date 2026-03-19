@@ -1,7 +1,7 @@
 -- HRMS Tables Migration
 
--- 1. Employees Table
-CREATE TABLE IF NOT EXISTS employees (
+-- 1. Staff Table
+CREATE TABLE IF NOT EXISTS staff (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     role TEXT NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS employees (
 -- 2. Attendance Table
 CREATE TABLE IF NOT EXISTS attendance (
     id BIGSERIAL PRIMARY KEY,
-    employee_id TEXT REFERENCES employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES staff(id) ON DELETE CASCADE,
     date DATE NOT NULL DEFAULT CURRENT_DATE,
     status TEXT NOT NULL, -- 'present', 'absent', 'late', 'half-day'
     check_in TIME,
@@ -31,10 +31,10 @@ CREATE TABLE IF NOT EXISTS attendance (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Leave Requests Table
-CREATE TABLE IF NOT EXISTS leave_requests (
+-- 3. Leaves Table
+CREATE TABLE IF NOT EXISTS leaves (
     id BIGSERIAL PRIMARY KEY,
-    employee_id TEXT REFERENCES employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES staff(id) ON DELETE CASCADE,
     type TEXT NOT NULL, -- 'Annual', 'Sick', 'Casual', 'Maternity', 'Paternity', 'Hajj'
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS leave_requests (
 -- 4. Advance Salary Table
 CREATE TABLE IF NOT EXISTS advance_salary (
     id BIGSERIAL PRIMARY KEY,
-    employee_id TEXT REFERENCES employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES staff(id) ON DELETE CASCADE,
     amount NUMERIC NOT NULL,
     reason TEXT,
     status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'approved', 'rejected', 'paid'
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS advance_salary (
 -- 5. Overtime Table
 CREATE TABLE IF NOT EXISTS overtime (
     id BIGSERIAL PRIMARY KEY,
-    employee_id TEXT REFERENCES employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES staff(id) ON DELETE CASCADE,
     date DATE NOT NULL DEFAULT CURRENT_DATE,
     hours NUMERIC NOT NULL,
     rate NUMERIC NOT NULL DEFAULT 1.5,
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS overtime (
 -- 6. Payroll History Table
 CREATE TABLE IF NOT EXISTS payroll_history (
     id BIGSERIAL PRIMARY KEY,
-    employee_id TEXT REFERENCES employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES staff(id) ON DELETE CASCADE,
     month TEXT NOT NULL, -- e.g. 'March 2024'
     basic_salary NUMERIC NOT NULL,
     hra NUMERIC NOT NULL DEFAULT 0,
@@ -85,23 +85,24 @@ CREATE TABLE IF NOT EXISTS payroll_history (
     late_deduction NUMERIC NOT NULL DEFAULT 0,
     absence_deduction NUMERIC NOT NULL DEFAULT 0,
     net_salary NUMERIC NOT NULL,
+    net_pay NUMERIC, -- Added for compatibility
     payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
     status TEXT NOT NULL DEFAULT 'paid',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Enable RLS (Optional, but good practice)
-ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE staff ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
-ALTER TABLE leave_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE leaves ENABLE ROW LEVEL SECURITY;
 ALTER TABLE advance_salary ENABLE ROW LEVEL SECURITY;
 ALTER TABLE overtime ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payroll_history ENABLE ROW LEVEL SECURITY;
 
 -- Simple RLS policies for now (Allow all to authenticated users)
-CREATE POLICY "Allow all for authenticated users" ON employees FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow all for authenticated users" ON staff FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow all for authenticated users" ON attendance FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow all for authenticated users" ON leave_requests FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow all for authenticated users" ON leaves FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow all for authenticated users" ON advance_salary FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow all for authenticated users" ON overtime FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow all for authenticated users" ON payroll_history FOR ALL USING (auth.role() = 'authenticated');

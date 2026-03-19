@@ -203,7 +203,7 @@ const HRStaff = () => {
   const fetchHRData = async () => {
     setLoading(true);
     try {
-      const { data: staffData } = await supabase.from('employees').select('*').order('name');
+      const { data: staffData } = await supabase.from('staff').select('*').order('name');
       
       const { data: payrollData } = await supabase.from('payroll_history').select('*').order('month', { ascending: false });
 
@@ -212,43 +212,43 @@ const HRStaff = () => {
         leaveBalance: s.leave_balance,
         payrollHistory: payrollData?.filter(p => p.employee_id === s.id).map(p => ({
           ...p,
-          netPay: p.net_salary // Map for compatibility
+          netPay: p.net_pay || p.net_salary // Support both naming conventions
         })) || []
       })));
 
-      const { data: attendanceData } = await supabase.from('attendance').select('*, employees(name)').order('date', { ascending: false });
+      const { data: attendanceData } = await supabase.from('attendance').select('*, staff(name)').order('date', { ascending: false });
       if (attendanceData) setAttendance(attendanceData.map(a => ({
         ...a,
         empId: a.employee_id,
-        name: (a as any).employees?.name,
+        name: (a as any).staff?.name,
         lateMinutes: a.late_minutes,
         isAuto: a.is_auto,
         checkIn: a.check_in,
         checkOut: a.check_out
       })));
 
-      const { data: leavesData } = await supabase.from('leave_requests').select('*, employees(name)').order('created_at', { ascending: false });
+      const { data: leavesData } = await supabase.from('leaves').select('*, staff(name)').order('created_at', { ascending: false });
       if (leavesData) setLeaves(leavesData.map(l => ({
         ...l,
         empId: l.employee_id,
-        name: (l as any).employees?.name,
+        name: (l as any).staff?.name,
         start: l.start_date,
         end: l.end_date
       })));
 
-      const { data: advanceData } = await supabase.from('advance_salary').select('*, employees(name)').order('created_at', { ascending: false });
+      const { data: advanceData } = await supabase.from('advance_salary').select('*, staff(name)').order('created_at', { ascending: false });
       if (advanceData) setAdvances(advanceData.map(a => ({
         ...a,
         empId: a.employee_id,
-        name: (a as any).employees?.name,
+        name: (a as any).staff?.name,
         date: a.request_date
       })));
 
-      const { data: overtimeData } = await supabase.from('overtime').select('*, employees(name)').order('created_at', { ascending: false });
+      const { data: overtimeData } = await supabase.from('overtime').select('*, staff(name)').order('created_at', { ascending: false });
       if (overtimeData) setOvertime(overtimeData.map(o => ({
         ...o,
         empId: o.employee_id,
-        name: (o as any).employees?.name
+        name: (o as any).staff?.name
       })));
     } catch (err) {
       console.error("Error fetching HR data:", err);
@@ -343,7 +343,7 @@ const HRStaff = () => {
     };
     
     try {
-      const { error } = await supabase.from('employees').insert([emp]);
+      const { error } = await supabase.from('staff').insert([emp]);
       if (error) throw error;
       
       fetchHRData();
@@ -367,7 +367,7 @@ const HRStaff = () => {
     }
     
     try {
-      const { error } = await supabase.from('employees').update({
+      const { error } = await supabase.from('staff').update({
         name: editStaff.name,
         role: editStaff.role,
         department: editStaff.department,
@@ -562,7 +562,7 @@ const HRStaff = () => {
     if (!emp) return;
     
     try {
-      const { error } = await supabase.from('leave_requests').insert([{
+      const { error } = await supabase.from('leaves').insert([{
         employee_id: leaveForm.empId,
         type: leaveForm.type,
         start_date: leaveForm.start,
@@ -584,7 +584,7 @@ const HRStaff = () => {
 
   const handleLeaveAction = async (id: number, status: string) => {
     try {
-      const { error } = await supabase.from('leave_requests').update({ status }).eq('id', id);
+      const { error } = await supabase.from('leaves').update({ status }).eq('id', id);
       if (error) throw error;
       
       fetchHRData();
@@ -634,6 +634,7 @@ const HRStaff = () => {
         late_deduction: payrollForm.deductions.late,
         absence_deduction: payrollForm.deductions.absences,
         net_salary: netSalary,
+        net_pay: netSalary, // Add both for compatibility
         status: 'paid'
       }]);
       
@@ -1207,7 +1208,7 @@ const HRStaff = () => {
 
   const handleDeleteStaff = async (id: string) => {
     try {
-      const { error } = await supabase.from('employees').delete().eq('id', id);
+      const { error } = await supabase.from('staff').delete().eq('id', id);
       if (error) throw error;
       
       fetchHRData();
@@ -1330,10 +1331,12 @@ const HRStaff = () => {
     s.department.toLowerCase().includes(search.toLowerCase())
   ), [staff, search]);
 
-  const monthlyPayrollTotal = useMemo(() => staff.reduce((acc, s) => {
-    const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-    return acc + (latestPayroll ? latestPayroll.netPay : s.salary);
-  }, 0), [staff]);
+  const monthlyPayrollTotal = useMemo(() => {
+    // Sum of all net_pay (or net_salary) from payroll_history for all staff
+    return staff.reduce((acc, s) => {
+      return acc + (s.payrollHistory || []).reduce((sum: number, p: any) => sum + (p.netPay || 0), 0);
+    }, 0);
+  }, [staff]);
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-10">

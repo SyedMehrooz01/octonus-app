@@ -43,7 +43,7 @@ const Dashboard = () => {
 
         // 2. Fetch Active Staff Count
         const { count: activeStaffCount } = await supabase
-          .from('employees')
+          .from('staff')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'active');
 
@@ -135,13 +135,13 @@ const Dashboard = () => {
 
         const { data: recentAttendance } = await supabase
           .from('attendance')
-          .select('id, date, status, employees(name)')
+          .select('id, date, status, staff(name)')
           .order('date', { ascending: false })
           .limit(3);
         
         recentAttendance?.forEach(a => activity.push({
           type: 'attendance',
-          title: `Attendance marked for ${(a as any).employees?.name}: ${a.status}`,
+          title: `Attendance marked for ${(a as any).staff?.name}: ${a.status}`,
           time: a.date,
           icon: CheckCircle,
           color: 'text-violet-500'
