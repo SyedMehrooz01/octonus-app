@@ -167,11 +167,18 @@ const HRStaff = () => {
   const { user, canDo, logAction } = useAuth();
   const [staff, setStaff] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const [attendanceChecked, setAttendanceChecked] = useState(false);
   const [leaves, setLeaves] = useState<any[]>([]);
-  const [markedAllPresent, setMarkedAllPresent] = useState(false);
-  const [announcements, setAnnouncements] = useState(DUMMY_ANNOUNCEMENTS);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [advances, setAdvances] = useState<any[]>([]);
+  const [overtime, setOvertime] = useState<any[]>([]);
+  const [outsideWorkers, setOutsideWorkers] = useState<any[]>([]);
+  const [outsideAssignments, setOutsideAssignments] = useState<any[]>([]);
+  const [outsidePayments, setOutsidePayments] = useState<any[]>([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [search, setSearch] = useState("");
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
@@ -190,82 +197,227 @@ const HRStaff = () => {
   const [showTotalLedgerModal, setShowTotalLedgerModal] = useState(false);
   const [selectedPayslip, setSelectedPayslip] = useState<any>(null);
   const [editAttendanceId, setEditAttendanceId] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const fetchHRData = async () => {
     if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      const { data: staffData } = await supabase.from('staff').select('*').order('name');
-      
-      const { data: payrollData } = await supabase.from('payroll_history').select('*').order('month', { ascending: false });
+      // 1. Fetch Staff (Base Data)
+      const { data: staffData, error: staffError } = await supabase
+        .from('staff')
+        .select('id, name, role, department, salary, phone, email, joining_date, status, avatar')
+        .order('name');
+      if (staffError) throw staffError;
 
-      if (staffData) setStaff(staffData.map(s => ({
-        ...s,
-        leaveBalance: s.leave_balance,
-        payrollHistory: payrollData?.filter(p => p.employee_id === s.id).map(p => ({
-          ...p,
-          netPay: p.net_pay || p.net_salary // Support both naming conventions
-        })) || []
-      })));
+      // 2. Fetch Payroll History
+      const { data: payrollData, error: payrollError } = await supabase
+        .from('payroll_history')
+        .select('id, employee_id, month, basic_salary, bonus, allowances, deductions, net_pay, status, payment_date')
+        .order('month', { ascending: false });
+      if (payrollError) throw payrollError;
 
-      const { data: attendanceData, error: attendanceError } = await supabase.from('attendance').select('*, staff(name)').order('date', { ascending: false });
-      if (attendanceError) throw new Error(`Supabase error (attendance): ${attendanceError.message}`);
-      if (attendanceData) setAttendance(attendanceData.map(a => ({
-        ...a,
-        empId: a.employee_id,
-        name: (a as any).staff?.name,
-        lateMinutes: a.late_minutes,
-        isAuto: a.is_auto,
-        checkIn: a.check_in,
-        checkOut: a.check_out
-      })));
+      // 3. Fetch Attendance
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('attendance')
+        .select('id, employee_id, date, check_in, check_out, status')
+        .order('date', { ascending: false });
+      if (attendanceError) throw attendanceError;
 
-      const { data: leavesData, error: leavesError } = await supabase.from('leaves').select('*, staff(name)').order('created_at', { ascending: false });
-      if (leavesError) throw new Error(`Supabase error (leaves): ${leavesError.message}`);
-      if (leavesData) setLeaves(leavesData.map(l => ({
-        ...l,
-        empId: l.employee_id,
-        name: (l as any).staff?.name,
-        start: l.start_date,
-        end: l.end_date
-      })));
+      // 4. Fetch Leaves
+      const { data: leavesData, error: leavesError } = await supabase
+        .from('leaves')
+        .select('id, employee_id, leave_type, start_date, end_date, reason, status')
+        .order('start_date', { ascending: false });
+      if (leavesError) throw leavesError;
 
-      const { data: advanceData, error: advanceError } = await supabase.from('advance_salary').select('*, staff(name)').order('created_at', { ascending: false });
-      if (advanceError) throw new Error(`Supabase error (advance_salary): ${advanceError.message}`);
-      if (advanceData) setAdvances(advanceData.map(a => ({
-        ...a,
-        empId: a.employee_id,
-        name: (a as any).staff?.name,
-        date: a.request_date
-      })));
+      // 5. Fetch Overtime
+      const { data: overtimeData, error: overtimeError } = await supabase
+        .from('overtime')
+        .select('id, employee_id, date, hours, rate, total, status')
+        .order('date', { ascending: false });
+      if (overtimeError) throw overtimeError;
 
-      const { data: overtimeData, error: overtimeError } = await supabase.from('overtime').select('*, staff(name)').order('created_at', { ascending: false });
-      if (overtimeError) throw new Error(`Supabase error (overtime): ${overtimeError.message}`);
-      if (overtimeData) setOvertime(overtimeData.map(o => ({
-        ...o,
-        empId: o.employee_id,
-        name: (o as any).staff?.name
-      })));
+      // 6. Fetch Performance
+      const { data: performanceData, error: performanceError } = await supabase
+        .from('performance')
+        .select('id, employee_id, month, rating, notes');
+      if (performanceError) throw performanceError;
 
-      const { data: announcementsData } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
-      if (announcementsData) setAnnouncements(announcementsData);
+      // 7. Fetch Advance Salary
+      const { data: advanceData, error: advanceError } = await supabase
+        .from('advance_salary')
+        .select('id, employee_id, amount, reason, status, request_date, deduction_month')
+        .order('request_date', { ascending: false });
+      if (advanceError) throw advanceError;
 
-      const { data: outsideWorkersData } = await supabase.from('outside_workers').select('*').order('name');
-      if (outsideWorkersData) setOutsideWorkers(outsideWorkersData);
+      // 8. Fetch Announcements
+      const { data: announceData, error: announceError } = await supabase
+        .from('announcements')
+        .select('id, title, message, created_by, created_at')
+        .order('created_at', { ascending: false });
+      if (announceError) throw announceError;
 
-      // Fetch performance data and map to staff
-      const { data: performanceData } = await supabase.from('performance').select('*');
-      if (performanceData && staffData) {
-        setStaff(prevStaff => prevStaff.map(s => ({
+      // 9. Fetch Outside Workers
+      const { data: outsideData, error: outsideError } = await supabase
+        .from('outside_workers')
+        .select('id, name, skill, phone, rate, rate_type, status, rating')
+        .order('name');
+      if (outsideError) throw outsideError;
+
+      // Map everything to staff members for the UI with 100% null safety
+      const enrichedStaff = (staffData ?? []).map(s => {
+        const s_id = s?.id ?? "";
+        return {
           ...s,
-          performance: performanceData.filter(p => p.staff_id === s.id).map(p => p.rating),
-          performanceNotes: performanceData.filter(p => p.staff_id === s.id).map(p => ({ note: p.notes, date: p.created_at }))
-        })));
-      }
-    } catch (err) {
+          id: s_id,
+          name: s?.name ?? "Unknown Staff",
+          role: s?.role ?? "No Role",
+          department: s?.department ?? "Unassigned",
+          salary: s?.salary ?? 0,
+          status: s?.status ?? "inactive",
+          joinDate: s?.joining_date ?? "N/A",
+          payrollHistory: (payrollData ?? [])
+            .filter(p => p?.employee_id === s_id)
+            .map(p => ({
+              ...p,
+              id: p?.id ?? 0,
+              month: p?.month ?? "N/A",
+              netPay: p?.net_pay ?? 0,
+              basic: p?.basic_salary ?? 0,
+              bonuses: p?.bonus ?? 0,
+              allowances: p?.allowances ?? 0,
+              deductions: p?.deductions ?? 0,
+              status: p?.status ?? "pending",
+              date: p?.payment_date ?? "N/A"
+            })),
+          attendanceRecords: (attendanceData ?? [])
+            .filter(a => a?.employee_id === s_id)
+            .map(a => ({
+              ...a,
+              id: a?.id ?? 0,
+              date: a?.date ?? "N/A",
+              status: a?.status ?? "absent",
+              check_in: a?.check_in ?? null,
+              check_out: a?.check_out ?? null
+            })),
+          leaves: (leavesData ?? [])
+            .filter(l => l?.employee_id === s_id)
+            .map(l => ({
+              ...l,
+              id: l?.id ?? 0,
+              leave_type: l?.leave_type ?? "N/A",
+              start_date: l?.start_date ?? "N/A",
+              end_date: l?.end_date ?? "N/A",
+              status: l?.status ?? "pending"
+            })),
+          performance: (performanceData ?? [])
+            .filter(p => p?.employee_id === s_id)
+            .map(p => p?.rating ?? 0),
+          performanceNotes: (performanceData ?? [])
+            .filter(p => p?.employee_id === s_id)
+            .map(p => ({ note: p?.notes ?? "", date: p?.month ?? "N/A" })),
+          advances: (advanceData ?? [])
+            .filter(a => a?.employee_id === s_id)
+            .map(a => ({
+              ...a,
+              id: a?.id ?? 0,
+              amount: a?.amount ?? 0,
+              status: a?.status ?? "pending",
+              request_date: a?.request_date ?? "N/A"
+            })),
+          overtime: (overtimeData ?? [])
+            .filter(o => o?.employee_id === s_id)
+            .map(o => ({
+              ...o,
+              id: o?.id ?? 0,
+              hours: o?.hours ?? 0,
+              total: o?.total ?? 0,
+              status: o?.status ?? "pending"
+            }))
+        };
+      });
+
+      setStaff(enrichedStaff);
+      
+      // Also update standalone states for tables with null safety
+      setAttendance((attendanceData ?? []).map(a => {
+        const emp = (staffData ?? []).find(s => s?.id === a?.employee_id);
+        return {
+          ...a,
+          id: a?.id ?? 0,
+          name: emp?.name ?? "Unknown",
+          empId: a?.employee_id ?? "",
+          date: a?.date ?? "N/A",
+          status: a?.status ?? "absent",
+          checkIn: a?.check_in ?? null,
+          checkOut: a?.check_out ?? null
+        };
+      }));
+
+      setLeaves((leavesData ?? []).map(l => {
+        const emp = (staffData ?? []).find(s => s?.id === l?.employee_id);
+        return {
+          ...l,
+          id: l?.id ?? 0,
+          name: emp?.name ?? "Unknown",
+          type: l?.leave_type ?? "N/A",
+          start: l?.start_date ?? "N/A",
+          end: l?.end_date ?? "N/A",
+          status: l?.status ?? "pending"
+        };
+      }));
+
+      setAnnouncements((announceData ?? []).map(an => ({
+        id: an?.id ?? 0,
+        title: an?.title ?? "No Title",
+        message: an?.message ?? "No Content",
+        created_by: an?.created_by ?? "Admin",
+        created_at: an?.created_at ?? new Date().toISOString()
+      })));
+      
+      setAdvances((advanceData ?? []).map(a => {
+        const emp = (staffData ?? []).find(s => s?.id === a?.employee_id);
+        return {
+          ...a,
+          id: a?.id ?? 0,
+          name: emp?.name ?? "Unknown",
+          empId: a?.employee_id ?? "",
+          amount: a?.amount ?? 0,
+          reason: a?.reason ?? "No Reason",
+          status: a?.status ?? "pending",
+          date: a?.request_date ?? "N/A"
+        };
+      }));
+
+      setOvertime((overtimeData ?? []).map(o => {
+        const emp = (staffData ?? []).find(s => s?.id === o?.employee_id);
+        return {
+          ...o,
+          id: o?.id ?? 0,
+          name: emp?.name ?? "Unknown",
+          empId: o?.employee_id ?? "",
+          date: o?.date ?? "N/A",
+          hours: o?.hours ?? 0,
+          status: o?.status ?? "pending"
+        };
+      }));
+
+      setOutsideWorkers((outsideData ?? []).map(w => ({
+        id: w?.id ?? 0,
+        name: w?.name ?? "Unknown",
+        skill: w?.skill ?? "General",
+        phone: w?.phone ?? "N/A",
+        rate: w?.rate ?? 0,
+        rate_type: w?.rate_type ?? "per event",
+        status: w?.status ?? "available",
+        rating: w?.rating ?? 5,
+        totalPaid: 0 // Will be updated by assignment history if needed
+      })));
+
+    } catch (err: any) {
       console.error("Error fetching HR data:", err);
+      setError(err?.message || "Failed to load HR data");
       toast.error("Failed to load HR data");
     } finally {
       setLoading(false);
@@ -279,9 +431,6 @@ const HRStaff = () => {
   }, [user]);
 
   // Outside Workers State
-  const [outsideWorkers, setOutsideWorkers] = useState(DUMMY_OUTSIDE_WORKERS);
-  const [outsideAssignments, setOutsideAssignments] = useState(DUMMY_OUTSIDE_ASSIGNMENTS);
-  const [outsidePayments, setOutsidePayments] = useState(DUMMY_OUTSIDE_PAYMENTS);
   const [showAddOutsideModal, setShowAddOutsideModal] = useState(false);
   const [showAssignEventModal, setShowAssignEventModal] = useState(false);
   const [showOutsidePaymentModal, setShowOutsidePaymentModal] = useState(false);
@@ -348,14 +497,13 @@ const HRStaff = () => {
       name: newStaff.name,
       role: newStaff.role,
       department: newStaff.department,
-      salary: Number(newStaff.salary),
+      salary: Number(newStaff.salary ?? 0),
       phone: newStaff.phone,
       email: newStaff.email,
       address: newStaff.address,
       emergency_contact: newStaff.emergencyContact,
       status: newStaff.status,
-      join_date: newStaff.joinDate,
-      leave_balance: { annual: 14, sick: 10, casual: 10, maternity: 12, paternity: 5, hajj: 1 }
+      joining_date: newStaff.joinDate
     };
     
     try {
@@ -372,12 +520,12 @@ const HRStaff = () => {
       toast.success("Staff member added successfully");
     } catch (err: any) {
       console.error("Error adding staff:", err);
-      toast.error(err.message || "Failed to add staff member");
+      toast.error(err?.message || "Failed to add staff member");
     }
   };
 
   const handleUpdateStaff = async () => {
-    if (!editStaff.name || !editStaff.role || !editStaff.email) {
+    if (!editStaff?.name || !editStaff?.role || !editStaff?.email) {
       toast.error("Please fill all required fields");
       return;
     }
@@ -387,13 +535,12 @@ const HRStaff = () => {
         name: editStaff.name,
         role: editStaff.role,
         department: editStaff.department,
-        salary: Number(editStaff.salary),
+        salary: Number(editStaff.salary ?? 0),
         phone: editStaff.phone,
         email: editStaff.email,
-        address: editStaff.address,
-        emergency_contact: editStaff.emergency_contact || editStaff.emergencyContact,
+        joining_date: editStaff.joining_date || editStaff.joinDate,
         status: editStaff.status,
-        join_date: editStaff.join_date || editStaff.joinDate
+        avatar: editStaff.avatar
       }).eq('id', editStaff.id);
       
       if (error) throw error;
@@ -404,183 +551,149 @@ const HRStaff = () => {
       toast.success("Staff member updated successfully");
     } catch (err: any) {
       console.error("Error updating staff:", err);
-      toast.error(err.message || "Failed to update staff member");
+      toast.error(err?.message || "Failed to update staff member");
     }
   };
 
-  const handleAddAnnouncement = () => {
+  const handleAddAnnouncement = async () => {
     if (!newAnnouncement.title || !newAnnouncement.content) {
       toast.error("Please fill all fields");
       return;
     }
-    const announce = {
-      id: announcements.length + 1,
-      ...newAnnouncement,
-      date: format(new Date(), "yyyy-MM-dd"),
-      author: "Admin"
-    };
-    setAnnouncements([announce, ...announcements]);
-    setNewAnnouncement({ title: "", content: "" });
-    setShowAnnounceModal(false);
-    toast.success("Announcement posted");
+    
+    try {
+      const { error } = await supabase.from('announcements').insert([{
+        title: newAnnouncement.title,
+        message: newAnnouncement.content,
+        created_by: user?.email ?? 'Admin',
+        created_at: new Date().toISOString()
+      }]);
+      
+      if (error) throw error;
+      
+      fetchHRData();
+      setNewAnnouncement({ title: "", content: "" });
+      setShowAnnounceModal(false);
+      toast.success("Announcement posted");
+    } catch (err: any) {
+      console.error("Error posting announcement:", err);
+      toast.error("Failed to post announcement");
+    }
   };
 
   const handleMarkAttendance = async () => {
-    const emp = staff.find(s => s.id === attendanceForm.empId);
+    const emp = (staff ?? []).find(s => s?.id === attendanceForm.empId);
     if (!emp) return;
     
-    const record = {
-      employee_id: attendanceForm.empId,
-      date: attendanceForm.date,
-      status: attendanceForm.status,
-      check_in: attendanceForm.status === 'present' ? attendanceForm.checkIn : null,
-      check_out: attendanceForm.status === 'present' ? attendanceForm.checkOut : null,
-      late_minutes: attendanceForm.status === "late" ? Number(attendanceForm.lateMinutes) : 0,
-      is_auto: false
-    };
-    
     try {
-      // Check if attendance already exists for this employee on this date
+      const record = {
+        employee_id: attendanceForm.empId,
+        date: attendanceForm.date,
+        check_in: attendanceForm.status === 'present' ? attendanceForm.checkIn : null,
+        check_out: attendanceForm.status === 'present' ? attendanceForm.checkOut : null,
+        status: attendanceForm.status
+      };
+      
       const { data: existing } = await supabase
         .from('attendance')
         .select('id')
         .eq('employee_id', attendanceForm.empId)
         .eq('date', attendanceForm.date)
-        .single();
+        .maybeSingle();
       
       if (existing) {
-        const { error } = await supabase.from('attendance').update(record).eq('id', existing.id);
+        const { error } = await supabase.from('attendance').update(record).eq('id', (existing as any).id);
         if (error) throw error;
-        toast.success("Attendance updated (override)");
       } else {
         const { error } = await supabase.from('attendance').insert([record]);
         if (error) throw error;
-        toast.success("Attendance marked");
       }
       
       fetchHRData();
       setShowAttendanceModal(false);
+      toast.success("Attendance updated");
     } catch (err: any) {
       console.error("Error marking attendance:", err);
-      toast.error("Failed to mark attendance");
+      toast.error(err?.message || "Failed to mark attendance");
     }
   };
 
   const handleMarkAllPresent = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
-    const markedIds = new Set(attendance.filter(a => a.date === today).map(a => a.empId));
     
-    const newRecords = staff
-      .filter(s => !markedIds.has(s.id))
-      .map(s => ({
-        employee_id: s.id,
-        status: "present",
-        date: today,
-        check_in: "09:00",
-        check_out: "18:00",
-        late_minutes: 0,
-        is_auto: false
-      }));
-
-    if (newRecords.length === 0) {
-      toast.info("All staff members already have attendance marked for today");
-      return;
-    }
-
     try {
-      const { error } = await supabase.from('attendance').insert(newRecords);
+      const records = (staff ?? []).map(s => ({
+        employee_id: s?.id ?? "",
+        date: today,
+        status: 'present',
+        check_in: '09:00',
+        check_out: '18:00'
+      })).filter(r => r.employee_id !== "");
+
+      if (records.length === 0) return;
+
+      const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id,date' });
       if (error) throw error;
       
       fetchHRData();
-      setMarkedAllPresent(true);
-      toast.success(`Marked ${newRecords.length} staff members as Present`);
+      toast.success(`Bulk marked all as present`);
     } catch (err: any) {
-      console.error("Error marking all present:", err);
-      toast.error("Failed to mark bulk attendance");
+      console.error("Error bulk marking attendance:", err);
+      toast.error(err?.message || "Failed to mark bulk attendance");
     }
   };
 
   const handleAutoAbsent = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
-    const markedIds = new Set(attendance.filter(a => a.date === today).map(a => a.empId));
     
-    const absentees = staff
-      .filter(s => !markedIds.has(s.id))
-      .map(s => ({
+    try {
+      const records = (staff ?? []).map(s => ({
         employee_id: s.id,
-        status: "absent",
         date: today,
-        is_auto: true
+        status: 'absent'
       }));
 
-    if (absentees.length > 0) {
-      try {
-        const { error } = await supabase.from('attendance').insert(absentees);
-        if (error) throw error;
-        fetchHRData();
-        toast.info(`Auto-marked ${absentees.length} missing staff as Absent`);
-      } catch (err) {
-        console.error("Error marking auto-absent:", err);
-      }
+      const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id,date' });
+      if (error) throw error;
+      fetchHRData();
+    } catch (err) {
+      console.error("Error marking auto-absent:", err);
     }
-    setAttendanceChecked(true);
   };
 
-  useEffect(() => {
-    // Auto Attendance Logic: Mark absent at end of day or if triggered
-    // In this app, we trigger it if attendance isn't marked by "midnight" (simulated by checking if it's a new day)
+  const handleBulkAttendance = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
-    const lastCheckedDate = localStorage.getItem('last_attendance_check');
     
-    if (lastCheckedDate !== today) {
-      // It's a new day, we should check yesterday's attendance and mark absent if missing
-      // For simplicity in this demo, we'll just provide a way to trigger it or do it for "today" if requested
-      // but the requirement says "automatically mark all employees as Absent if attendance not marked"
-      // We'll simulate this by checking if any attendance exists for today. If not, and it's late in the day...
-      
-      const hour = new Date().getHours();
-      if (hour >= 23 || hour < 1) { // Near midnight
-        handleAutoAbsent();
-        localStorage.setItem('last_attendance_check', today);
-      }
-    }
-  }, [attendance, staff]);
-
-  const handleBulkAttendance = () => {
-    const today = format(new Date(), "yyyy-MM-dd");
-    const markedIds = new Set(attendance.filter(a => a.date === today).map(a => a.empId));
-    
-    const newRecords = staff
-      .filter(s => !markedIds.has(s.id))
-      .map((s, index) => ({
-        id: attendance.length + index + 1,
-        empId: s.id,
-        name: s.name,
-        status: bulkStatus,
+    try {
+      const records = (staff ?? []).map(s => ({
+        employee_id: s?.id ?? "",
         date: today,
-        checkIn: bulkStatus === "present" ? "09:00" : "-",
-        checkOut: bulkStatus === "present" ? "18:00" : "-",
-        lateMinutes: 0,
-        isAuto: false
-      }));
+        status: bulkStatus,
+        check_in: bulkStatus === 'present' ? '09:00' : null,
+        check_out: bulkStatus === 'present' ? '18:00' : null
+      })).filter(r => r.employee_id !== "");
 
-    if (newRecords.length > 0) {
-      setAttendance([...newRecords, ...attendance]);
-      toast.success(`Bulk marked ${newRecords.length} staff members as ${bulkStatus}`);
-    } else {
-      toast.info("All staff members already have attendance marked for today");
+      if (records.length === 0) return;
+
+      const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id,date' });
+      if (error) throw error;
+      
+      fetchHRData();
+      setShowBulkAttendanceModal(false);
+      toast.success(`Bulk marked all as ${bulkStatus}`);
+    } catch (err: any) {
+      console.error("Error bulk marking attendance:", err);
+      toast.error(err?.message || "Failed to mark bulk attendance");
     }
-    setShowBulkAttendanceModal(false);
   };
 
   const handleRequestLeave = async () => {
-    const emp = staff.find(s => s.id === leaveForm.empId);
-    if (!emp) return;
+    if (!leaveForm.empId) return;
     
     try {
       const { error } = await supabase.from('leaves').insert([{
         employee_id: leaveForm.empId,
-        type: leaveForm.type,
+        leave_type: leaveForm.type,
         start_date: leaveForm.start,
         end_date: leaveForm.end,
         reason: leaveForm.reason,
@@ -611,47 +724,44 @@ const HRStaff = () => {
     }
   };
 
-  const handleAddPerformance = () => {
-    const updatedStaff = staff.map(s => {
-      if (s.id === performanceForm.empId) {
-        return {
-          ...s,
-          performance: [...(s.performance || []), performanceForm.rating],
-          performanceNotes: [...(s.performanceNotes || []), { note: performanceForm.notes, date: format(new Date(), "yyyy-MM-dd") }]
-        };
-      }
-      return s;
-    });
-    setStaff(updatedStaff);
-    setShowPerformanceModal(false);
-    toast.success("Performance rating added");
+  const handleAddPerformance = async () => {
+    if (!performanceForm.empId) return;
+    
+    try {
+      const { error } = await supabase.from('performance').insert([{
+        employee_id: performanceForm.empId,
+        month: format(new Date(), "MMMM yyyy"),
+        rating: performanceForm.rating,
+        notes: performanceForm.notes
+      }]);
+      
+      if (error) throw error;
+      
+      fetchHRData();
+      setShowPerformanceModal(false);
+      toast.success("Performance rating added");
+    } catch (err: any) {
+      console.error("Error adding performance:", err);
+      toast.error("Failed to add performance record");
+    }
   };
 
   const handleMarkAsPaid = async () => {
-    const gross = payrollForm.basicSalary + payrollForm.allowances.houseRent + payrollForm.allowances.medical + payrollForm.allowances.conveyance + payrollForm.allowances.special + payrollForm.overtime.pay;
-    const totalDeductions = payrollForm.deductions.tax + payrollForm.deductions.eobi + payrollForm.deductions.pessi + payrollForm.deductions.loans + payrollForm.deductions.late + payrollForm.deductions.absences;
-    const netSalary = gross - totalDeductions;
+    const gross = (payrollForm.basicSalary ?? 0) + (payrollForm.allowances.houseRent ?? 0) + (payrollForm.allowances.medical ?? 0) + (payrollForm.allowances.conveyance ?? 0) + (payrollForm.allowances.special ?? 0) + (payrollForm.overtime.pay ?? 0);
+    const deductions = (payrollForm.deductions.tax ?? 0) + (payrollForm.deductions.eobi ?? 0) + (payrollForm.deductions.pessi ?? 0) + (payrollForm.deductions.loans ?? 0) + (payrollForm.deductions.late ?? 0) + (payrollForm.deductions.absences ?? 0);
+    const netSalary = gross - deductions;
     
     try {
       const { error } = await supabase.from('payroll_history').insert([{
         employee_id: payrollForm.empId,
         month: payrollForm.month,
         basic_salary: payrollForm.basicSalary,
-        hra: payrollForm.allowances.houseRent,
-        medical_allowance: payrollForm.allowances.medical,
-        conveyance_allowance: payrollForm.allowances.conveyance,
-        special_allowance: payrollForm.allowances.special,
-        overtime_pay: payrollForm.overtime.pay,
-        gross_salary: gross,
-        income_tax: payrollForm.deductions.tax,
-        eobi: payrollForm.deductions.eobi,
-        pessi: payrollForm.deductions.pessi,
-        loan_deduction: payrollForm.deductions.loans,
-        late_deduction: payrollForm.deductions.late,
-        absence_deduction: payrollForm.deductions.absences,
-        net_salary: netSalary,
-        net_pay: netSalary, // Add both for compatibility
-        status: 'paid'
+        bonus: 0,
+        allowances: (payrollForm.allowances.houseRent ?? 0) + (payrollForm.allowances.medical ?? 0) + (payrollForm.allowances.conveyance ?? 0) + (payrollForm.allowances.special ?? 0) + (payrollForm.overtime.pay ?? 0),
+        deductions: deductions,
+        net_pay: netSalary,
+        status: 'paid',
+        payment_date: format(new Date(), "yyyy-MM-dd")
       }]);
       
       if (error) throw error;
@@ -661,49 +771,42 @@ const HRStaff = () => {
       toast.success(`Payroll processed for ${payrollForm.month}`);
     } catch (err: any) {
       console.error("Error processing payroll:", err);
-      toast.error("Failed to process payroll");
+      toast.error(err?.message || "Failed to process payroll");
     }
   };
 
   const prefillPayrollForm = (emp: any) => {
     const month = format(new Date(), "MMMM yyyy");
-    const basic = emp.salary;
+    const basic = emp.salary ?? 0;
     
-    // Standard Pakistani Allowances (Estimated)
     const hra = Math.round(basic * 0.45);
     const medical = Math.round(basic * 0.10);
     const conveyance = Math.round(basic * 0.10);
-    const special = 0;
-
-    // Deductions
+    
+    const tax = calculateTax(basic * 12);
     const eobi = calculateEOBI(basic);
     const pessi = calculatePESSI(basic);
-    const tax = calculateTax(basic * 12);
 
-    // Overtime
-    const empOvertime = overtime.filter(o => o.empId === emp.id && o.status === 'pending');
-    const otHours = empOvertime.reduce((sum, o) => sum + o.hours, 0);
-    const hourlyRate = getHourlyRate(basic);
-    const otPay = calculateOvertime(hourlyRate, otHours);
+    const empOvertime = (emp.overtime ?? []).filter((o: any) => o.status === 'pending');
+    const otHours = empOvertime.reduce((sum: number, o: any) => sum + (o.hours ?? 0), 0);
+    const otPay = calculateOvertime(getHourlyRate(basic), otHours);
 
-    // Attendance Deductions (Absences & Late)
-    const monthAttendance = attendance.filter(a => a.empId === emp.id && a.date.startsWith(format(new Date(), "yyyy-MM")));
-    const absences = monthAttendance.filter(a => a.status === 'absent').length;
-    const lateDays = monthAttendance.filter(a => a.status === 'late').length;
+    const empAdvances = (emp.advances ?? []).filter((a: any) => a.status === 'approved');
+    const advanceDeduction = empAdvances.reduce((sum: number, a: any) => sum + (a.amount ?? 0), 0);
+
+    const monthAttendance = (emp.attendanceRecords ?? []).filter((a: any) => a.date?.startsWith(format(new Date(), "yyyy-MM")));
+    const absences = monthAttendance.filter((a: any) => a.status === 'absent').length;
+    const lateDays = monthAttendance.filter((a: any) => a.status === 'late').length;
     
     const dayRate = basic / 22;
     const absenceDeduction = absences * dayRate;
-    const lateDeduction = lateDays > 3 ? (lateDays - 3) * (dayRate / 4) : 0; // Policy: 1/4 day pay after 3 late arrivals
-
-    // Advances
-    const empAdvances = advances.filter(a => a.empId === emp.id && a.status === 'approved');
-    const advanceDeduction = empAdvances.reduce((sum, a) => sum + a.amount, 0);
+    const lateDeduction = lateDays > 3 ? (lateDays - 3) * (dayRate / 4) : 0;
 
     setPayrollForm({
       empId: emp.id,
       month,
       basicSalary: basic,
-      allowances: { houseRent: hra, medical, conveyance, special },
+      allowances: { houseRent: hra, medical, conveyance, special: 0 },
       overtime: { hours: otHours, pay: Math.round(otPay) },
       deductions: { 
         tax: Math.round(tax), 
@@ -716,30 +819,32 @@ const HRStaff = () => {
     });
   };
 
-  const handleUpdateRights = (id: string, rights: string[]) => {
-    const updatedStaff = staff.map(s => s.id === id ? { ...s, rights } : s);
-    setStaff(updatedStaff);
-    setShowRightsModal(false);
-    toast.success("User rights updated");
-  };
-
-  const handleAddOutsideWorker = () => {
-    if (!newOutsideWorker.name || !newOutsideWorker.phone) {
+  const handleAddOutsideWorker = async () => {
+    if (!newOutsideWorker?.name || !newOutsideWorker?.phone) {
       toast.error("Please fill name and phone");
       return;
     }
-    const worker = {
-      ...newOutsideWorker,
-      id: `W-${String(outsideWorkers.length + 1).padStart(3, '0')}`,
-      rate: Number(newOutsideWorker.rate),
-      rating: 5,
-      totalPaid: 0,
-      pastEvents: [],
-      avatar: null
-    };
-    setOutsideWorkers([...outsideWorkers, worker]);
-    setShowAddOutsideModal(false);
-    toast.success("Outside worker added");
+    
+    try {
+      const { error } = await supabase.from('outside_workers').insert([{
+        name: newOutsideWorker.name,
+        skill: newOutsideWorker.skill,
+        phone: newOutsideWorker.phone,
+        rate: Number(newOutsideWorker.rate ?? 0),
+        rate_type: newOutsideWorker.rateType,
+        status: 'active',
+        rating: 5
+      }]);
+      
+      if (error) throw error;
+      
+      fetchHRData();
+      setShowAddOutsideModal(false);
+      toast.success("Outside worker added");
+    } catch (err: any) {
+      console.error("Error adding worker:", err);
+      toast.error(err?.message || "Failed to add worker");
+    }
   };
 
   const handleAssignToEvent = () => {
@@ -862,18 +967,18 @@ const HRStaff = () => {
   };
 
   const handleExportPayroll = () => {
-    const data = staff.map((s) => {
-      const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-      const netSalary = latestPayroll ? latestPayroll.netPay : s.salary;
-      const status = latestPayroll ? "Paid" : "Pending";
-      const basicSalary = latestPayroll ? latestPayroll.basic : s.salary;
-      const bonus = latestPayroll ? latestPayroll.bonuses : 0;
-      const deductions = latestPayroll ? (latestPayroll.deductions.tax + latestPayroll.deductions.loans + latestPayroll.deductions.absences) : 0;
+    const data = (staff ?? []).map((s) => {
+      const latestPayroll = (s?.payrollHistory ?? [])[0];
+      const netSalary = latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0);
+      const status = latestPayroll ? (latestPayroll?.status ?? "Paid") : "Pending";
+      const basicSalary = latestPayroll ? (latestPayroll?.basic ?? 0) : (s?.salary ?? 0);
+      const bonus = latestPayroll ? (latestPayroll?.bonuses ?? 0) : 0;
+      const deductions = latestPayroll ? (latestPayroll?.deductions ?? 0) : 0;
       
       return {
-        'Employee ID': s.id,
-        'Staff Name': s.name,
-        'Month': latestPayroll ? latestPayroll.month : format(new Date(), 'MMMM yyyy'),
+        'Employee ID': s?.id ?? "N/A",
+        'Staff Name': s?.name ?? "Unknown",
+        'Month': latestPayroll ? (latestPayroll?.month ?? "N/A") : format(new Date(), 'MMMM yyyy'),
         'Basic Salary': basicSalary,
         'Bonus': bonus,
         'Deductions': deductions,
@@ -897,13 +1002,13 @@ const HRStaff = () => {
   };
 
   const handleExportAttendance = () => {
-    const data = attendance.map((a) => ({
-      'Staff Name': a.name,
-      'Employee ID': a.empId,
-      'Date': a.date,
-      'Check In': a.checkIn,
-      'Check Out': a.checkOut,
-      'Status': a.status,
+    const data = (attendance ?? []).map((a) => ({
+      'Staff Name': a?.name ?? "Unknown",
+      'Employee ID': a?.empId ?? "N/A",
+      'Date': a?.date ?? "N/A",
+      'Check In': a?.checkIn ?? "-",
+      'Check Out': a?.checkOut ?? "-",
+      'Status': a?.status ?? "N/A",
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -916,29 +1021,26 @@ const HRStaff = () => {
     const blob = new Blob([excelBuffer], {
       type: 'application/octet-stream'
     });
-    saveAs(blob, 'Attendance_March_2026.xlsx');
+    saveAs(blob, `Attendance_${format(new Date(), 'MMM_yyyy')}.xlsx`);
     toast.success("Attendance exported successfully to Excel");
   };
 
   const handleExportLedger = () => {
     if (!ledgerStaff) return;
     
-    const data = (ledgerStaff.payrollHistory || []).map((h: any, index: number, array: any[]) => {
-      // Calculate running balance
-      const runningBalance = array.slice(0, index + 1).reduce((acc, curr) => acc + curr.netPay, 0);
+    let runningBalance = 0;
+    const data = (ledgerStaff?.payrollHistory ?? []).map((h: any) => {
+      const netPay = h?.netPay ?? 0;
+      runningBalance += netPay;
       
       return {
-        'Date': h.date,
-        'Month': h.month,
-        'Basic Salary': h.basic,
-        'Transport': h.allowances.transport,
-        'Meal': h.allowances.meal,
-        'Housing': h.allowances.housing || 0,
-        'Bonuses': h.bonuses,
-        'Tax Deduction': h.deductions.tax,
-        'Loan/Advance': h.deductions.loans,
-        'Absence Deduction': h.deductions.absences,
-        'Net Paid': h.netPay,
+        'Date': h?.payment_date ?? h?.date ?? "N/A",
+        'Month': h?.month ?? "N/A",
+        'Basic Salary': h?.basic ?? 0,
+        'Bonuses': h?.bonuses ?? 0,
+        'Allowances': h?.allowances ?? 0,
+        'Deductions': h?.deductions ?? 0,
+        'Net Paid': netPay,
         'Running Total': runningBalance
       };
     });
@@ -947,10 +1049,9 @@ const HRStaff = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Staff_Ledger');
     
-    // Add header row style if possible (optional)
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(blob, `Ledger_${ledgerStaff.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    saveAs(blob, `Ledger_${(ledgerStaff?.name ?? 'Staff').replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
     toast.success("Ledger exported to Excel");
   };
 
@@ -959,59 +1060,53 @@ const HRStaff = () => {
     toast.success("Downloading ledger as PDF...");
     
     let content = `STAFF PAYROLL LEDGER\n`;
-    content += `Employee: ${ledgerStaff.name} (${ledgerStaff.id})\n`;
+    content += `Employee: ${ledgerStaff?.name ?? "Unknown"} (${ledgerStaff?.id ?? "N/A"})\n`;
     content += `Date Generated: ${format(new Date(), 'PPP')}\n\n`;
     content += `Date | Month | Net Paid | Running Total\n`;
     content += `------------------------------------------\n`;
     
     let runningBalance = 0;
-    (ledgerStaff.payrollHistory || []).forEach((h: any) => {
-      runningBalance += (h.netPay || 0);
-      content += `${h.date} | ${h.month} | Rs ${(h.netPay || 0).toLocaleString()} | Rs ${(runningBalance || 0).toLocaleString()}\n`;
+    (ledgerStaff?.payrollHistory ?? []).forEach((h: any) => {
+      const netPay = h?.netPay ?? 0;
+      runningBalance += netPay;
+      content += `${h?.payment_date ?? h?.date ?? "N/A"} | ${h?.month ?? "N/A"} | Rs ${(netPay ?? 0).toLocaleString()} | Rs ${(runningBalance ?? 0).toLocaleString()}\n`;
     });
 
     const blob = new Blob([content], { type: 'text/plain' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `Ledger_${ledgerStaff.id}_${format(new Date(), 'yyyy-MM-dd')}.txt`;
+    link.download = `Ledger_${ledgerStaff?.id ?? "N/A"}_${format(new Date(), 'yyyy-MM-dd')}.txt`;
     link.click();
-  };
-
-  const handleUpdateAttendance = (id: number, status: string) => {
-    setAttendance(attendance.map(a => a.id === id ? { ...a, status } : a));
-    setEditAttendanceId(null);
-    toast.success("Attendance updated");
   };
 
   const handleExportTotalLedgerExcel = () => {
     const data: any[] = [];
     let grandTotal = 0;
 
-    staff.forEach(s => {
-      const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-      const status = latestPayroll ? "Paid" : "Pending";
-      const basic = latestPayroll ? latestPayroll.basic : s.salary;
-      const bonus = latestPayroll ? latestPayroll.bonuses : 0;
-      const allowances = latestPayroll ? (latestPayroll.allowances.transport + latestPayroll.allowances.meal + (latestPayroll.allowances.housing || 0)) : 0;
-      const deductions = latestPayroll ? (latestPayroll.deductions.tax + latestPayroll.deductions.loans + latestPayroll.deductions.absences) : 0;
-      const netPay = latestPayroll ? latestPayroll.netPay : s.salary;
-      grandTotal += netPay;
+    (staff ?? []).forEach(s => {
+      const latestPayroll = (s?.payrollHistory ?? [])[0];
+      const status = latestPayroll ? (latestPayroll?.status ?? "Paid") : "Pending";
+      const basic = latestPayroll ? (latestPayroll?.basic ?? 0) : (s?.salary ?? 0);
+      const bonus = latestPayroll ? (latestPayroll?.bonuses ?? 0) : 0;
+      const allowances = latestPayroll ? (latestPayroll?.allowances ?? 0) : 0;
+      const deductions = latestPayroll ? (latestPayroll?.deductions ?? 0) : 0;
+      const netPay = latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0);
+      grandTotal += (netPay ?? 0);
 
       data.push({
-        'Employee ID': s.id,
-        'Name': s.name,
-        'Department': s.department,
+        'Employee ID': s?.id ?? "N/A",
+        'Name': s?.name ?? "Unknown",
+        'Department': s?.department ?? "N/A",
         'Basic Salary': basic,
         'Bonus': bonus,
         'Allowances': allowances,
         'Deductions': deductions,
         'Net Pay': netPay,
         'Status': status,
-        'Date': latestPayroll ? latestPayroll.date : '-'
+        'Date': latestPayroll ? (latestPayroll?.payment_date ?? latestPayroll?.date ?? "N/A") : '-'
       });
     });
 
-    // Add Grand Total row
     data.push({});
     data.push({
       'Name': 'GRAND TOTAL',
@@ -1027,30 +1122,6 @@ const HRStaff = () => {
     toast.success("Total payroll ledger exported to Excel");
   };
 
-  const handleRequestAdvance = async () => {
-    const emp = staff.find(s => s.id === advanceForm.empId);
-    if (!emp) return;
-    
-    try {
-      const { error } = await supabase.from('advance_salary').insert([{
-        employee_id: advanceForm.empId,
-        amount: Number(advanceForm.amount),
-        reason: advanceForm.reason,
-        status: 'pending'
-      }]);
-      
-      if (error) throw error;
-      
-      fetchHRData();
-      setShowAdvanceModal(false);
-      logAction(`Requested advance for ${emp.name}: ₨ ${advanceForm.amount}`, "HR & Staff");
-      toast.success("Advance request submitted");
-    } catch (err: any) {
-      console.error("Error requesting advance:", err);
-      toast.error("Failed to submit advance request");
-    }
-  };
-
   const handleAdvanceAction = async (id: number, status: string) => {
     try {
       const { error } = await supabase.from('advance_salary').update({ status }).eq('id', id);
@@ -1061,31 +1132,6 @@ const HRStaff = () => {
     } catch (err: any) {
       console.error("Error updating advance:", err);
       toast.error("Failed to update advance status");
-    }
-  };
-
-  const handleLogOvertime = async () => {
-    const emp = staff.find(s => s.id === overtimeForm.empId);
-    if (!emp) return;
-    
-    try {
-      const { error } = await supabase.from('overtime').insert([{
-        employee_id: overtimeForm.empId,
-        hours: Number(overtimeForm.hours),
-        date: overtimeForm.date,
-        rate: 1.5,
-        status: 'pending'
-      }]);
-      
-      if (error) throw error;
-      
-      fetchHRData();
-      setShowOvertimeModal(false);
-      logAction(`Logged overtime for ${emp.name}: ${overtimeForm.hours} hours`, "HR & Staff");
-      toast.success("Overtime logged");
-    } catch (err: any) {
-      console.error("Error logging overtime:", err);
-      toast.error("Failed to log overtime");
     }
   };
 
@@ -1104,39 +1150,28 @@ const HRStaff = () => {
 
   const handleGeneratePayslip = (staff: any, payroll: any) => {
     const doc = new jsPDF();
-    // Add company logo and header
     doc.setFontSize(22);
-    doc.setTextColor(22, 163, 74); // success color
+    doc.setTextColor(22, 163, 74);
     doc.text("Octonus Solutions", 105, 20, { align: 'center' });
     doc.setFontSize(14);
     doc.setTextColor(100);
     doc.text("Salary Payslip", 105, 28, { align: 'center' });
 
-    // Employee details
     doc.setFontSize(10);
     doc.setTextColor(0);
-    doc.text(`Employee Name: ${staff.name}`, 14, 45);
-    doc.text(`Employee ID: ${staff.id}`, 14, 52);
-    doc.text(`Designation: ${staff.role}`, 14, 59);
-    doc.text(`Month & Year: ${payroll.month}`, 14, 66);
+    doc.text(`Employee Name: ${staff?.name ?? "Unknown"}`, 14, 45);
+    doc.text(`Employee ID: ${staff?.id ?? "N/A"}`, 14, 52);
+    doc.text(`Designation: ${staff?.role ?? "Staff"}`, 14, 59);
+    doc.text(`Month & Year: ${payroll?.month ?? format(new Date(), "MMMM yyyy")}`, 14, 66);
 
-    // Earnings and Deductions tables
     const earnings = [
-      ["Basic Salary", `Rs ${(payroll.basic_salary || 0).toLocaleString()}`],
-      ["House Rent Allowance", `Rs ${(payroll.hra || 0).toLocaleString()}`],
-      ["Medical Allowance", `Rs ${(payroll.medical_allowance || 0).toLocaleString()}`],
-      ["Conveyance Allowance", `Rs ${(payroll.conveyance_allowance || 0).toLocaleString()}`],
-      ["Special Allowance", `Rs ${(payroll.special_allowance || 0).toLocaleString()}`],
-      ["Overtime Pay", `Rs ${(payroll.overtime_pay || 0).toLocaleString()}`],
+      ["Basic Salary", `Rs ${(payroll?.basic ?? 0).toLocaleString()}`],
+      ["Allowances", `Rs ${(payroll?.allowances ?? 0).toLocaleString()}`],
+      ["Bonus", `Rs ${(payroll?.bonus ?? 0).toLocaleString()}`],
     ];
     
     const deductions = [
-      ["Income Tax", `Rs ${(payroll.income_tax || 0).toLocaleString()}`],
-      ["EOBI", `Rs ${(payroll.eobi || 0).toLocaleString()}`],
-      ["PESSI/SESSI", `Rs ${(payroll.pessi || 0).toLocaleString()}`],
-      ["Loan/Advance", `Rs ${(payroll.loan_deduction || 0).toLocaleString()}`],
-      ["Late Arrival", `Rs ${(payroll.late_deduction || 0).toLocaleString()}`],
-      ["Absence", `Rs ${(payroll.absence_deduction || 0).toLocaleString()}`],
+      ["Deductions", `Rs ${(payroll?.deductions ?? 0).toLocaleString()}`],
     ];
 
     autoTable(doc, {
@@ -1155,40 +1190,29 @@ const HRStaff = () => {
       headStyles: { fillColor: [220, 38, 38] },
     });
 
-    // Totals
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(`Gross Salary: Rs ${(payroll.gross_salary || 0).toLocaleString()}`, 14, finalY);
-    doc.text(`Net Salary: Rs ${(payroll.net_salary || 0).toLocaleString()}`, 14, finalY + 8);
+    doc.text(`Net Salary: Rs ${(payroll?.netPay ?? 0).toLocaleString()}`, 14, finalY);
 
-    // Net salary in words
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text("Net Salary in Words:", 14, finalY + 18);
+    doc.text("Net Salary in Words:", 14, finalY + 10);
     doc.setFont("helvetica", "bold");
-    doc.text(numberToWords(payroll.net_salary || 0).toUpperCase(), 14, finalY + 24);
+    doc.text(numberToWords(payroll?.netPay ?? 0).toUpperCase(), 14, finalY + 16);
 
-    // Signature placeholders
-    doc.setFont("helvetica", "normal");
-    doc.text("__________________________", 14, finalY + 45);
-    doc.text("Employee Signature", 14, finalY + 50);
-    doc.text("__________________________", 140, finalY + 45);
-    doc.text("Authorized Signature", 140, finalY + 50);
-
-    doc.save(`Payslip_${staff.name}_${payroll.month}.pdf`);
+    doc.save(`Payslip_${staff?.name ?? "Staff"}_${payroll?.month ?? "Month"}.pdf`);
   };
 
-
   const handleExportEOBIReport = () => {
-    const data = staff.map(s => {
-      const latestPayroll = s.payrollHistory?.[0]; // History is sorted by month desc
+    const data = (staff ?? []).map(s => {
+      const latestPayroll = (s.payrollHistory ?? [])[0];
       return {
         "Employee ID": s.id,
         "Name": s.name,
         "Department": s.department,
-        "Basic Salary": s.salary,
-        "EOBI Contribution": latestPayroll ? latestPayroll.eobi : 0,
+        "Basic Salary": s.salary ?? 0,
+        "EOBI Contribution": (s.salary ?? 0) * 0.01,
         "Month": latestPayroll ? latestPayroll.month : format(new Date(), "MMMM yyyy")
       };
     });
@@ -1202,14 +1226,14 @@ const HRStaff = () => {
   };
 
   const handleExportTaxReport = () => {
-    const data = staff.map(s => {
-      const latestPayroll = s.payrollHistory?.[0];
+    const data = (staff ?? []).map(s => {
+      const latestPayroll = (s.payrollHistory ?? [])[0];
       return {
         "Employee ID": s.id,
         "Name": s.name,
         "Department": s.department,
-        "Annual Salary": s.salary * 12,
-        "Monthly Tax Deduction": latestPayroll ? latestPayroll.income_tax : 0,
+        "Annual Salary": (s.salary ?? 0) * 12,
+        "Monthly Tax Deduction": calculateTax((s.salary ?? 0) * 12),
         "Month": latestPayroll ? latestPayroll.month : format(new Date(), "MMMM yyyy")
       };
     });
@@ -1306,25 +1330,31 @@ const HRStaff = () => {
     doc.setTextColor(100);
     doc.text(`Generated on: ${format(new Date(), 'PPP')}`, 14, 30);
 
-    const tableData = staff.map(s => {
-      const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
+    const tableData = (staff ?? []).map(s => {
+      const latestPayroll = s?.payrollHistory?.[s?.payrollHistory?.length - 1];
+      const allowances = latestPayroll ? (latestPayroll?.allowances ?? 0) : 0;
+      const deductions = latestPayroll ? (latestPayroll?.deductions ?? 0) : 0;
+      const netPay = latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0);
+      const basic = latestPayroll ? (latestPayroll?.basic ?? 0) : (s?.salary ?? 0);
+      const bonus = latestPayroll ? (latestPayroll?.bonuses ?? 0) : 0;
+
       return [
-        s.id,
-        s.name,
-        s.department,
-        `Rs ${((latestPayroll ? latestPayroll.basic : s.salary) || 0).toLocaleString()}`,
-        `Rs ${((latestPayroll ? latestPayroll.bonuses : 0) || 0).toLocaleString()}`,
-        `Rs ${((latestPayroll ? (latestPayroll.allowances.transport + latestPayroll.allowances.meal + (latestPayroll.allowances.housing || 0)) : 0) || 0).toLocaleString()}`,
-        `Rs ${((latestPayroll ? (latestPayroll.deductions.tax + latestPayroll.deductions.loans + latestPayroll.deductions.absences) : 0) || 0).toLocaleString()}`,
-        `Rs ${((latestPayroll ? latestPayroll.netPay : s.salary) || 0).toLocaleString()}`,
-        latestPayroll ? "Paid" : "Pending",
-        latestPayroll ? latestPayroll.date : '-'
+        s?.id ?? "N/A",
+        s?.name ?? "Unknown",
+        s?.department ?? "N/A",
+        `Rs ${(basic || 0).toLocaleString()}`,
+        `Rs ${(bonus || 0).toLocaleString()}`,
+        `Rs ${(allowances || 0).toLocaleString()}`,
+        `Rs ${(deductions || 0).toLocaleString()}`,
+        `Rs ${(netPay || 0).toLocaleString()}`,
+        latestPayroll ? (latestPayroll?.status ?? "Paid") : "Pending",
+        latestPayroll ? (latestPayroll?.date ?? "N/A") : '-'
       ];
     });
 
-    const grandTotal = staff.reduce((acc, s) => {
-      const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-      return acc + ((latestPayroll ? latestPayroll.netPay : s.salary) || 0);
+    const grandTotal = (staff ?? []).reduce((acc, s) => {
+      const latestPayroll = s?.payrollHistory?.[s?.payrollHistory?.length - 1];
+      return acc + ((latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0)) || 0);
     }, 0);
 
     autoTable(doc, {
@@ -1341,23 +1371,24 @@ const HRStaff = () => {
     toast.success("Total payroll ledger exported to PDF");
   };
 
-  const filteredStaff = useMemo(() => staff.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.id.toLowerCase().includes(search.toLowerCase()) ||
-    s.department.toLowerCase().includes(search.toLowerCase())
+  const filteredStaff = useMemo(() => (staff ?? []).filter(s =>
+    (s?.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+    (s?.id ?? "").toLowerCase().includes(search.toLowerCase()) ||
+    (s?.department ?? "").toLowerCase().includes(search.toLowerCase())
   ), [staff, search]);
 
   const monthlyPayrollTotal = useMemo(() => {
     // Sum of all net_pay (or net_salary) from payroll_history for all staff
-    return staff.reduce((acc, s) => {
-      return acc + (s.payrollHistory || []).reduce((sum: number, p: any) => sum + (p.netPay || 0), 0);
+    return (staff ?? []).reduce((acc, s) => {
+      return acc + (s?.payrollHistory ?? []).reduce((sum: number, p: any) => sum + (p?.netPay ?? 0), 0);
     }, 0);
   }, [staff]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Loading HR data...</p>
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <div className="h-10 w-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-muted-foreground animate-pulse">Fetching HR data securely...</p>
       </div>
     );
   }
@@ -1394,13 +1425,13 @@ const HRStaff = () => {
       </div>
 
       {/* Announcements Banner */}
-      {announcements.length > 0 && (
+      {(announcements ?? []).length > 0 && (
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 sm:p-4">
           <div className="flex items-start gap-3">
             <Bell className="mt-0.5 h-4 w-4 text-primary animate-pulse" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-primary truncate">{announcements[0].title}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{announcements[0].content}</p>
+              <p className="text-sm font-bold text-primary truncate">{(announcements ?? [])[0]?.title ?? "No Title"}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{(announcements ?? [])[0]?.message ?? ""}</p>
             </div>
           </div>
         </div>
@@ -1433,7 +1464,7 @@ const HRStaff = () => {
             <div className="h-8 w-[1px] bg-border mx-2" />
             <div className="flex flex-col">
               <span className="text-[10px] uppercase font-bold text-muted-foreground">Active Staff</span>
-              <span className="text-sm font-bold">{staff.filter(s => s.status === 'active').length}</span>
+              <span className="text-sm font-bold">{(staff ?? []).filter(s => s?.status === 'active').length}</span>
             </div>
           </div>
         </div>
@@ -1485,28 +1516,28 @@ const HRStaff = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {filteredStaff.map(s => (
-                      <tr key={s.id} className="hover:bg-muted/30 transition-colors group">
-                        <td className="px-4 py-4 text-sm font-mono font-medium text-primary">{s.id}</td>
+                    {(filteredStaff ?? []).map(s => (
+                      <tr key={s?.id ?? Math.random()} className="hover:bg-muted/30 transition-colors group">
+                        <td className="px-4 py-4 text-sm font-mono font-medium text-primary">{s?.id ?? "N/A"}</td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
                             <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-bold text-xs">
-                              {s.name.split(" ").map((n:any) => n[0]).join("").toUpperCase()}
+                              {(s?.name ?? "U").split(" ").map((n:any) => n[0]).join("").toUpperCase()}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-semibold text-foreground truncate">{s.name}</p>
-                              <p className="text-[11px] text-muted-foreground truncate">{s.email}</p>
+                              <p className="text-sm font-semibold text-foreground truncate">{s?.name ?? "Unknown"}</p>
+                              <p className="text-[11px] text-muted-foreground truncate">{s?.email ?? "No Email"}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-4 text-sm text-muted-foreground">{s.phone}</td>
+                        <td className="px-4 py-4 text-sm text-muted-foreground">{s?.phone ?? "N/A"}</td>
                         <td className="px-4 py-4">
-                          <p className="text-sm font-medium text-card-foreground">{s.role}</p>
-                          <p className="text-[11px] text-muted-foreground">{s.department}</p>
+                          <p className="text-sm font-medium text-card-foreground">{s?.role ?? "N/A"}</p>
+                          <p className="text-[11px] text-muted-foreground">{s?.department ?? "N/A"}</p>
                         </td>
                         <td className="px-4 py-4">
-                          <Badge variant="outline" className={`capitalize font-medium ${statusColor(s.status)}`}>
-                            {s.status}
+                          <Badge variant="outline" className={`capitalize font-medium ${statusColor(s?.status ?? "inactive")}`}>
+                            {s?.status ?? "inactive"}
                           </Badge>
                         </td>
                         <td className="px-4 py-4 text-right">
@@ -1531,7 +1562,7 @@ const HRStaff = () => {
                               </Button>
                             )}
                             {canDo("delete") && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => setShowDeleteConfirm(s.id)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => setShowDeleteConfirm(s?.id)}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             )}
@@ -1545,53 +1576,53 @@ const HRStaff = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredStaff.map(s => (
-                <div key={s.id} className="relative group overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all">
+              {(filteredStaff ?? []).map(s => (
+                <div key={s?.id ?? Math.random()} className="relative group overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-4">
                       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-xl font-black text-primary border-2 border-primary/20">
-                        {s.name.split(' ').map((n:any) => n[0]).join('').toUpperCase()}
+                        {(s?.name ?? "U").split(' ').map((n:any) => n[0]).join('').toUpperCase()}
                       </div>
                       <div>
-                        <h4 className="text-base font-bold text-card-foreground leading-tight">{s.name}</h4>
-                        <p className="text-xs text-muted-foreground font-medium">{s.role}</p>
+                        <h4 className="text-base font-bold text-card-foreground leading-tight">{s?.name ?? "Unknown"}</h4>
+                        <p className="text-xs text-muted-foreground font-medium">{s?.role ?? "No Role"}</p>
                         <div className="flex items-center gap-1 mt-1">
                           {Array.from({ length: 5 }).map((_, i) => (
-                            <Star key={i} className={`h-3 w-3 ${i < (s.performance?.[s.performance.length-1] || 4) ? "text-amber-400 fill-amber-400" : "text-muted"}`} />
+                            <Star key={i} className={`h-3 w-3 ${i < (s?.performance?.[(s?.performance?.length ?? 0) - 1] || 4) ? "text-amber-400 fill-amber-400" : "text-muted"}`} />
                           ))}
                         </div>
                       </div>
                     </div>
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase border ${
-                      s.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+                      (s?.status ?? 'active') === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
                     }`}>
-                      {s.status}
+                      {s?.status ?? "inactive"}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-y-3 gap-x-2 border-t border-border pt-4 text-[11px]">
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Staff ID</p>
-                      <p className="font-bold">{s.id}</p>
+                      <p className="font-bold">{s?.id ?? "N/A"}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Department</p>
-                      <p className="font-bold">{s.department}</p>
+                      <p className="font-bold">{s?.department ?? "N/A"}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Monthly Salary</p>
-                      <p className="font-bold text-success">₨ {(s.salary || 0).toLocaleString()}</p>
+                      <p className="font-bold text-success">₨ {(s?.salary ?? 0).toLocaleString()}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Joining Date</p>
-                      <p className="font-bold">{s.joinDate}</p>
+                      <p className="font-bold">{s?.joinDate ?? "N/A"}</p>
                     </div>
                   </div>
 
                   <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                     <div className="flex flex-col">
                       <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Monthly Attendance</span>
-                      <span className="text-sm font-black text-primary">{s.attendance}%</span>
+                      <span className="text-sm font-black text-primary">{(s?.attendance ?? 100)}%</span>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => { setSelectedStaff(s); setShowViewModal(true); }}><Eye className="h-4 w-4" /></Button>
@@ -1659,54 +1690,54 @@ const HRStaff = () => {
 
           {outsideViewMode === "cards" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {outsideWorkers.filter(w => 
-                w.name.toLowerCase().includes(search.toLowerCase()) || 
-                w.skill.toLowerCase().includes(search.toLowerCase())
+              {(outsideWorkers ?? []).filter(w => 
+                (w?.name ?? "").toLowerCase().includes(search.toLowerCase()) || 
+                (w?.skill ?? "").toLowerCase().includes(search.toLowerCase())
               ).map(worker => (
-                <div key={worker.id} className="relative group overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all">
+                <div key={worker?.id ?? Math.random()} className="relative group overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-4">
                       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-xl font-black text-primary border-2 border-primary/20">
-                        {worker.name[0]}
+                        {(worker?.name ?? "W")[0]}
                       </div>
                       <div>
-                        <h4 className="text-base font-bold text-card-foreground leading-tight">{worker.name}</h4>
-                        <p className="text-xs text-primary font-bold uppercase tracking-wider">{worker.skill}</p>
+                        <h4 className="text-base font-bold text-card-foreground leading-tight">{worker?.name ?? "Unknown"}</h4>
+                        <p className="text-xs text-primary font-bold uppercase tracking-wider">{worker?.skill ?? "General"}</p>
                         <div className="flex items-center gap-1 mt-1">
                           {Array.from({ length: 5 }).map((_, i) => (
-                            <Star key={i} className={`h-3 w-3 ${i < worker.rating ? "text-amber-400 fill-amber-400" : "text-muted"}`} />
+                            <Star key={i} className={`h-3 w-3 ${i < (worker?.rating ?? 5) ? "text-amber-400 fill-amber-400" : "text-muted"}`} />
                           ))}
                         </div>
                       </div>
                     </div>
-                    <Badge variant="outline" className={`capitalize font-bold ${worker.status === 'available' ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'}`}>
-                      {worker.status}
+                    <Badge variant="outline" className={`capitalize font-bold ${worker?.status === 'available' ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'}`}>
+                      {worker?.status ?? "available"}
                     </Badge>
                   </div>
 
                   <div className="grid grid-cols-2 gap-y-3 gap-x-2 border-t border-border pt-4 text-[11px]">
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Type</p>
-                      <p className="font-bold">{worker.type}</p>
+                      <p className="font-bold">{worker?.type ?? "Freelancer"}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Rate</p>
-                      <p className="font-bold">₨ {(worker.rate || 0).toLocaleString()} <span className="text-[9px] text-muted-foreground font-normal">{worker.rateType}</span></p>
+                      <p className="font-bold">₨ {(worker?.rate ?? 0).toLocaleString()} <span className="text-[9px] text-muted-foreground font-normal">{worker?.rate_type ?? "per event"}</span></p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Contact</p>
-                      <p className="font-bold">{worker.phone}</p>
+                      <p className="font-bold">{worker?.phone ?? "N/A"}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Location</p>
-                      <p className="font-bold truncate">{worker.area}, {worker.city}</p>
+                      <p className="font-bold truncate">{worker?.area ?? ""}, {worker?.city ?? ""}</p>
                     </div>
                   </div>
 
                   <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                     <div className="flex flex-col">
                       <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Total Paid</span>
-                      <span className="text-sm font-black text-success">₨ {(worker.totalPaid || 0).toLocaleString()}</span>
+                      <span className="text-sm font-black text-success">₨ {(worker?.totalPaid ?? 0).toLocaleString()}</span>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="h-8 gap-2 px-3 text-[10px] font-bold uppercase tracking-wider" onClick={() => handlePrintWorkerCard(worker)}>
@@ -1718,18 +1749,18 @@ const HRStaff = () => {
                   <div className="mt-4 pt-4 border-t border-border">
                     <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest mb-2">Recent Assignments</p>
                     <div className="space-y-2">
-                      {outsideAssignments.filter(a => a.workerId === worker.id).slice(0, 2).map(a => (
-                        <div key={a.id} className="flex items-center justify-between text-[10px] bg-muted/30 p-1.5 rounded">
-                          <span className="font-bold truncate max-w-[120px]">{a.eventName}</span>
+                      {(outsideAssignments ?? []).filter(a => a?.workerId === worker?.id).slice(0, 2).map(a => (
+                        <div key={a?.id ?? Math.random()} className="flex items-center justify-between text-[10px] bg-muted/30 p-1.5 rounded">
+                          <span className="font-bold truncate max-w-[120px]">{a?.eventName ?? "Event"}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">{a.date}</span>
-                            <Badge variant="outline" className={`h-4 text-[8px] px-1 ${a.status === 'paid' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                              {a.status}
+                            <span className="text-muted-foreground">{a?.date ?? "N/A"}</span>
+                            <Badge variant="outline" className={`h-4 text-[8px] px-1 ${a?.status === 'paid' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                              {a?.status ?? "pending"}
                             </Badge>
                           </div>
                         </div>
                       ))}
-                      {outsideAssignments.filter(a => a.workerId === worker.id).length === 0 && (
+                      {(outsideAssignments ?? []).filter(a => a?.workerId === worker?.id).length === 0 && (
                         <p className="text-[10px] text-muted-foreground italic">No past events found</p>
                       )}
                     </div>
@@ -1760,26 +1791,26 @@ const HRStaff = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {outsideAssignments.filter(a => {
-                        const w = outsideWorkers.find(x => x.id === a.workerId);
-                        return w?.name.toLowerCase().includes(search.toLowerCase()) || 
-                               a.eventName.toLowerCase().includes(search.toLowerCase());
+                      {(outsideAssignments ?? []).filter(a => {
+                        const w = (outsideWorkers ?? []).find(x => x?.id === a?.workerId);
+                        return (w?.name ?? "").toLowerCase().includes(search.toLowerCase()) || 
+                               (a?.eventName ?? "").toLowerCase().includes(search.toLowerCase());
                       }).map(a => (
-                        <tr key={a.id} className="text-xs hover:bg-muted/10 transition-colors">
-                          <td className="px-4 py-3 font-bold">{outsideWorkers.find(w => w.id === a.workerId)?.name}</td>
-                          <td className="px-4 py-3">{a.eventName}</td>
-                          <td className="px-4 py-3 text-muted-foreground">{a.date}</td>
-                          <td className="px-4 py-3 text-right font-bold">₨ {(a.amount || 0).toLocaleString()}</td>
+                        <tr key={a?.id ?? Math.random()} className="text-xs hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-3 font-bold">{(outsideWorkers ?? []).find(w => w?.id === a?.workerId)?.name ?? "Unknown"}</td>
+                          <td className="px-4 py-3">{a?.eventName ?? "Event"}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{a?.date ?? "N/A"}</td>
+                          <td className="px-4 py-3 text-right font-bold">₨ {(a?.amount ?? 0).toLocaleString()}</td>
                           <td className="px-4 py-3 text-center">
                             <Input 
                               type="number" 
                               className="h-7 w-16 text-center mx-auto" 
-                              value={a.hours} 
-                              onChange={e => setOutsideAssignments(outsideAssignments.map(x => x.id === a.id ? { ...x, hours: Number(e.target.value) } : x))}
+                              value={a?.hours ?? 0} 
+                              onChange={e => setOutsideAssignments((outsideAssignments ?? []).map(x => x?.id === a?.id ? { ...x, hours: Number(e.target.value) } : x))}
                             />
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <Select value={a.attendance} onValueChange={v => setOutsideAssignments(outsideAssignments.map(x => x.id === a.id ? { ...x, attendance: v } : x))}>
+                            <Select value={a?.attendance ?? "pending"} onValueChange={v => setOutsideAssignments((outsideAssignments ?? []).map(x => x?.id === a?.id ? { ...x, attendance: v } : x))}>
                               <SelectTrigger className="h-7 w-24 mx-auto text-[10px]"><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="pending">Pending</SelectItem>
@@ -1789,8 +1820,8 @@ const HRStaff = () => {
                             </Select>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <Badge variant="outline" className={`h-5 text-[9px] capitalize ${a.status === 'paid' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                              {a.status}
+                            <Badge variant="outline" className={`h-5 text-[9px] capitalize ${a?.status === 'paid' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                              {a?.status ?? "pending"}
                             </Badge>
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -1798,9 +1829,9 @@ const HRStaff = () => {
                               size="sm" 
                               variant="outline" 
                               className="h-7 text-[9px] gap-1"
-                              disabled={a.status === 'paid'}
+                              disabled={a?.status === 'paid'}
                               onClick={() => {
-                                setOutsidePaymentForm({ workerId: a.workerId, amount: a.amount, method: "cash", eventId: a.eventId });
+                                setOutsidePaymentForm({ workerId: a?.workerId ?? "", amount: a?.amount ?? 0, method: "cash", eventId: a?.eventId ?? "" });
                                 setShowOutsidePaymentModal(true);
                               }}
                             >
@@ -1832,17 +1863,17 @@ const HRStaff = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {outsidePayments.filter(p => {
-                        const w = outsideWorkers.find(x => x.id === p.workerId);
-                        return w?.name.toLowerCase().includes(search.toLowerCase()) || 
-                               p.method.toLowerCase().includes(search.toLowerCase());
+                      {(outsidePayments ?? []).filter(p => {
+                        const w = (outsideWorkers ?? []).find(x => x?.id === p?.workerId);
+                        return (w?.name ?? "").toLowerCase().includes(search.toLowerCase()) || 
+                               (p?.method ?? "").toLowerCase().includes(search.toLowerCase());
                       }).map(p => (
-                        <tr key={p.id} className="text-xs hover:bg-muted/10 transition-colors">
-                          <td className="px-4 py-3 text-muted-foreground">{p.date}</td>
-                          <td className="px-4 py-3 font-bold">{outsideWorkers.find(w => w.id === p.workerId)?.name}</td>
-                          <td className="px-4 py-3 capitalize">{p.method}</td>
-                          <td className="px-4 py-3 text-muted-foreground">{p.eventId || "General Payment"}</td>
-                          <td className="px-4 py-3 text-right font-bold text-success">₨ {(p.amount || 0).toLocaleString()}</td>
+                        <tr key={p?.id ?? Math.random()} className="text-xs hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-3 text-muted-foreground">{p?.date ?? "N/A"}</td>
+                          <td className="px-4 py-3 font-bold">{(outsideWorkers ?? []).find(w => w?.id === p?.workerId)?.name ?? "Unknown"}</td>
+                          <td className="px-4 py-3 capitalize">{p?.method ?? "cash"}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{p?.eventId ?? "General Payment"}</td>
+                          <td className="px-4 py-3 text-right font-bold text-success">₨ {(p?.amount ?? 0).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1895,13 +1926,13 @@ const HRStaff = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {attendance.map(a => (
-                    <tr key={a.id} className="text-sm hover:bg-muted/20">
-                      <td className="px-4 py-3 font-medium">{a.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{format(new Date(a.date), 'MMM dd, yyyy')}</td>
+                  {(attendance ?? []).map(a => (
+                    <tr key={a?.id ?? Math.random()} className="text-sm hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium">{a?.name ?? "Unknown"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{a?.date ? format(new Date(a.date), 'MMM dd, yyyy') : "N/A"}</td>
                       <td className="px-4 py-3">
-                        {editAttendanceId === a.id ? (
-                          <Select defaultValue={a.status} onValueChange={(v) => handleUpdateAttendance(a.id, v)}>
+                        {editAttendanceId === a?.id ? (
+                          <Select defaultValue={a?.status ?? "present"} onValueChange={(v) => handleUpdateAttendance(a?.id, v)}>
                             <SelectTrigger className="h-8 w-[120px]">
                               <SelectValue />
                             </SelectTrigger>
@@ -1913,12 +1944,12 @@ const HRStaff = () => {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <Badge variant="outline" className={statusColor(a.status)}>{a.status}</Badge>
+                          <Badge variant="outline" className={statusColor(a?.status ?? "absent")}>{a?.status ?? "absent"}</Badge>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{a.checkIn} - {a.checkOut}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{a?.checkIn ?? "-"} - {a?.checkOut ?? "-"}</td>
                       <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditAttendanceId(editAttendanceId === a.id ? null : a.id)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditAttendanceId(editAttendanceId === a?.id ? null : a?.id)}>
                           <Edit className="h-3.5 w-3.5" />
                         </Button>
                       </td>
@@ -1952,20 +1983,20 @@ const HRStaff = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {staff.map(s => {
-                    const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-                    const netSalary = latestPayroll ? latestPayroll.netPay : s.salary;
+                  {(staff ?? []).map(s => {
+                    const latestPayroll = s?.payrollHistory?.[(s?.payrollHistory?.length ?? 0) - 1];
+                    const netSalary = latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0);
                     return (
-                      <tr key={s.id} className="text-sm hover:bg-muted/20">
+                      <tr key={s?.id ?? Math.random()} className="text-sm hover:bg-muted/20">
                         <td className="px-4 py-3">
-                          <p className="font-medium">{s.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{s.id}</p>
+                          <p className="font-medium">{s?.name ?? "Unknown"}</p>
+                          <p className="text-[10px] text-muted-foreground">{s?.id ?? "N/A"}</p>
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">{latestPayroll ? latestPayroll.month : format(new Date(), 'MMMM yyyy')}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{latestPayroll ? (latestPayroll?.month ?? "N/A") : format(new Date(), 'MMMM yyyy')}</td>
                         <td className="px-4 py-3 font-bold text-success">₨ {(netSalary || 0).toLocaleString()}</td>
                         <td className="px-4 py-3">
-                          <Badge variant="outline" className={statusColor(latestPayroll ? "paid" : "pending")}>
-                            {latestPayroll ? "Paid" : "Pending"}
+                          <Badge variant="outline" className={statusColor(latestPayroll ? (latestPayroll?.status ?? "paid") : "pending")}>
+                            {latestPayroll ? (latestPayroll?.status ?? "Paid") : "Pending"}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -1995,9 +2026,9 @@ const HRStaff = () => {
                   <tr>
                     <td colSpan={2} className="px-4 py-3 text-sm uppercase tracking-wider text-right">Total Monthly Payroll:</td>
                     <td className="px-4 py-3 text-success text-lg">
-                      ₨ {(staff.reduce((acc, s) => {
-                        const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-                        return acc + ((latestPayroll ? latestPayroll.netPay : s.salary) || 0);
+                      ₨ {((staff ?? []).reduce((acc, s) => {
+                        const latestPayroll = s?.payrollHistory?.[(s?.payrollHistory?.length ?? 0) - 1];
+                        return acc + ((latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0)) || 0);
                       }, 0) || 0).toLocaleString()}
                     </td>
                     <td colSpan={2}></td>
@@ -2038,21 +2069,21 @@ const HRStaff = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {leaves.map(l => (
-                    <tr key={l.id} className="text-sm hover:bg-muted/20">
-                      <td className="px-4 py-3 font-medium">{l.name}</td>
-                      <td className="px-4 py-3">{l.type}</td>
+                  {(leaves ?? []).map(l => (
+                    <tr key={l?.id ?? Math.random()} className="text-sm hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium">{l?.name ?? "Unknown"}</td>
+                      <td className="px-4 py-3">{l?.type ?? "N/A"}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {format(new Date(l.start), 'MMM dd')} - {format(new Date(l.end), 'MMM dd')}
+                        {l?.start ? format(new Date(l.start), 'MMM dd') : "N/A"} - {l?.end ? format(new Date(l.end), 'MMM dd') : "N/A"}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline" className={statusColor(l.status)}>{l.status}</Badge>
+                        <Badge variant="outline" className={statusColor(l?.status ?? "pending")}>{l?.status ?? "pending"}</Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {canDo("edit") && l.status === 'pending' && (
+                        {canDo("edit") && (l?.status ?? "pending") === 'pending' && (
                           <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10" onClick={() => handleLeaveAction(l.id, 'approved')}>Approve</Button>
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-destructive text-destructive hover:bg-destructive/10" onClick={() => handleLeaveAction(l.id, 'rejected')}>Reject</Button>
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10" onClick={() => handleLeaveAction(l?.id, 'approved')}>Approve</Button>
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-destructive text-destructive hover:bg-destructive/10" onClick={() => handleLeaveAction(l?.id, 'rejected')}>Reject</Button>
                           </div>
                         )}
                       </td>
@@ -2086,17 +2117,17 @@ const HRStaff = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {overtime.map(o => (
-                    <tr key={o.id} className="text-sm hover:bg-muted/20">
-                      <td className="px-4 py-3 font-medium">{o.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{o.date}</td>
-                      <td className="px-4 py-3">{o.hours}</td>
+                  {(overtime ?? []).map(o => (
+                    <tr key={o?.id ?? Math.random()} className="text-sm hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium">{o?.name ?? "Unknown"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{o?.date ?? "N/A"}</td>
+                      <td className="px-4 py-3">{o?.hours ?? 0}</td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline" className={statusColor(o.status)}>{o.status}</Badge>
+                        <Badge variant="outline" className={statusColor(o?.status ?? "pending")}>{o?.status ?? "pending"}</Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {o.status === 'pending' && canDo("edit") && (
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10" onClick={() => handleOvertimeAction(o.id, 'paid')}>Mark as Paid</Button>
+                        {(o?.status ?? "pending") === 'pending' && canDo("edit") && (
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10" onClick={() => handleOvertimeAction(o?.id, 'paid')}>Mark as Paid</Button>
                         )}
                       </td>
                     </tr>
@@ -2130,20 +2161,20 @@ const HRStaff = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {advances.map(a => (
-                    <tr key={a.id} className="text-sm hover:bg-muted/20">
-                      <td className="px-4 py-3 font-medium">{a.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{a.date}</td>
-                      <td className="px-4 py-3">₨ {(a.amount || 0).toLocaleString()}</td>
-                      <td className="px-4 py-3">{a.reason}</td>
+                  {(advances ?? []).map(a => (
+                    <tr key={a?.id ?? Math.random()} className="text-sm hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium">{a?.name ?? "Unknown"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{a?.date ?? "N/A"}</td>
+                      <td className="px-4 py-3">₨ {(a?.amount ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3">{a?.reason ?? "No Reason"}</td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline" className={statusColor(a.status)}>{a.status}</Badge>
+                        <Badge variant="outline" className={statusColor(a?.status ?? "pending")}>{a?.status ?? "pending"}</Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {a.status === 'pending' && canDo("edit") && (
+                        {(a?.status ?? "pending") === 'pending' && canDo("edit") && (
                           <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10" onClick={() => handleAdvanceAction(a.id, 'approved')}>Approve</Button>
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-destructive text-destructive hover:bg-destructive/10" onClick={() => handleAdvanceAction(a.id, 'rejected')}>Reject</Button>
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10" onClick={() => handleAdvanceAction(a?.id, 'approved')}>Approve</Button>
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-destructive text-destructive hover:bg-destructive/10" onClick={() => handleAdvanceAction(a?.id, 'rejected')}>Reject</Button>
                           </div>
                         )}
                       </td>
@@ -2165,31 +2196,31 @@ const HRStaff = () => {
             )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {staff.map(s => (
-              <div key={s.id} className="rounded-lg border border-border bg-card p-4 space-y-4">
+            {(staff ?? []).map(s => (
+              <div key={s?.id ?? Math.random()} className="rounded-lg border border-border bg-card p-4 space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    {s.name[0]}
+                    {(s?.name ?? "U")[0]}
                   </div>
                   <div>
-                    <p className="font-bold text-sm">{s.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{s.role}</p>
+                    <p className="font-bold text-sm">{s?.name ?? "Unknown"}</p>
+                    <p className="text-[10px] text-muted-foreground">{s?.role ?? "No Role"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map(star => (
                     <Star 
                       key={star} 
-                      className={`h-4 w-4 ${star <= (s.performance?.[s.performance.length-1] || 0) ? "fill-warning text-warning" : "text-muted-foreground"}`} 
+                      className={`h-4 w-4 ${star <= (s?.performance?.[(s?.performance?.length ?? 0) - 1] || 0) ? "fill-warning text-warning" : "text-muted-foreground"}`} 
                     />
                   ))}
-                  <span className="ml-2 text-xs font-bold">{(s.performance?.[s.performance.length-1] || 0)}.0</span>
+                  <span className="ml-2 text-xs font-bold">{(s?.performance?.[(s?.performance?.length ?? 0) - 1] || 0)}.0</span>
                 </div>
                 <div className="pt-2 border-t border-border">
                   <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-2">History</p>
                   <div className="flex gap-1 h-8 items-end">
-                    {(s.performance || []).map((p: any, i: number) => (
-                      <div key={i} className="bg-primary/40 w-full rounded-t-sm" style={{ height: `${p * 20}%` }} title={`Rating: ${p}`} />
+                    {(s?.performance ?? []).map((p: any, i: number) => (
+                      <div key={i} className="bg-primary/40 w-full rounded-t-sm" style={{ height: `${(p ?? 0) * 20}%` }} title={`Rating: ${p ?? 0}`} />
                     ))}
                   </div>
                 </div>
@@ -2198,7 +2229,6 @@ const HRStaff = () => {
           </div>
         </TabsContent>
 
-        {/* Reports */}
         <TabsContent value="reports" className="mt-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-lg border border-border bg-card p-4">
@@ -2251,7 +2281,7 @@ const HRStaff = () => {
               <Select onValueChange={v => setAttendanceForm({ ...attendanceForm, empId: v })}>
                 <SelectTrigger><SelectValue placeholder="Select Staff" /></SelectTrigger>
                 <SelectContent>
-                  {staff.map(s => <SelectItem key={s.id} value={s.id}>{s.name} ({s.id})</SelectItem>)}
+                  {(staff ?? []).map(s => <SelectItem key={s?.id ?? Math.random()} value={s?.id ?? ""}>{s?.name ?? "Unknown"} ({s?.id ?? "N/A"})</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -2399,7 +2429,7 @@ const HRStaff = () => {
               <Select onValueChange={v => setLeaveForm({ ...leaveForm, empId: v })}>
                 <SelectTrigger><SelectValue placeholder="Select Staff" /></SelectTrigger>
                 <SelectContent>
-                  {staff.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  {(staff ?? []).map(s => <SelectItem key={s?.id ?? Math.random()} value={s?.id ?? ""}>{s?.name ?? "Unknown"}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -2450,7 +2480,7 @@ const HRStaff = () => {
               <Select onValueChange={v => setPerformanceForm({ ...performanceForm, empId: v })}>
                 <SelectTrigger><SelectValue placeholder="Select Staff" /></SelectTrigger>
                 <SelectContent>
-                  {staff.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  {(staff ?? []).map(s => <SelectItem key={s?.id ?? Math.random()} value={s?.id ?? ""}>{s?.name ?? "Unknown"}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -2933,7 +2963,7 @@ const HRStaff = () => {
               <Select onValueChange={v => setAssignmentForm({ ...assignmentForm, workerId: v })}>
                 <SelectTrigger><SelectValue placeholder="Choose Worker" /></SelectTrigger>
                 <SelectContent>
-                  {outsideWorkers.map(w => <SelectItem key={w.id} value={w.id}>{w.name} ({w.skill})</SelectItem>)}
+                  {(outsideWorkers ?? []).map(w => <SelectItem key={w?.id ?? Math.random()} value={w?.id ?? ""}>{w?.name ?? "Unknown"} ({w?.skill ?? "General"})</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -2971,7 +3001,7 @@ const HRStaff = () => {
               <Select onValueChange={v => setOutsidePaymentForm({ ...outsidePaymentForm, workerId: v })}>
                 <SelectTrigger><SelectValue placeholder="Choose Worker" /></SelectTrigger>
                 <SelectContent>
-                  {outsideWorkers.map(w => <SelectItem key={w.id} value={w.id}>{w.name} (₨ {(w.totalPaid || 0).toLocaleString()} paid)</SelectItem>)}
+                  {(outsideWorkers ?? []).map(w => <SelectItem key={w?.id ?? Math.random()} value={w?.id ?? ""}>{w?.name ?? "Unknown"} (₨ {(w?.totalPaid ?? 0).toLocaleString()} paid)</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -3027,7 +3057,7 @@ const HRStaff = () => {
               <Select onValueChange={v => setOvertimeForm({ ...overtimeForm, empId: v })}>
                 <SelectTrigger><SelectValue placeholder="Select Staff" /></SelectTrigger>
                 <SelectContent>
-                  {staff.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  {(staff ?? []).map(s => <SelectItem key={s?.id ?? Math.random()} value={s?.id ?? ""}>{s?.name ?? "Unknown"}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -3060,7 +3090,7 @@ const HRStaff = () => {
               <Select onValueChange={v => setAdvanceForm({ ...advanceForm, empId: v })}>
                 <SelectTrigger><SelectValue placeholder="Select Staff" /></SelectTrigger>
                 <SelectContent>
-                  {staff.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  {(staff ?? []).map(s => <SelectItem key={s?.id ?? Math.random()} value={s?.id ?? ""}>{s?.name ?? "Unknown"}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -3188,9 +3218,9 @@ const HRStaff = () => {
                       Array.from({ length: 6 }).map((_, i) => {
                         const date = subMonths(new Date(), 5 - i);
                         const monthName = format(date, 'MMM yyyy');
-                        const total = staff.reduce((acc, s) => {
-                          const payroll = s.payrollHistory?.find(h => h.month === format(date, 'MMMM yyyy'));
-                          return acc + (payroll?.netPay || 0);
+                        const total = (staff ?? []).reduce((acc, s) => {
+                          const payroll = (s?.payrollHistory ?? []).find(h => h?.month === format(date, 'MMMM yyyy'));
+                          return acc + (payroll?.netPay ?? 0);
                         }, 0);
                         return { month: monthName, total };
                       })
@@ -3219,7 +3249,7 @@ const HRStaff = () => {
                         data={
                           ["Operations", "Kitchen", "Decoration", "Finance", "Logistics", "Admin"].map(dept => ({
                             name: dept,
-                            value: staff.filter(s => s.department === dept).reduce((acc, s) => acc + s.salary, 0)
+                            value: (staff ?? []).filter(s => s?.department === dept).reduce((acc, s) => acc + (s?.salary ?? 0), 0)
                           })).filter(d => d.value > 0)
                         }
                         cx="50%"
@@ -3262,24 +3292,24 @@ const HRStaff = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {staff.map(s => {
-                      const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-                      const basic = latestPayroll ? latestPayroll.basic : s.salary;
-                      const bonus = latestPayroll ? latestPayroll.bonuses : 0;
-                      const allowances = latestPayroll ? (latestPayroll.allowances.transport + latestPayroll.allowances.meal + (latestPayroll.allowances.housing || 0)) : 0;
-                      const deductions = latestPayroll ? (latestPayroll.deductions.tax + latestPayroll.deductions.loans + latestPayroll.deductions.absences) : 0;
-                      const netPay = latestPayroll ? latestPayroll.netPay : s.salary;
+                    {(staff ?? []).map(s => {
+                      const latestPayroll = s?.payrollHistory?.[(s?.payrollHistory?.length ?? 0) - 1];
+                      const basic = latestPayroll ? (latestPayroll?.basic ?? 0) : (s?.salary ?? 0);
+                      const bonus = latestPayroll ? (latestPayroll?.bonuses ?? 0) : 0;
+                      const allowances = latestPayroll ? (latestPayroll?.allowances ?? 0) : 0;
+                      const deductions = latestPayroll ? (latestPayroll?.deductions ?? 0) : 0;
+                      const netPay = latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0);
 
                       return (
-                        <tr key={s.id} className="text-sm hover:bg-muted/10 transition-colors">
+                        <tr key={s?.id ?? Math.random()} className="text-sm hover:bg-muted/10 transition-colors">
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-3">
                               <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px]">
-                                {s.name.split(" ").map((n:any) => n[0]).join("").toUpperCase()}
+                                {(s?.name ?? "U").split(" ").map((n:any) => n[0]).join("").toUpperCase()}
                               </div>
                               <div>
-                                <p className="font-bold text-xs">{s.name}</p>
-                                <p className="text-[10px] text-muted-foreground font-mono">{s.id}</p>
+                                <p className="font-bold text-xs">{s?.name ?? "Unknown"}</p>
+                                <p className="text-[10px] text-muted-foreground font-mono">{s?.id ?? "N/A"}</p>
                               </div>
                             </div>
                           </td>
@@ -3289,11 +3319,11 @@ const HRStaff = () => {
                           <td className="px-4 py-4 text-right text-xs text-destructive">₨ {(deductions || 0).toLocaleString()}</td>
                           <td className="px-4 py-4 text-right font-bold text-success">₨ {(netPay || 0).toLocaleString()}</td>
                           <td className="px-4 py-4 text-center">
-                            <Badge variant="outline" className={`text-[10px] px-2 py-0 ${statusColor(latestPayroll ? "paid" : "pending")}`}>
-                              {latestPayroll ? "Paid" : "Pending"}
+                            <Badge variant="outline" className={`text-[10px] px-2 py-0 ${statusColor(latestPayroll ? (latestPayroll?.status ?? "paid") : "pending")}`}>
+                              {latestPayroll ? (latestPayroll?.status ?? "Paid") : "Pending"}
                             </Badge>
                           </td>
-                          <td className="px-4 py-4 text-right text-xs text-muted-foreground">{latestPayroll ? latestPayroll.date : "-"}</td>
+                          <td className="px-4 py-4 text-right text-xs text-muted-foreground">{latestPayroll ? (latestPayroll?.date ?? "N/A") : "-"}</td>
                         </tr>
                       );
                     })}
@@ -3303,9 +3333,9 @@ const HRStaff = () => {
                       <td className="px-4 py-6 text-sm uppercase tracking-wider">Grand Total</td>
                       <td colSpan={4}></td>
                       <td className="px-4 py-6 text-right text-lg text-success">
-                        ₨ {(staff.reduce((acc, s) => {
-                          const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-                          return acc + ((latestPayroll ? latestPayroll.netPay : s.salary) || 0);
+                        ₨ {((staff ?? []).reduce((acc, s) => {
+                          const latestPayroll = s?.payrollHistory?.[(s?.payrollHistory?.length ?? 0) - 1];
+                          return acc + ((latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0)) || 0);
                         }, 0) || 0).toLocaleString()}
                       </td>
                       <td colSpan={2}></td>
