@@ -4,7 +4,7 @@ import {
   DollarSign, Camera, FileText, Calendar, Phone, Mail, MapPin, 
   UserPlus, Download, Star, StarOff, Bell, ShieldCheck, ChevronRight, BarChart3, PieChart as PieChartIcon, Receipt,
   TrendingDown, LayoutDashboard, CalendarDays, Landmark, Package, Settings, LogOut,
-  LayoutGrid, List, Printer
+  LayoutGrid, List, Printer, Briefcase, BriefcaseBusiness, QrCode, Wallet2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,6 +86,52 @@ const DUMMY_ANNOUNCEMENTS = [
   { id: 1, title: "Ramadan Office Hours", content: "Working hours will be 9 AM to 3 PM during Ramadan.", date: "2024-03-10", author: "Admin" },
 ];
 
+const DUMMY_OUTSIDE_WORKERS = [
+  {
+    id: "W-001",
+    name: "Zahid Ali",
+    type: "Freelancer",
+    skill: "Decorator",
+    phone: "0321-1122334",
+    whatsapp: "0321-1122334",
+    city: "Karachi",
+    area: "Gulshan",
+    rate: 5000,
+    rateType: "per event",
+    status: "available",
+    rating: 5,
+    totalPaid: 15000,
+    pastEvents: ["E-001", "E-002"],
+    avatar: null
+  },
+  {
+    id: "W-002",
+    name: "Imran Khan",
+    type: "Contractor",
+    skill: "Caterer",
+    phone: "0333-5566778",
+    whatsapp: "0333-5566778",
+    city: "Karachi",
+    area: "DHA",
+    rate: 1500,
+    rateType: "per day",
+    status: "busy",
+    rating: 4,
+    totalPaid: 3000,
+    pastEvents: ["E-003"],
+    avatar: null
+  }
+];
+
+const DUMMY_OUTSIDE_ASSIGNMENTS = [
+  { id: 1, workerId: "W-001", eventId: "E-001", eventName: "Wedding Ceremony", date: "2024-03-10", amount: 5000, status: "paid", hours: 8, attendance: "present" },
+  { id: 2, workerId: "W-001", eventId: "E-002", eventName: "Corporate Meetup", date: "2024-03-15", amount: 5000, status: "unpaid", hours: 6, attendance: "present" },
+];
+
+const DUMMY_OUTSIDE_PAYMENTS = [
+  { id: 1, workerId: "W-001", amount: 5000, method: "cash", date: "2024-03-11", eventId: "E-001" },
+];
+
 const statusColor = (status: string) => {
   const s = status.toLowerCase();
   if (s === "active" || s === "present" || s === "paid" || s === "approved") return "bg-success/10 text-success border-success/20";
@@ -120,6 +166,26 @@ const HRStaff = () => {
   const [showTotalLedgerModal, setShowTotalLedgerModal] = useState(false);
   const [selectedPayslip, setSelectedPayslip] = useState<any>(null);
   const [editAttendanceId, setEditAttendanceId] = useState<number | null>(null);
+
+  // Outside Workers State
+  const [outsideWorkers, setOutsideWorkers] = useState(DUMMY_OUTSIDE_WORKERS);
+  const [outsideAssignments, setOutsideAssignments] = useState(DUMMY_OUTSIDE_ASSIGNMENTS);
+  const [outsidePayments, setOutsidePayments] = useState(DUMMY_OUTSIDE_PAYMENTS);
+  const [showAddOutsideModal, setShowAddOutsideModal] = useState(false);
+  const [showAssignEventModal, setShowAssignEventModal] = useState(false);
+  const [showOutsidePaymentModal, setShowOutsidePaymentModal] = useState(false);
+  const [selectedOutsideWorker, setSelectedOutsideWorker] = useState<any>(null);
+  const [outsideViewMode, setOutsideViewMode] = useState<"cards" | "history">("cards");
+  const [newOutsideWorker, setNewOutsideWorker] = useState({
+    name: "", type: "Freelancer", skill: "Decorator", phone: "", whatsapp: "", 
+    city: "Karachi", area: "", rate: "", rateType: "per event", status: "available"
+  });
+  const [assignmentForm, setAssignmentForm] = useState({
+    workerId: "", eventId: "", eventName: "", date: format(new Date(), "yyyy-MM-dd"), amount: 0
+  });
+  const [outsidePaymentForm, setOutsidePaymentForm] = useState({
+    workerId: "", amount: 0, method: "cash", eventId: ""
+  });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -419,6 +485,144 @@ const HRStaff = () => {
     setStaff(updatedStaff);
     setShowRightsModal(false);
     toast.success("User rights updated");
+  };
+
+  const handleAddOutsideWorker = () => {
+    if (!newOutsideWorker.name || !newOutsideWorker.phone) {
+      toast.error("Please fill name and phone");
+      return;
+    }
+    const worker = {
+      ...newOutsideWorker,
+      id: `W-${String(outsideWorkers.length + 1).padStart(3, '0')}`,
+      rate: Number(newOutsideWorker.rate),
+      rating: 5,
+      totalPaid: 0,
+      pastEvents: [],
+      avatar: null
+    };
+    setOutsideWorkers([...outsideWorkers, worker]);
+    setShowAddOutsideModal(false);
+    toast.success("Outside worker added");
+  };
+
+  const handleAssignToEvent = () => {
+    if (!assignmentForm.eventId || !assignmentForm.workerId) {
+      toast.error("Please select worker and event");
+      return;
+    }
+    const newAssignment = {
+      id: outsideAssignments.length + 1,
+      ...assignmentForm,
+      status: "unpaid",
+      hours: 0,
+      attendance: "pending"
+    };
+    setOutsideAssignments([...outsideAssignments, newAssignment]);
+    
+    // Update worker's past events
+    setOutsideWorkers(outsideWorkers.map(w => 
+      w.id === assignmentForm.workerId 
+        ? { ...w, pastEvents: [...w.pastEvents, assignmentForm.eventId] }
+        : w
+    ));
+    
+    setShowAssignEventModal(false);
+    toast.success("Worker assigned to event");
+  };
+
+  const handleOutsidePayment = () => {
+    if (!outsidePaymentForm.amount || !outsidePaymentForm.workerId) {
+      toast.error("Please fill amount and select worker");
+      return;
+    }
+    const newPayment = {
+      id: outsidePayments.length + 1,
+      ...outsidePaymentForm,
+      date: format(new Date(), "yyyy-MM-dd")
+    };
+    setOutsidePayments([...outsidePayments, newPayment]);
+    
+    // Update total paid for worker
+    setOutsideWorkers(outsideWorkers.map(w => 
+      w.id === outsidePaymentForm.workerId 
+        ? { ...w, totalPaid: (w.totalPaid || 0) + Number(outsidePaymentForm.amount) }
+        : w
+    ));
+    
+    // Mark assignment as paid if linked to event
+    if (outsidePaymentForm.eventId) {
+      setOutsideAssignments(outsideAssignments.map(a => 
+        (a.workerId === outsidePaymentForm.workerId && a.eventId === outsidePaymentForm.eventId)
+          ? { ...a, status: "paid" }
+          : a
+      ));
+    }
+    
+    setShowOutsidePaymentModal(false);
+    toast.success("Payment recorded");
+  };
+
+  const handlePrintWorkerCard = (worker: any) => {
+    const printWindow = window.open('', '_blank', 'width=600,height=400');
+    if (!printWindow) return;
+
+    const html = `
+      <html>
+        <head>
+          <title>Worker ID Card - ${worker.name}</title>
+          <style>
+            body { font-family: 'Inter', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f0; }
+            .card { width: 350px; height: 220px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; display: flex; border: 2px solid #e2e8f0; position: relative; }
+            .left { width: 120px; background: #1e293b; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; padding: 10px; }
+            .avatar { width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; border: 2px solid white; margin-bottom: 10px; }
+            .right { flex: 1; padding: 15px; display: flex; flex-direction: column; justify-content: center; }
+            .name { font-size: 18px; font-weight: 800; color: #1e293b; margin: 0; margin-bottom: 2px; }
+            .skill { font-size: 12px; color: #4f46e5; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; }
+            .field { margin-bottom: 8px; }
+            .label { font-size: 8px; text-transform: uppercase; color: #94a3b8; font-weight: 700; margin: 0; }
+            .value { font-size: 11px; color: #334155; font-weight: 600; margin: 0; }
+            .emp-id { font-family: monospace; font-size: 10px; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; margin-top: 5px; }
+            .qr-placeholder { position: absolute; bottom: 10px; right: 10px; width: 40px; height: 40px; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 6px; color: #94a3b8; text-align: center; }
+            @media print { body { background: white; } .card { box-shadow: none; border: 1px solid #ddd; } }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="left">
+              <div class="avatar">${worker.name[0]}</div>
+              <div class="emp-id">${worker.id}</div>
+            </div>
+            <div class="right">
+              <h1 class="name">${worker.name}</h1>
+              <p class="skill">${worker.skill}</p>
+              
+              <div class="field">
+                <p class="label">Worker Type</p>
+                <p class="value">${worker.type}</p>
+              </div>
+              <div class="field">
+                <p class="label">Contact</p>
+                <p class="value">${worker.phone}</p>
+              </div>
+              <div class="field">
+                <p class="label">City/Area</p>
+                <p class="value">${worker.city}, ${worker.area}</p>
+              </div>
+              <div class="qr-placeholder">QR CODE</div>
+            </div>
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            }
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const handleExportPayroll = () => {
@@ -752,6 +956,7 @@ const HRStaff = () => {
               <TabsTrigger value="profiles" className="text-xs sm:text-sm">Profiles</TabsTrigger>
               <TabsTrigger value="attendance" className="text-xs sm:text-sm">Attendance</TabsTrigger>
               <TabsTrigger value="payroll" className="text-xs sm:text-sm">Payroll</TabsTrigger>
+              <TabsTrigger value="outside" className="text-xs sm:text-sm">Outside Workers</TabsTrigger>
               <TabsTrigger value="leaves" className="text-xs sm:text-sm">Leaves</TabsTrigger>
               <TabsTrigger value="performance" className="text-xs sm:text-sm">Performance</TabsTrigger>
             </TabsList>
@@ -930,6 +1135,247 @@ const HRStaff = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Outside Workers Management */}
+        <TabsContent value="outside" className="mt-4 space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+              <Button 
+                variant={outsideViewMode === "cards" ? "secondary" : "ghost"} 
+                size="sm" 
+                onClick={() => setOutsideViewMode("cards")}
+                className="h-8 gap-2"
+              >
+                <Users className="h-4 w-4" /> Workers
+              </Button>
+              <Button 
+                variant={outsideViewMode === "history" ? "secondary" : "ghost"} 
+                size="sm" 
+                onClick={() => setOutsideViewMode("history")}
+                className="h-8 gap-2"
+              >
+                <History className="h-4 w-4" /> History & Payments
+              </Button>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input 
+                  placeholder="Search workers..." 
+                  className="pl-9 h-9 w-full" 
+                  value={search} 
+                  onChange={e => setSearch(e.target.value)} 
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => setShowAddOutsideModal(true)} className="gap-2 flex-1 sm:flex-none h-9">
+                  <Plus className="h-4 w-4" /> Add Worker
+                </Button>
+                <Button onClick={() => setShowAssignEventModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none h-9">
+                  <CalendarDays className="h-4 w-4" /> Assign
+                </Button>
+                <Button onClick={() => setShowOutsidePaymentModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none h-9">
+                  <Wallet2 className="h-4 w-4" /> Pay
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {outsideViewMode === "cards" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {outsideWorkers.filter(w => 
+                w.name.toLowerCase().includes(search.toLowerCase()) || 
+                w.skill.toLowerCase().includes(search.toLowerCase())
+              ).map(worker => (
+                <div key={worker.id} className="relative group overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-xl font-black text-primary border-2 border-primary/20">
+                        {worker.name[0]}
+                      </div>
+                      <div>
+                        <h4 className="text-base font-bold text-card-foreground leading-tight">{worker.name}</h4>
+                        <p className="text-xs text-primary font-bold uppercase tracking-wider">{worker.skill}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star key={i} className={`h-3 w-3 ${i < worker.rating ? "text-amber-400 fill-amber-400" : "text-muted"}`} />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={`capitalize font-bold ${worker.status === 'available' ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'}`}>
+                      {worker.status}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 border-t border-border pt-4 text-[11px]">
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Type</p>
+                      <p className="font-bold">{worker.type}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Rate</p>
+                      <p className="font-bold">₨ {worker.rate.toLocaleString()} <span className="text-[9px] text-muted-foreground font-normal">{worker.rateType}</span></p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Contact</p>
+                      <p className="font-bold">{worker.phone}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Location</p>
+                      <p className="font-bold truncate">{worker.area}, {worker.city}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Total Paid</span>
+                      <span className="text-sm font-black text-success">₨ {worker.totalPaid.toLocaleString()}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="h-8 gap-2 px-3 text-[10px] font-bold uppercase tracking-wider" onClick={() => handlePrintWorkerCard(worker)}>
+                        <Printer className="h-3 w-3" /> Worker Card
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest mb-2">Recent Assignments</p>
+                    <div className="space-y-2">
+                      {outsideAssignments.filter(a => a.workerId === worker.id).slice(0, 2).map(a => (
+                        <div key={a.id} className="flex items-center justify-between text-[10px] bg-muted/30 p-1.5 rounded">
+                          <span className="font-bold truncate max-w-[120px]">{a.eventName}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">{a.date}</span>
+                            <Badge variant="outline" className={`h-4 text-[8px] px-1 ${a.status === 'paid' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                              {a.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                      {outsideAssignments.filter(a => a.workerId === worker.id).length === 0 && (
+                        <p className="text-[10px] text-muted-foreground italic">No past events found</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="rounded-lg border border-border bg-card">
+                <div className="p-4 border-b border-border bg-muted/20">
+                  <h4 className="text-sm font-bold flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-primary" /> Worker Assignments & Attendance
+                  </h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse min-w-[800px]">
+                    <thead>
+                      <tr className="border-b border-border text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left">Worker</th>
+                        <th className="px-4 py-3 text-left">Event</th>
+                        <th className="px-4 py-3 text-left">Date</th>
+                        <th className="px-4 py-3 text-right">Rate</th>
+                        <th className="px-4 py-3 text-center">Hours</th>
+                        <th className="px-4 py-3 text-center">Attendance</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {outsideAssignments.filter(a => {
+                        const w = outsideWorkers.find(x => x.id === a.workerId);
+                        return w?.name.toLowerCase().includes(search.toLowerCase()) || 
+                               a.eventName.toLowerCase().includes(search.toLowerCase());
+                      }).map(a => (
+                        <tr key={a.id} className="text-xs hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-3 font-bold">{outsideWorkers.find(w => w.id === a.workerId)?.name}</td>
+                          <td className="px-4 py-3">{a.eventName}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{a.date}</td>
+                          <td className="px-4 py-3 text-right font-bold">₨ {a.amount.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-center">
+                            <Input 
+                              type="number" 
+                              className="h-7 w-16 text-center mx-auto" 
+                              value={a.hours} 
+                              onChange={e => setOutsideAssignments(outsideAssignments.map(x => x.id === a.id ? { ...x, hours: Number(e.target.value) } : x))}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Select value={a.attendance} onValueChange={v => setOutsideAssignments(outsideAssignments.map(x => x.id === a.id ? { ...x, attendance: v } : x))}>
+                              <SelectTrigger className="h-7 w-24 mx-auto text-[10px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="present">Present</SelectItem>
+                                <SelectItem value="absent">Absent</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Badge variant="outline" className={`h-5 text-[9px] capitalize ${a.status === 'paid' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                              {a.status}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="h-7 text-[9px] gap-1"
+                              disabled={a.status === 'paid'}
+                              onClick={() => {
+                                setOutsidePaymentForm({ workerId: a.workerId, amount: a.amount, method: "cash", eventId: a.eventId });
+                                setShowOutsidePaymentModal(true);
+                              }}
+                            >
+                              <Wallet2 className="h-3 w-3" /> Pay
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-card">
+                <div className="p-4 border-b border-border bg-muted/20">
+                  <h4 className="text-sm font-bold flex items-center gap-2">
+                    <History className="h-4 w-4 text-primary" /> Payment History
+                  </h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse min-w-[600px]">
+                    <thead>
+                      <tr className="border-b border-border text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left">Date</th>
+                        <th className="px-4 py-3 text-left">Worker</th>
+                        <th className="px-4 py-3 text-left">Method</th>
+                        <th className="px-4 py-3 text-left">Reference</th>
+                        <th className="px-4 py-3 text-right">Amount Paid</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {outsidePayments.filter(p => {
+                        const w = outsideWorkers.find(x => x.id === p.workerId);
+                        return w?.name.toLowerCase().includes(search.toLowerCase()) || 
+                               p.method.toLowerCase().includes(search.toLowerCase());
+                      }).map(p => (
+                        <tr key={p.id} className="text-xs hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-3 text-muted-foreground">{p.date}</td>
+                          <td className="px-4 py-3 font-bold">{outsideWorkers.find(w => w.id === p.workerId)?.name}</td>
+                          <td className="px-4 py-3 capitalize">{p.method}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{p.eventId || "General Payment"}</td>
+                          <td className="px-4 py-3 text-right font-bold text-success">₨ {p.amount.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
         </TabsContent>
@@ -1794,23 +2240,189 @@ const HRStaff = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <Dialog open={!!showDeleteConfirm} onOpenChange={() => setShowDeleteConfirm(null)}>
-        <DialogContent className="sm:max-w-md">
+      {/* Add Outside Worker Modal */}
+      <Dialog open={showAddOutsideModal} onOpenChange={setShowAddOutsideModal}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-destructive flex items-center gap-2">
-              <Trash2 className="h-5 w-5" /> Delete Staff Record?
-            </DialogTitle>
-            <DialogDescription>
-              This action cannot be undone. All data related to this staff member (attendance, payroll, history) will be permanently removed.
-            </DialogDescription>
+            <DialogTitle>Add Outside Worker</DialogTitle>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(null)}>Keep Record</Button>
-            <Button variant="destructive" onClick={() => showDeleteConfirm && handleDeleteStaff(showDeleteConfirm)}>Yes, Delete Staff</Button>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="col-span-2 space-y-1.5">
+              <Label>Full Name</Label>
+              <Input placeholder="e.g. Zahid Ali" value={newOutsideWorker.name} onChange={e => setNewOutsideWorker({ ...newOutsideWorker, name: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Worker Type</Label>
+              <Select value={newOutsideWorker.type} onValueChange={v => setNewOutsideWorker({ ...newOutsideWorker, type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Freelancer">Freelancer</SelectItem>
+                  <SelectItem value="Contractor">Contractor</SelectItem>
+                  <SelectItem value="Daily Wage">Daily Wage</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Skill / Service</Label>
+              <Select value={newOutsideWorker.skill} onValueChange={v => setNewOutsideWorker({ ...newOutsideWorker, skill: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["Decorator", "Caterer", "DJ", "Photographer", "Driver", "Security", "Waiter", "Cleaner"].map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone Number</Label>
+              <Input placeholder="0300-0000000" value={newOutsideWorker.phone} onChange={e => setNewOutsideWorker({ ...newOutsideWorker, phone: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>WhatsApp Number</Label>
+              <Input placeholder="0300-0000000" value={newOutsideWorker.whatsapp} onChange={e => setNewOutsideWorker({ ...newOutsideWorker, whatsapp: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Rate</Label>
+              <Input type="number" placeholder="5000" value={newOutsideWorker.rate} onChange={e => setNewOutsideWorker({ ...newOutsideWorker, rate: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Rate Type</Label>
+              <Select value={newOutsideWorker.rateType} onValueChange={v => setNewOutsideWorker({ ...newOutsideWorker, rateType: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="per hour">Per Hour</SelectItem>
+                  <SelectItem value="per day">Per Day</SelectItem>
+                  <SelectItem value="per event">Per Event</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>City</Label>
+              <Input value={newOutsideWorker.city} onChange={e => setNewOutsideWorker({ ...newOutsideWorker, city: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Area</Label>
+              <Input placeholder="e.g. Gulshan" value={newOutsideWorker.area} onChange={e => setNewOutsideWorker({ ...newOutsideWorker, area: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddOutsideModal(false)}>Cancel</Button>
+            <Button onClick={handleAddOutsideWorker}>Add Worker</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Assign Worker to Event Modal */}
+      <Dialog open={showAssignEventModal} onOpenChange={setShowAssignEventModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Worker to Event</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <Label>Select Worker</Label>
+              <Select onValueChange={v => setAssignmentForm({ ...assignmentForm, workerId: v })}>
+                <SelectTrigger><SelectValue placeholder="Choose Worker" /></SelectTrigger>
+                <SelectContent>
+                  {outsideWorkers.map(w => <SelectItem key={w.id} value={w.id}>{w.name} ({w.skill})</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Event Name</Label>
+              <Input placeholder="e.g. Wedding Ceremony" value={assignmentForm.eventName} onChange={e => setAssignmentForm({ ...assignmentForm, eventName: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Event Date</Label>
+                <Input type="date" value={assignmentForm.date} onChange={e => setAssignmentForm({ ...assignmentForm, date: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Payment Amount (₨)</Label>
+                <Input type="number" value={assignmentForm.amount} onChange={e => setAssignmentForm({ ...assignmentForm, amount: Number(e.target.value) })} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignEventModal(false)}>Cancel</Button>
+            <Button onClick={handleAssignToEvent}>Assign Worker</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Record Outside Payment Modal */}
+      <Dialog open={showOutsidePaymentModal} onOpenChange={setShowOutsidePaymentModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Worker Payment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <Label>Select Worker</Label>
+              <Select onValueChange={v => setOutsidePaymentForm({ ...outsidePaymentForm, workerId: v })}>
+                <SelectTrigger><SelectValue placeholder="Choose Worker" /></SelectTrigger>
+                <SelectContent>
+                  {outsideWorkers.map(w => <SelectItem key={w.id} value={w.id}>{w.name} (₨ {w.totalPaid.toLocaleString()} paid)</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Link to Assignment (Optional)</Label>
+              <Select onValueChange={v => {
+                const a = outsideAssignments.find(x => x.id === Number(v));
+                if (a) setOutsidePaymentForm({ ...outsidePaymentForm, eventId: a.eventId, amount: a.amount });
+              }}>
+                <SelectTrigger><SelectValue placeholder="Choose Assignment" /></SelectTrigger>
+                <SelectContent>
+                  {outsideAssignments.filter(a => a.status === 'unpaid').map(a => (
+                    <SelectItem key={a.id} value={a.id.toString()}>{a.eventName} - ₨ {a.amount}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Payment Amount (₨)</Label>
+                <Input type="number" value={outsidePaymentForm.amount} onChange={e => setOutsidePaymentForm({ ...outsidePaymentForm, amount: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Payment Method</Label>
+                <Select value={outsidePaymentForm.method} onValueChange={v => setOutsidePaymentForm({ ...outsidePaymentForm, method: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="bank transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="easypaisa">EasyPaisa</SelectItem>
+                    <SelectItem value="jazzcash">JazzCash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+             <Button variant="outline" onClick={() => setShowOutsidePaymentModal(false)}>Cancel</Button>
+             <Button onClick={handleOutsidePayment}>Record Payment</Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+
+       {/* Delete Confirmation */}
+       <Dialog open={!!showDeleteConfirm} onOpenChange={() => setShowDeleteConfirm(null)}>
+         <DialogContent className="sm:max-w-md">
+           <DialogHeader>
+             <DialogTitle className="text-destructive flex items-center gap-2">
+               <Trash2 className="h-5 w-5" /> Delete Staff Record?
+             </DialogTitle>
+             <DialogDescription>
+               This action cannot be undone. All data related to this staff member (attendance, payroll, history) will be permanently removed.
+             </DialogDescription>
+           </DialogHeader>
+           <DialogFooter className="gap-2 sm:gap-0">
+             <Button variant="outline" onClick={() => setShowDeleteConfirm(null)}>Keep Record</Button>
+             <Button variant="destructive" onClick={() => showDeleteConfirm && handleDeleteStaff(showDeleteConfirm)}>Yes, Delete Staff</Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
 
       {/* Total Payroll Ledger Modal */}
       <Dialog open={showTotalLedgerModal} onOpenChange={setShowTotalLedgerModal}>
