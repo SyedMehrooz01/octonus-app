@@ -20,6 +20,7 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -141,6 +142,7 @@ const statusColor = (status: string) => {
 };
 
 const HRStaff = () => {
+  const { canDo, logAction } = useAuth();
   const [staff, setStaff] = useState(DUMMY_STAFF);
   const [attendance, setAttendance] = useState(DUMMY_ATTENDANCE);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -248,6 +250,7 @@ const HRStaff = () => {
       address: "", emergencyContact: "", status: "active", joinDate: format(new Date(), "yyyy-MM-dd") 
     });
     setShowAddModal(false);
+    logAction(`Added new staff member: ${emp.name}`, "HR & Staff");
     toast.success("Staff member added successfully");
   };
 
@@ -268,6 +271,7 @@ const HRStaff = () => {
     });
     setStaff(updatedStaff);
     setShowEditModal(false);
+    logAction(`Updated staff member: ${editStaff.name}`, "HR & Staff");
     toast.success("Staff member updated successfully");
   };
 
@@ -1056,18 +1060,24 @@ const HRStaff = () => {
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handlePrintCard(s)}>
                               <Printer className="h-4 w-4 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditStaff(s); setShowEditModal(true); }}>
-                              <Edit className="h-4 w-4 text-muted-foreground" />
-                            </Button>
+                            {canDo("edit") && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditStaff(s); setShowEditModal(true); }}>
+                                <Edit className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            )}
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setLedgerStaff(s); setShowLedgerModal(true); }}>
                               <FileText className="h-4 w-4 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setRightsStaff(s); setShowRightsModal(true); }}>
-                              <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => setShowDeleteConfirm(s.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            {user?.role === "admin" && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setRightsStaff(s); setShowRightsModal(true); }}>
+                                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            )}
+                            {canDo("delete") && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10" onClick={() => setShowDeleteConfirm(s.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1171,15 +1181,21 @@ const HRStaff = () => {
                 />
               </div>
               <div className="flex gap-2">
-                <Button onClick={() => setShowAddOutsideModal(true)} className="gap-2 flex-1 sm:flex-none h-9">
-                  <Plus className="h-4 w-4" /> Add Worker
-                </Button>
-                <Button onClick={() => setShowAssignEventModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none h-9">
-                  <CalendarDays className="h-4 w-4" /> Assign
-                </Button>
-                <Button onClick={() => setShowOutsidePaymentModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none h-9">
-                  <Wallet2 className="h-4 w-4" /> Pay
-                </Button>
+                {canDo("add") && (
+                  <Button onClick={() => setShowAddOutsideModal(true)} className="gap-2 flex-1 sm:flex-none h-9">
+                    <Plus className="h-4 w-4" /> Add Worker
+                  </Button>
+                )}
+                {canDo("edit") && (
+                  <>
+                    <Button onClick={() => setShowAssignEventModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none h-9">
+                      <CalendarDays className="h-4 w-4" /> Assign
+                    </Button>
+                    <Button onClick={() => setShowOutsidePaymentModal(true)} variant="outline" className="gap-2 flex-1 sm:flex-none h-9">
+                      <Wallet2 className="h-4 w-4" /> Pay
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1384,20 +1400,28 @@ const HRStaff = () => {
         <TabsContent value="attendance" className="mt-4 space-y-4">
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
             <div className="flex gap-2 w-full sm:w-auto">
-              <Button onClick={() => setShowAttendanceModal(true)} className="gap-2 flex-1 sm:flex-none">
-                <CheckCircle className="h-4 w-4" /> Mark Attendance
-              </Button>
-              <Button onClick={handleMarkAllPresent} variant="outline" className="gap-2 flex-1 sm:flex-none">
-                <Users className="h-4 w-4" /> Mark All Present
-              </Button>
+              {canDo("add") && (
+                <Button onClick={() => setShowAttendanceModal(true)} className="gap-2 flex-1 sm:flex-none">
+                  <CheckCircle className="h-4 w-4" /> Mark Attendance
+                </Button>
+              )}
+              {canDo("edit") && (
+                <Button onClick={handleMarkAllPresent} variant="outline" className="gap-2 flex-1 sm:flex-none">
+                  <Users className="h-4 w-4" /> Mark All Present
+                </Button>
+              )}
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
-              <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={handleAutoAbsent}>
-                <Clock className="h-4 w-4" /> Run Auto Absent
-              </Button>
-              <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={handleExportAttendance}>
-                <Download className="h-4 w-4" /> Export Report
-              </Button>
+              {canDo("edit") && (
+                <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={handleAutoAbsent}>
+                  <Clock className="h-4 w-4" /> Run Auto Absent
+                </Button>
+              )}
+              {canDo("export") && (
+                <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={handleExportAttendance}>
+                  <Download className="h-4 w-4" /> Export Report
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1452,9 +1476,11 @@ const HRStaff = () => {
         {/* Payroll System */}
         <TabsContent value="payroll" className="mt-4 space-y-4">
           <div className="flex justify-end">
-            <Button variant="outline" className="gap-2" onClick={handleExportPayroll}>
-              <Download className="h-4 w-4" /> Export Payroll
-            </Button>
+            {canDo("export") && (
+              <Button variant="outline" className="gap-2" onClick={handleExportPayroll}>
+                <Download className="h-4 w-4" /> Export Payroll
+              </Button>
+            )}
           </div>
           <div className="rounded-lg border border-border bg-card">
             <div className="overflow-x-auto">
@@ -1487,17 +1513,19 @@ const HRStaff = () => {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
-                              setPayrollForm({
-                                empId: s.id,
-                                month: format(new Date(), "MMMM yyyy"),
-                                basicSalary: s.salary,
-                                deductions: { tax: 0, loans: 0, absences: 0 },
-                                bonuses: 0,
-                                allowances: { transport: 0, meal: 0, housing: 0 }
-                              });
-                              setShowPayrollModal(true);
-                            }}>Process</Button>
+                            {canDo("edit") && (
+                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
+                                setPayrollForm({
+                                  empId: s.id,
+                                  month: format(new Date(), "MMMM yyyy"),
+                                  basicSalary: s.salary,
+                                  deductions: { tax: 0, loans: 0, absences: 0 },
+                                  bonuses: 0,
+                                  allowances: { transport: 0, meal: 0, housing: 0 }
+                                });
+                                setShowPayrollModal(true);
+                              }}>Process</Button>
+                            )}
                             <Button 
                               size="sm" 
                               variant="ghost" 
@@ -1544,9 +1572,11 @@ const HRStaff = () => {
                 </div>
               ))}
             </div>
-            <Button onClick={() => setShowLeaveRequestModal(true)} className="gap-2">
-              <Plus className="h-4 w-4" /> Request Leave
-            </Button>
+            {canDo("add") && (
+              <Button onClick={() => setShowLeaveRequestModal(true)} className="gap-2">
+                <Plus className="h-4 w-4" /> Request Leave
+              </Button>
+            )}
           </div>
           <div className="rounded-lg border border-border bg-card">
             <div className="overflow-x-auto">
@@ -1572,7 +1602,7 @@ const HRStaff = () => {
                         <Badge variant="outline" className={statusColor(l.status)}>{l.status}</Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {l.status === 'pending' && (
+                        {canDo("edit") && l.status === 'pending' && (
                           <div className="flex justify-end gap-2">
                             <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-success text-success hover:bg-success/10" onClick={() => handleLeaveAction(l.id, 'approved')}>Approve</Button>
                             <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-destructive text-destructive hover:bg-destructive/10" onClick={() => handleLeaveAction(l.id, 'rejected')}>Reject</Button>
@@ -1590,9 +1620,11 @@ const HRStaff = () => {
         {/* Performance Tracking */}
         <TabsContent value="performance" className="mt-4 space-y-4">
           <div className="flex justify-end">
-            <Button onClick={() => setShowPerformanceModal(true)} className="gap-2">
-              <Star className="h-4 w-4" /> Add Rating
-            </Button>
+            {canDo("add") && (
+              <Button onClick={() => setShowPerformanceModal(true)} className="gap-2">
+                <Star className="h-4 w-4" /> Add Rating
+              </Button>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {staff.map(s => (

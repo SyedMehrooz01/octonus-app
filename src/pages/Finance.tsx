@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfYear, endOfYear, eachMonthOfInterval, isWithinInterval, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -71,6 +72,7 @@ const ACCOUNTS = ["Cash","Bank","Supplier","Vendor","Other"];
 const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque", "Online Transfer"];
 
 const Finance = () => {
+  const { canDo, logAction } = useAuth();
   const { toast } = useToast();
   const [ledger, setLedger] = useState<LedgerEntry[]>(INIT_LEDGER);
   const [suppliers, setSuppliers] = useState(INIT_SUPPLIERS);
@@ -276,7 +278,9 @@ const Finance = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h2 className="text-2xl font-bold text-foreground">Finance & Accounts</h2><p className="text-sm text-muted-foreground">Ledger, event finance, advance tracking, supplier & P&L</p></div>
-        <Button onClick={()=>setShowAdd(true)} className="gap-2"><Plus className="h-4 w-4"/>Add Entry</Button>
+        {canDo("add") && (
+          <Button onClick={()=>setShowAdd(true)} className="gap-2"><Plus className="h-4 w-4"/>Add Entry</Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -318,10 +322,12 @@ const Finance = () => {
                   <span className="text-muted-foreground">to</span>
                   <Input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} className="w-36 text-xs h-9" />
                 </div>
-                <div className="flex items-center gap-1 ml-2">
-                  <Button variant="outline" size="sm" onClick={() => exportStatement('pdf')} className="h-9 px-2"><FileText className="h-4 w-4 mr-1"/>PDF</Button>
-                  <Button variant="outline" size="sm" onClick={() => exportStatement('excel')} className="h-9 px-2"><Download className="h-4 w-4 mr-1"/>Excel</Button>
-                </div>
+                {canDo("export") && (
+                  <div className="flex items-center gap-1 ml-2">
+                    <Button variant="outline" size="sm" onClick={() => exportStatement('pdf')} className="h-9 px-2"><FileText className="h-4 w-4 mr-1"/>PDF</Button>
+                    <Button variant="outline" size="sm" onClick={() => exportStatement('excel')} className="h-9 px-2"><Download className="h-4 w-4 mr-1"/>Excel</Button>
+                  </div>
+                )}
               </div>
             </div>
             <div className="overflow-x-auto">

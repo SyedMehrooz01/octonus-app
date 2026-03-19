@@ -3,6 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type UserRole = "admin" | "manager" | "staff" | "accountant";
 
+export type UserAction = "view" | "add" | "edit" | "delete" | "export";
+
+export interface UserPermissions {
+  pages: string[];
+  actions: UserAction[];
+}
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -10,13 +17,28 @@ export interface AuthUser {
   role: UserRole;
   email: string;
   avatar: string;
+  permissions?: UserPermissions;
+  isActive?: boolean;
+  lastLogin?: string;
 }
 
-export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-  admin: ["dashboard", "hr", "events", "finance", "inventory", "expenses", "settings"],
-  manager: ["dashboard", "events", "inventory", "expenses"],
-  staff: ["dashboard", "events", "inventory"],
-  accountant: ["dashboard", "finance", "expenses"],
+export const ROLE_PERMISSIONS: Record<UserRole, UserPermissions> = {
+  admin: {
+    pages: ["dashboard", "hr", "events", "finance", "inventory", "expenses", "settings"],
+    actions: ["view", "add", "edit", "delete", "export"]
+  },
+  manager: {
+    pages: ["dashboard", "hr", "events", "inventory", "expenses"],
+    actions: ["view", "add", "edit", "export"]
+  },
+  staff: {
+    pages: ["dashboard", "events", "inventory"],
+    actions: ["view", "add"]
+  },
+  accountant: {
+    pages: ["dashboard", "finance", "expenses"],
+    actions: ["view", "add", "edit", "export"]
+  },
 };
 
 interface AuthContextType {
@@ -25,6 +47,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   hasAccess: (page: string) => boolean;
+  canDo: (action: UserAction) => boolean;
+  logAction: (action: string, page: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -84,13 +108,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const mapSupabaseUser = (sbUser: any): AuthUser => {
     const meta = sbUser.user_metadata || {};
+    const role = (meta.role as UserRole) || "staff";
+    
+    // Default permissions from role, or override from user metadata
+    const permissions: UserPermissions = meta.permissions || ROLE_PERMISSIONS[role];
+
     return {
       id: sbUser.id,
       name: meta.full_name || sbUser.email?.split('@')[0] || "User",
       username: meta.username || sbUser.email?.split('@')[0] || "user",
-      role: (meta.role as UserRole) || "staff",
+      role: role,
       email: sbUser.email || "",
       avatar: meta.avatar_url || (meta.full_name ? meta.full_name.substring(0, 2).toUpperCase() : "U"),
+      permissions: permissions,
+      isActive: meta.isActive !== undefined ? meta.isActive : true,
+      lastLogin: sbUser.last_sign_in_at
     };
   };
 
@@ -157,11 +189,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const hasAccess = (page: string) => {
     if (!user) return false;
-    return ROLE_PERMISSIONS[user.role]?.includes(page) ?? false;
+    if (user.role === "admin") return true;
+    return user.permissions?.pages.includes(page) ?? false;
+  };
+
+  const canDo = (action: UserAction) => {
+    if (!user) return false;
+    if (user.role === "admin") return true;
+    return user.permissions?.actions.includes(action) ?? false;
+  };
+
+  const logAction = async (action: string, page: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase.from("audit_logs").insert([
+        {
+          user_id: user.id,
+          user_name: user.name,
+          action,
+          page,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+      if (error) console.error("Error logging action:", error);
+    } catch (err) {
+      console.error("Audit log failed:", err);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, hasAccess }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, hasAccess, canDo, logAction }}>
       {children}
     </AuthContext.Provider>
   );

@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 type BookingStatus = "tentative" | "confirmed" | "postponed" | "cancelled";
 interface Booking { id: number; clientName: string; phone: string; eventType: string; eventDate: string; bookingDate: string; venue: string; guests: number; totalAmount: number; advance: number; balanceRemaining: number; status: BookingStatus; paymentMethod: string; menu: string; notes: string; thirdParty: boolean; supplierCost: number; sellingRate: number; }
@@ -69,6 +70,7 @@ const sd = (s: BookingStatus) => s==="confirmed"?"bg-success":s==="tentative"?"b
 const EMPTY = { clientName:"",phone:"",eventType:"",eventDate:"",bookingDate:new Date().toISOString().split("T")[0],venue:"",guests:"",totalAmount:"",advance:"",paymentMethod:"Cash",status:"tentative" as BookingStatus,menu:"Menu A - Desi",notes:"",thirdParty:false,supplierCost:"",sellingRate:"" };
 
 const EventBooking = () => {
+  const { canDo, logAction } = useAuth();
   const [menus, setMenus] = useState<Menu[]>(INITIAL_MENUS);
   const [loadingMenus, setLoadingMenus] = useState(false);
   const [showItemModal, setShowItemModal] = useState(false);
@@ -260,6 +262,7 @@ const EventBooking = () => {
           .eq('id', editingItem.id);
 
         if (error) throw error;
+        logAction(`Updated menu item: ${itemForm.item}`, "Event Booking");
         toast.success("Item updated successfully");
       } else {
         // Add new item
@@ -273,6 +276,7 @@ const EventBooking = () => {
           }]);
 
         if (error) throw error;
+        logAction(`Added new menu item: ${itemForm.item}`, "Event Booking");
         toast.success("Item added successfully");
       }
       
@@ -663,11 +667,13 @@ const EventBooking = () => {
                 <div key={menu.id} className="rounded-lg border border-border bg-card">
                   <div className="flex items-center justify-between border-b border-border p-4">
                     <h3 className="font-semibold text-card-foreground">{menu.name}</h3>
-                    <Button variant="outline" size="sm" onClick={() => handleAddClick(menu.id)}>+ Add Item</Button>
+                    {canDo("add") && (
+                      <Button variant="outline" size="sm" onClick={() => handleAddClick(menu.id)}>+ Add Item</Button>
+                    )}
                   </div>
                   <table className="w-full min-w-[600px]">
                     <thead><tr className="border-b border-border bg-muted/40"><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Item</th><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Unit</th><th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Rate (₨)</th><th className="px-4 py-2 text-xs text-muted-foreground text-center">Edit</th></tr></thead>
-                    <tbody>{menu.items.map((item,idx)=><tr key={item.id || idx} className="border-b border-border last:border-0"><td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item}</td><td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td><td className="px-4 py-2 text-sm">₨ {item.rate}</td><td className="px-4 py-2 text-center"><button onClick={() => handleEditClick(item, menu.id)} className="rounded p-1 hover:bg-muted"><Edit className="h-3.5 w-3.5 text-muted-foreground"/></button></td></tr>)}</tbody>
+                    <tbody>{menu.items.map((item,idx)=><tr key={item.id || idx} className="border-b border-border last:border-0"><td className="px-4 py-2 text-sm font-medium text-card-foreground">{item.item}</td><td className="px-4 py-2 text-sm text-muted-foreground">{item.unit}</td><td className="px-4 py-2 text-sm">₨ {item.rate}</td><td className="px-4 py-2 text-center">{canDo("edit") && <button onClick={() => handleEditClick(item, menu.id)} className="rounded p-1 hover:bg-muted"><Edit className="h-3.5 w-3.5 text-muted-foreground"/></button>}</td></tr>)}</tbody>
                   </table>
                 </div>
               ))
@@ -685,14 +691,18 @@ const EventBooking = () => {
               </Select>
               {selected && (
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleSaveKitchen} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
-                    Save Progress
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setShowConsumptionModal(true)}>
-                    <CheckCircle2 className="h-4 w-4 mr-2"/>
-                    Track Consumption
-                  </Button>
+                  {canDo("edit") && (
+                    <Button variant="outline" size="sm" onClick={handleSaveKitchen} disabled={isSaving}>
+                      {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
+                      Save Progress
+                    </Button>
+                  )}
+                  {canDo("add") && (
+                    <Button variant="outline" size="sm" onClick={() => setShowConsumptionModal(true)}>
+                      <CheckCircle2 className="h-4 w-4 mr-2"/>
+                      Track Consumption
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

@@ -6,9 +6,10 @@ import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Dashboard = () => {
+  const { canDo, hasAccess } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState([
     { label: "Today's Events", value: "0", icon: CalendarDays, color: "bg-blue-500", textColor: "text-blue-500" },
@@ -269,11 +270,11 @@ const Dashboard = () => {
             </h3>
             <div className="grid grid-cols-1 gap-3">
               {[
-                { name: "New Event Booking", icon: Plus, color: "bg-blue-500" },
-                { name: "Add Expense", icon: Receipt, color: "bg-rose-500" },
-                { name: "Mark Attendance", icon: CheckCircle, color: "bg-emerald-500" },
-                { name: "Generate Payroll", icon: Wallet, color: "bg-violet-500" }
-              ].map((action) => (
+                { name: "New Event Booking", icon: Plus, color: "bg-blue-500", access: "events", action: "add" },
+                { name: "Add Expense", icon: Receipt, color: "bg-rose-500", access: "expenses", action: "add" },
+                { name: "Mark Attendance", icon: CheckCircle, color: "bg-emerald-500", access: "hr", action: "add" },
+                { name: "Generate Payroll", icon: Wallet, color: "bg-violet-500", access: "hr", action: "edit" }
+              ].filter(a => hasAccess(a.access) && canDo(a.action as any)).map((action) => (
                 <Button
                   key={action.name}
                   onClick={() => handleQuickAction(action.name)}
@@ -324,7 +325,9 @@ const Dashboard = () => {
             <h3 className="text-lg font-bold text-card-foreground">Upcoming Events (Next 7 Days)</h3>
             <p className="text-xs text-muted-foreground">Detailed schedule of confirmed bookings</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate("/events")} className="text-primary font-bold">View Calendar</Button>
+          {hasAccess("events") && (
+            <Button variant="ghost" size="sm" onClick={() => navigate("/events")} className="text-primary font-bold">View Calendar</Button>
+          )}
         </div>
         
         {loading ? (
@@ -365,7 +368,14 @@ const Dashboard = () => {
                       </span>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <p className="text-sm font-black text-primary">₨ {event.total_amount?.toLocaleString()}</p>
+                      <div className="flex items-center justify-end gap-2">
+                        <p className="text-sm font-black text-primary">₨ {event.total_amount?.toLocaleString()}</p>
+                        {hasAccess("events") && (
+                          <Button variant="ghost" size="sm" onClick={() => navigate("/events")} className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <ArrowRight className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

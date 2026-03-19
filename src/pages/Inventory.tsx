@@ -11,6 +11,7 @@ import { format, isWithinInterval, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface InventoryItem {
   id: string | number;
@@ -41,6 +42,7 @@ interface StockMovement {
 const CATEGORIES = ["Kitchen", "Furniture", "Decoration", "Linens", "Electronics", "Other"];
 
 const Inventory = () => {
+  const { canDo, logAction } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [history, setHistory] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -254,9 +256,11 @@ const Inventory = () => {
           <h2 className="text-2xl font-bold text-foreground">Inventory & Stock Management</h2>
           <p className="text-sm text-muted-foreground">Track items, purchases, and stock levels</p>
         </div>
-        <Button onClick={() => setShowAddModal(true)} className="gap-2">
-          <Plus className="h-4 w-4" /> Add Item
-        </Button>
+        {canDo("add") && (
+          <Button onClick={() => setShowAddModal(true)} className="gap-2">
+            <Plus className="h-4 w-4" /> Add Item
+          </Button>
+        )}
       </div>
 
       {/* Summary */}
@@ -344,14 +348,16 @@ const Inventory = () => {
                       <td className="px-4 py-3 text-sm text-muted-foreground">{item.minStock}</td>
                       <td className="px-4 py-3 text-sm font-medium text-card-foreground">₨ {(item.stock * item.purchasePrice).toLocaleString()}</td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => { setSelectedItem(item); setStockAction({ type: "purchase", qty: "", note: "", issued_to: "" }); setShowStockModal(true); }} className="flex items-center gap-1 rounded bg-success/10 px-2 py-1 text-xs text-success hover:bg-success/20">
-                            <ArrowUp className="h-3 w-3" /> In
-                          </button>
-                          <button onClick={() => { setSelectedItem(item); setStockAction({ type: "issue", qty: "", note: "", issued_to: "" }); setShowStockModal(true); }} className="flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-xs text-destructive hover:bg-destructive/20">
-                            <ArrowDown className="h-3 w-3" /> Out
-                          </button>
-                        </div>
+                        {canDo("edit") && (
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => { setSelectedItem(item); setStockAction({ type: "purchase", qty: "", note: "", issued_to: "" }); setShowStockModal(true); }} className="flex items-center gap-1 rounded bg-success/10 px-2 py-1 text-xs text-success hover:bg-success/20">
+                              <ArrowUp className="h-3 w-3" /> In
+                            </button>
+                            <button onClick={() => { setSelectedItem(item); setStockAction({ type: "issue", qty: "", note: "", issued_to: "" }); setShowStockModal(true); }} className="flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-xs text-destructive hover:bg-destructive/20">
+                              <ArrowDown className="h-3 w-3" /> Out
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -382,9 +388,11 @@ const Inventory = () => {
                 <span className="text-muted-foreground">to</span>
                 <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-36 text-xs h-9" />
               </div>
-              <Button variant="outline" size="sm" onClick={exportHistory} className="h-9">
-                <Download className="h-4 w-4 mr-2" /> Export Excel
-              </Button>
+              {canDo("export") && (
+                <Button variant="outline" size="sm" onClick={exportHistory} className="h-9">
+                  <Download className="h-4 w-4 mr-2" /> Export Excel
+                </Button>
+              )}
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px]">
@@ -417,7 +425,7 @@ const Inventory = () => {
                       <td className="px-4 py-3 text-sm text-muted-foreground">{h.issued_to || h.returned_by || "-"}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{h.note}</td>
                       <td className="px-4 py-3">
-                        {h.type === "issue" && h.category === "non-consumable" && (
+                        {canDo("edit") && h.type === "issue" && h.category === "non-consumable" && (
                           <Button variant="ghost" size="sm" onClick={() => {
                             const item = items.find(i => i.id === h.item_id);
                             if (item) {

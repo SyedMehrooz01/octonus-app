@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { format, startOfToday, startOfMonth, endOfMonth, eachMonthOfInterval, startOfYear, endOfYear, isWithinInterval, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { saveAs } from "file-saver";
@@ -29,6 +30,7 @@ interface Expense {
 }
 
 const Expenses = () => {
+  const { canDo, logAction } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -98,6 +100,7 @@ const Expenses = () => {
 
       if (error) throw error;
       
+      logAction(`Added new expense: ${newExpense.description} (₨ ${newExpense.amount})`, "Expenses");
       toast.success("Expense added successfully");
       setShowAddModal(false);
       setNewExpense({ 
@@ -265,9 +268,11 @@ const Expenses = () => {
               </button>
             ))}
           </div>
-          <Button onClick={() => setShowAddModal(true)} className="gap-2 w-full sm:w-auto justify-center">
-            <Plus className="h-4 w-4" /> Add Expense
-          </Button>
+          {canDo("add") && (
+            <Button onClick={() => setShowAddModal(true)} className="gap-2 w-full sm:w-auto justify-center">
+              <Plus className="h-4 w-4" /> Add Expense
+            </Button>
+          )}
         </div>
       </div>
 
@@ -464,9 +469,11 @@ const Expenses = () => {
             <div className="rounded-lg border border-border bg-card p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-sm font-bold flex items-center gap-2"><PieChart className="h-4 w-4"/> Expenses by Category</h3>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => exportToExcel(groupByCategory, 'Expenses_By_Category')} className="h-8 w-8"><Download className="h-4 w-4"/></Button>
-                </div>
+                {canDo("export") && (
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => exportToExcel(groupByCategory, 'Expenses_By_Category')} className="h-8 w-8"><Download className="h-4 w-4"/></Button>
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
                 {groupByCategory.map(g => {
@@ -489,9 +496,11 @@ const Expenses = () => {
             <div className="rounded-lg border border-border bg-card p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-sm font-bold flex items-center gap-2"><BarChart3 className="h-4 w-4"/> Expenses by Payment Mode</h3>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => exportToExcel(groupByPayment, 'Expenses_By_Payment_Mode')} className="h-8 w-8"><Download className="h-4 w-4"/></Button>
-                </div>
+                {canDo("export") && (
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => exportToExcel(groupByPayment, 'Expenses_By_Payment_Mode')} className="h-8 w-8"><Download className="h-4 w-4"/></Button>
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
                 {groupByPayment.map(g => {
@@ -529,10 +538,12 @@ const Expenses = () => {
                   <span className="ml-2 font-bold text-destructive">₨ {totalYearly.toLocaleString()}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => exportYearly('pdf')}><FileText className="h-4 w-4 mr-2"/>Export PDF</Button>
-                <Button variant="outline" size="sm" onClick={() => exportYearly('excel')}><Download className="h-4 w-4 mr-2"/>Export Excel</Button>
-              </div>
+              {canDo("export") && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => exportYearly('pdf')}><FileText className="h-4 w-4 mr-2"/>Export PDF</Button>
+                  <Button variant="outline" size="sm" onClick={() => exportYearly('excel')}><Download className="h-4 w-4 mr-2"/>Export Excel</Button>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

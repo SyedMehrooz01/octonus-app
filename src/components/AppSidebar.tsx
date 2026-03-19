@@ -4,13 +4,13 @@ import { BRAND_NAME, BRAND_INITIALS } from "@/constants";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/hr", label: "HR & Staff", icon: Users },
-  { to: "/events", label: "Event Booking", icon: CalendarDays },
-  { to: "/finance", label: "Finance", icon: Landmark },
-  { to: "/inventory", label: "Inventory", icon: Package },
-  { to: "/expenses", label: "Expenses", icon: Receipt },
-  { to: "/settings", label: "Settings", icon: Settings },
+  { id: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "hr", to: "/hr", label: "HR & Staff", icon: Users },
+  { id: "events", to: "/events", label: "Event Booking", icon: CalendarDays },
+  { id: "finance", to: "/finance", label: "Finance", icon: Landmark },
+  { id: "inventory", to: "/inventory", label: "Inventory", icon: Package },
+  { id: "expenses", to: "/expenses", label: "Expenses", icon: Receipt },
+  { id: "settings", to: "/settings", label: "Settings", icon: Settings },
 ];
 
 interface AppSidebarProps {
@@ -28,11 +28,7 @@ const AppSidebar = ({ onLogout }: AppSidebarProps) => {
     if (onLogout) onLogout();
   };
 
-  const filteredNavItems = navItems.filter(item => {
-    // Basic mapping of routes to permission keys
-    const page = item.to.replace("/", "");
-    return hasAccess(page);
-  });
+  const filteredNavItems = navItems.filter(item => hasAccess(item.id));
 
   return (
     <aside className="hidden md:flex md:w-52 md:flex-col md:fixed md:inset-y-0 bg-secondary text-sidebar-foreground z-10">
