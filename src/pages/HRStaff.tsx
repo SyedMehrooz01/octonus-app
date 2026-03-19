@@ -190,18 +190,12 @@ const HRStaff = () => {
   const [showTotalLedgerModal, setShowTotalLedgerModal] = useState(false);
   const [selectedPayslip, setSelectedPayslip] = useState<any>(null);
   const [editAttendanceId, setEditAttendanceId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Pakistani HRMS Features State
-  const [advances, setAdvances] = useState<any[]>([]);
-  const [overtime, setOvertime] = useState<any[]>([]);
-  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
-  const [showOvertimeModal, setShowOvertimeModal] = useState(false);
-  const [advanceForm, setAdvanceForm] = useState({ empId: "", amount: "", reason: "" });
-  const [overtimeForm, setOvertimeForm] = useState({ empId: "", hours: "", date: format(new Date(), "yyyy-MM-dd") });
+  const [error, setError] = useState<string | null>(null);
 
   const fetchHRData = async () => {
+    if (!user) return;
     setLoading(true);
+    setError(null);
     try {
       const { data: staffData } = await supabase.from('staff').select('*').order('name');
       
@@ -216,7 +210,8 @@ const HRStaff = () => {
         })) || []
       })));
 
-      const { data: attendanceData } = await supabase.from('attendance').select('*, staff(name)').order('date', { ascending: false });
+      const { data: attendanceData, error: attendanceError } = await supabase.from('attendance').select('*, staff(name)').order('date', { ascending: false });
+      if (attendanceError) throw new Error(`Supabase error (attendance): ${attendanceError.message}`);
       if (attendanceData) setAttendance(attendanceData.map(a => ({
         ...a,
         empId: a.employee_id,
@@ -227,7 +222,8 @@ const HRStaff = () => {
         checkOut: a.check_out
       })));
 
-      const { data: leavesData } = await supabase.from('leaves').select('*, staff(name)').order('created_at', { ascending: false });
+      const { data: leavesData, error: leavesError } = await supabase.from('leaves').select('*, staff(name)').order('created_at', { ascending: false });
+      if (leavesError) throw new Error(`Supabase error (leaves): ${leavesError.message}`);
       if (leavesData) setLeaves(leavesData.map(l => ({
         ...l,
         empId: l.employee_id,
@@ -236,7 +232,8 @@ const HRStaff = () => {
         end: l.end_date
       })));
 
-      const { data: advanceData } = await supabase.from('advance_salary').select('*, staff(name)').order('created_at', { ascending: false });
+      const { data: advanceData, error: advanceError } = await supabase.from('advance_salary').select('*, staff(name)').order('created_at', { ascending: false });
+      if (advanceError) throw new Error(`Supabase error (advance_salary): ${advanceError.message}`);
       if (advanceData) setAdvances(advanceData.map(a => ({
         ...a,
         empId: a.employee_id,
@@ -244,7 +241,8 @@ const HRStaff = () => {
         date: a.request_date
       })));
 
-      const { data: overtimeData } = await supabase.from('overtime').select('*, staff(name)').order('created_at', { ascending: false });
+      const { data: overtimeData, error: overtimeError } = await supabase.from('overtime').select('*, staff(name)').order('created_at', { ascending: false });
+      if (overtimeError) throw new Error(`Supabase error (overtime): ${overtimeError.message}`);
       if (overtimeData) setOvertime(overtimeData.map(o => ({
         ...o,
         empId: o.employee_id,
@@ -259,8 +257,10 @@ const HRStaff = () => {
   };
 
   useEffect(() => {
-    fetchHRData();
-  }, []);
+    if (user) {
+      fetchHRData();
+    }
+  }, [user]);
 
   // Outside Workers State
   const [outsideWorkers, setOutsideWorkers] = useState(DUMMY_OUTSIDE_WORKERS);
@@ -1106,21 +1106,21 @@ const HRStaff = () => {
 
     // Earnings and Deductions tables
     const earnings = [
-      ["Basic Salary", `Rs ${payroll.basic_salary.toLocaleString()}`],
-      ["House Rent Allowance", `Rs ${payroll.hra.toLocaleString()}`],
-      ["Medical Allowance", `Rs ${payroll.medical_allowance.toLocaleString()}`],
-      ["Conveyance Allowance", `Rs ${payroll.conveyance_allowance.toLocaleString()}`],
-      ["Special Allowance", `Rs ${payroll.special_allowance.toLocaleString()}`],
-      ["Overtime Pay", `Rs ${payroll.overtime_pay.toLocaleString()}`],
+      ["Basic Salary", `Rs ${(payroll.basic_salary || 0).toLocaleString()}`],
+      ["House Rent Allowance", `Rs ${(payroll.hra || 0).toLocaleString()}`],
+      ["Medical Allowance", `Rs ${(payroll.medical_allowance || 0).toLocaleString()}`],
+      ["Conveyance Allowance", `Rs ${(payroll.conveyance_allowance || 0).toLocaleString()}`],
+      ["Special Allowance", `Rs ${(payroll.special_allowance || 0).toLocaleString()}`],
+      ["Overtime Pay", `Rs ${(payroll.overtime_pay || 0).toLocaleString()}`],
     ];
     
     const deductions = [
-      ["Income Tax", `Rs ${payroll.income_tax.toLocaleString()}`],
-      ["EOBI", `Rs ${payroll.eobi.toLocaleString()}`],
-      ["PESSI/SESSI", `Rs ${payroll.pessi.toLocaleString()}`],
-      ["Loan/Advance", `Rs ${payroll.loan_deduction.toLocaleString()}`],
-      ["Late Arrival", `Rs ${payroll.late_deduction.toLocaleString()}`],
-      ["Absence", `Rs ${payroll.absence_deduction.toLocaleString()}`],
+      ["Income Tax", `Rs ${(payroll.income_tax || 0).toLocaleString()}`],
+      ["EOBI", `Rs ${(payroll.eobi || 0).toLocaleString()}`],
+      ["PESSI/SESSI", `Rs ${(payroll.pessi || 0).toLocaleString()}`],
+      ["Loan/Advance", `Rs ${(payroll.loan_deduction || 0).toLocaleString()}`],
+      ["Late Arrival", `Rs ${(payroll.late_deduction || 0).toLocaleString()}`],
+      ["Absence", `Rs ${(payroll.absence_deduction || 0).toLocaleString()}`],
     ];
 
     autoTable(doc, {
@@ -1143,15 +1143,15 @@ const HRStaff = () => {
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(`Gross Salary: Rs ${payroll.gross_salary.toLocaleString()}`, 14, finalY);
-    doc.text(`Net Salary: Rs ${payroll.net_salary.toLocaleString()}`, 14, finalY + 8);
+    doc.text(`Gross Salary: Rs ${(payroll.gross_salary || 0).toLocaleString()}`, 14, finalY);
+    doc.text(`Net Salary: Rs ${(payroll.net_salary || 0).toLocaleString()}`, 14, finalY + 8);
 
     // Net salary in words
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text("Net Salary in Words:", 14, finalY + 18);
     doc.setFont("helvetica", "bold");
-    doc.text(numberToWords(payroll.net_salary).toUpperCase(), 14, finalY + 24);
+    doc.text(numberToWords(payroll.net_salary || 0).toUpperCase(), 14, finalY + 24);
 
     // Signature placeholders
     doc.setFont("helvetica", "normal");
@@ -1296,11 +1296,11 @@ const HRStaff = () => {
         s.id,
         s.name,
         s.department,
-        `Rs ${ (latestPayroll ? latestPayroll.basic : s.salary).toLocaleString() }`,
-        `Rs ${ (latestPayroll ? latestPayroll.bonuses : 0).toLocaleString() }`,
-        `Rs ${ (latestPayroll ? (latestPayroll.allowances.transport + latestPayroll.allowances.meal + (latestPayroll.allowances.housing || 0)) : 0).toLocaleString() }`,
-        `Rs ${ (latestPayroll ? (latestPayroll.deductions.tax + latestPayroll.deductions.loans + latestPayroll.deductions.absences) : 0).toLocaleString() }`,
-        `Rs ${ (latestPayroll ? latestPayroll.netPay : s.salary).toLocaleString() }`,
+        `Rs ${((latestPayroll ? latestPayroll.basic : s.salary) || 0).toLocaleString()}`,
+        `Rs ${((latestPayroll ? latestPayroll.bonuses : 0) || 0).toLocaleString()}`,
+        `Rs ${((latestPayroll ? (latestPayroll.allowances.transport + latestPayroll.allowances.meal + (latestPayroll.allowances.housing || 0)) : 0) || 0).toLocaleString()}`,
+        `Rs ${((latestPayroll ? (latestPayroll.deductions.tax + latestPayroll.deductions.loans + latestPayroll.deductions.absences) : 0) || 0).toLocaleString()}`,
+        `Rs ${((latestPayroll ? latestPayroll.netPay : s.salary) || 0).toLocaleString()}`,
         latestPayroll ? "Paid" : "Pending",
         latestPayroll ? latestPayroll.date : '-'
       ];
@@ -1308,7 +1308,7 @@ const HRStaff = () => {
 
     const grandTotal = staff.reduce((acc, s) => {
       const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-      return acc + (latestPayroll ? latestPayroll.netPay : s.salary);
+      return acc + ((latestPayroll ? latestPayroll.netPay : s.salary) || 0);
     }, 0);
 
     autoTable(doc, {
@@ -1337,6 +1337,24 @@ const HRStaff = () => {
       return acc + (s.payrollHistory || []).reduce((sum: number, p: any) => sum + (p.netPay || 0), 0);
     }, 0);
   }, [staff]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Loading HR data...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 bg-destructive/10 border border-destructive rounded-lg">
+        <p className="text-destructive font-bold">Error loading data</p>
+        <p className="text-muted-foreground text-sm">{error}</p>
+        <Button onClick={fetchHRData} className="mt-4">Try Again</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-10">
@@ -1390,12 +1408,12 @@ const HRStaff = () => {
           </div>
           
           <div className="flex items-center gap-4 w-full sm:w-auto bg-card border border-border rounded-lg px-4 py-2">
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground">Monthly Total Payroll</span>
-              <span className="text-sm font-bold text-success">
-                ₨ {monthlyPayrollTotal.toLocaleString()}
-              </span>
-            </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground">Monthly Total Payroll</span>
+                <span className="text-sm font-bold text-success">
+                  ₨ {(monthlyPayrollTotal || 0).toLocaleString()}
+                </span>
+              </div>
             <div className="h-8 w-[1px] bg-border mx-2" />
             <div className="flex flex-col">
               <span className="text-[10px] uppercase font-bold text-muted-foreground">Active Staff</span>
@@ -1546,7 +1564,7 @@ const HRStaff = () => {
                     </div>
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Monthly Salary</p>
-                      <p className="font-bold text-success">₨ {s.salary.toLocaleString()}</p>
+                      <p className="font-bold text-success">₨ {(s.salary || 0).toLocaleString()}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Joining Date</p>
@@ -1657,7 +1675,7 @@ const HRStaff = () => {
                     </div>
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Rate</p>
-                      <p className="font-bold">₨ {worker.rate.toLocaleString()} <span className="text-[9px] text-muted-foreground font-normal">{worker.rateType}</span></p>
+                      <p className="font-bold">₨ {(worker.rate || 0).toLocaleString()} <span className="text-[9px] text-muted-foreground font-normal">{worker.rateType}</span></p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-muted-foreground font-bold uppercase tracking-widest text-[9px]">Contact</p>
@@ -1672,7 +1690,7 @@ const HRStaff = () => {
                   <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                     <div className="flex flex-col">
                       <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Total Paid</span>
-                      <span className="text-sm font-black text-success">₨ {worker.totalPaid.toLocaleString()}</span>
+                      <span className="text-sm font-black text-success">₨ {(worker.totalPaid || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="h-8 gap-2 px-3 text-[10px] font-bold uppercase tracking-wider" onClick={() => handlePrintWorkerCard(worker)}>
@@ -1735,7 +1753,7 @@ const HRStaff = () => {
                           <td className="px-4 py-3 font-bold">{outsideWorkers.find(w => w.id === a.workerId)?.name}</td>
                           <td className="px-4 py-3">{a.eventName}</td>
                           <td className="px-4 py-3 text-muted-foreground">{a.date}</td>
-                          <td className="px-4 py-3 text-right font-bold">₨ {a.amount.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right font-bold">₨ {(a.amount || 0).toLocaleString()}</td>
                           <td className="px-4 py-3 text-center">
                             <Input 
                               type="number" 
@@ -1808,7 +1826,7 @@ const HRStaff = () => {
                           <td className="px-4 py-3 font-bold">{outsideWorkers.find(w => w.id === p.workerId)?.name}</td>
                           <td className="px-4 py-3 capitalize">{p.method}</td>
                           <td className="px-4 py-3 text-muted-foreground">{p.eventId || "General Payment"}</td>
-                          <td className="px-4 py-3 text-right font-bold text-success">₨ {p.amount.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right font-bold text-success">₨ {(p.amount || 0).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1928,7 +1946,7 @@ const HRStaff = () => {
                           <p className="text-[10px] text-muted-foreground">{s.id}</p>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{latestPayroll ? latestPayroll.month : format(new Date(), 'MMMM yyyy')}</td>
-                        <td className="px-4 py-3 font-bold text-success">₨ {netSalary.toLocaleString()}</td>
+                        <td className="px-4 py-3 font-bold text-success">₨ {(netSalary || 0).toLocaleString()}</td>
                         <td className="px-4 py-3">
                           <Badge variant="outline" className={statusColor(latestPayroll ? "paid" : "pending")}>
                             {latestPayroll ? "Paid" : "Pending"}
@@ -1961,10 +1979,10 @@ const HRStaff = () => {
                   <tr>
                     <td colSpan={2} className="px-4 py-3 text-sm uppercase tracking-wider text-right">Total Monthly Payroll:</td>
                     <td className="px-4 py-3 text-success text-lg">
-                      ₨ {staff.reduce((acc, s) => {
+                      ₨ {(staff.reduce((acc, s) => {
                         const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-                        return acc + (latestPayroll ? latestPayroll.netPay : s.salary);
-                      }, 0).toLocaleString()}
+                        return acc + ((latestPayroll ? latestPayroll.netPay : s.salary) || 0);
+                      }, 0) || 0).toLocaleString()}
                     </td>
                     <td colSpan={2}></td>
                   </tr>
@@ -2100,7 +2118,7 @@ const HRStaff = () => {
                     <tr key={a.id} className="text-sm hover:bg-muted/20">
                       <td className="px-4 py-3 font-medium">{a.name}</td>
                       <td className="px-4 py-3 text-muted-foreground">{a.date}</td>
-                      <td className="px-4 py-3">₨ {a.amount.toLocaleString()}</td>
+                      <td className="px-4 py-3">₨ {(a.amount || 0).toLocaleString()}</td>
                       <td className="px-4 py-3">{a.reason}</td>
                       <td className="px-4 py-3">
                         <Badge variant="outline" className={statusColor(a.status)}>{a.status}</Badge>
@@ -2286,7 +2304,7 @@ const HRStaff = () => {
               <div className="space-y-4">
                 <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Earnings & Allowances</p>
                 <div className="space-y-2">
-                  <Label className="text-xs">Basic Salary: ₨ {payrollForm.basicSalary.toLocaleString()}</Label>
+                  <Label className="text-xs">Basic Salary: ₨ {(payrollForm.basicSalary || 0).toLocaleString()}</Label>
                   <div className="space-y-1.5">
                     <Label>House Rent Allowance</Label>
                     <Input type="number" value={payrollForm.allowances.houseRent} onChange={e => setPayrollForm({ ...payrollForm, allowances: { ...payrollForm.allowances, houseRent: Number(e.target.value) } })} />
@@ -2342,7 +2360,7 @@ const HRStaff = () => {
             <div className="p-4 bg-muted rounded-lg flex justify-between items-center">
               <span className="font-bold">Net Payable:</span>
               <span className="text-xl font-bold text-success">
-                ₨ {(payrollForm.basicSalary + payrollForm.allowances.houseRent + payrollForm.allowances.medical + payrollForm.allowances.conveyance + payrollForm.allowances.special + payrollForm.overtime.pay - payrollForm.deductions.tax - payrollForm.deductions.eobi - payrollForm.deductions.pessi - payrollForm.deductions.loans - payrollForm.deductions.late - payrollForm.deductions.absences).toLocaleString()}
+                ₨ {((payrollForm.basicSalary || 0) + (payrollForm.allowances.houseRent || 0) + (payrollForm.allowances.medical || 0) + (payrollForm.allowances.conveyance || 0) + (payrollForm.allowances.special || 0) + (payrollForm.overtime.pay || 0) - (payrollForm.deductions.tax || 0) - (payrollForm.deductions.eobi || 0) - (payrollForm.deductions.pessi || 0) - (payrollForm.deductions.loans || 0) - (payrollForm.deductions.late || 0) - (payrollForm.deductions.absences || 0)).toLocaleString()}
               </span>
             </div>
           </div>
@@ -2523,25 +2541,25 @@ const HRStaff = () => {
               <div className="p-3 rounded-lg border border-border bg-muted/20">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Paid</p>
                 <p className="text-lg font-bold text-success">
-                  ₨ {(ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + h.netPay, 0).toLocaleString()}
+                  ₨ {((ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + (h.netPay || 0), 0) || 0).toLocaleString()}
                 </p>
               </div>
               <div className="p-3 rounded-lg border border-border bg-muted/20">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Advances</p>
                 <p className="text-lg font-bold text-destructive">
-                  ₨ {(ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + h.deductions.loans, 0).toLocaleString()}
+                  ₨ {((ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + (h.deductions.loans || 0), 0) || 0).toLocaleString()}
                 </p>
               </div>
               <div className="p-3 rounded-lg border border-border bg-muted/20">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Deductions</p>
                 <p className="text-lg font-bold text-destructive">
-                  ₨ {(ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + (h.deductions.tax + h.deductions.absences), 0).toLocaleString()}
+                  ₨ {((ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + ((h.deductions.tax || 0) + (h.deductions.absences || 0)), 0) || 0).toLocaleString()}
                 </p>
               </div>
               <div className="p-3 rounded-lg border border-border bg-muted/20">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground">Running Balance</p>
                 <p className="text-lg font-bold text-primary">
-                  ₨ {(ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + h.netPay, 0).toLocaleString()}
+                  ₨ {((ledgerStaff?.payrollHistory || []).reduce((acc: number, h: any) => acc + (h.netPay || 0), 0) || 0).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -2566,18 +2584,18 @@ const HRStaff = () => {
                       (() => {
                         let runningBalance = 0;
                         return ledgerStaff.payrollHistory.map((h: any) => {
-                          runningBalance += h.netPay;
+                          runningBalance += (h.netPay || 0);
                           return (
                             <tr key={h.id} className="text-sm hover:bg-muted/20">
                               <td className="px-4 py-3 text-muted-foreground">{h.date}</td>
                               <td className="px-4 py-3 font-medium">{h.month}</td>
-                              <td className="px-4 py-3 text-right">₨ {h.basic.toLocaleString()}</td>
-                              <td className="px-4 py-3 text-right">₨ {(h.allowances.transport + h.allowances.meal + (h.allowances.housing || 0)).toLocaleString()}</td>
-                              <td className="px-4 py-3 text-right">₨ {h.bonuses.toLocaleString()}</td>
-                              <td className="px-4 py-3 text-right text-destructive">₨ {h.deductions.loans.toLocaleString()}</td>
-                              <td className="px-4 py-3 text-right text-destructive">₨ {(h.deductions.tax + h.deductions.absences).toLocaleString()}</td>
-                              <td className="px-4 py-3 text-right font-bold text-success">₨ {h.netPay.toLocaleString()}</td>
-                              <td className="px-4 py-3 text-right font-bold text-primary">₨ {runningBalance.toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right">₨ {(h.basic || 0).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right">₨ {((h.allowances.transport || 0) + (h.allowances.meal || 0) + (h.allowances.housing || 0)).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right">₨ {(h.bonuses || 0).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right text-destructive">₨ {(h.deductions.loans || 0).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right text-destructive">₨ {((h.deductions.tax || 0) + (h.deductions.absences || 0)).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right font-bold text-success">₨ {(h.netPay || 0).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right font-bold text-primary">₨ {(runningBalance || 0).toLocaleString()}</td>
                             </tr>
                           );
                         });
@@ -2678,24 +2696,24 @@ const HRStaff = () => {
               <div className="space-y-3 bg-muted/30 p-4 rounded-lg">
                 <div className="flex justify-between text-sm">
                   <span>Basic Salary</span>
-                  <span>₨ {selectedPayslip.payroll.basic.toLocaleString()}</span>
+                  <span>₨ {(selectedPayslip.payroll.basic || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Allowances (Transport, Meal, Housing)</span>
-                  <span>₨ {(selectedPayslip.payroll.allowances.transport + selectedPayslip.payroll.allowances.meal + (selectedPayslip.payroll.allowances.housing || 0)).toLocaleString()}</span>
+                  <span>₨ {((selectedPayslip.payroll.allowances.transport || 0) + (selectedPayslip.payroll.allowances.meal || 0) + (selectedPayslip.payroll.allowances.housing || 0)).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Bonuses</span>
-                  <span>₨ {selectedPayslip.payroll.bonuses.toLocaleString()}</span>
+                  <span>₨ {(selectedPayslip.payroll.bonuses || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm text-destructive">
                   <span>Deductions (Tax, Loan, Absence)</span>
-                  <span>-₨ {(selectedPayslip.payroll.deductions.tax + selectedPayslip.payroll.deductions.loans + selectedPayslip.payroll.deductions.absences).toLocaleString()}</span>
+                  <span>-₨ {((selectedPayslip.payroll.deductions.tax || 0) + (selectedPayslip.payroll.deductions.loans || 0) + (selectedPayslip.payroll.deductions.absences || 0)).toLocaleString()}</span>
                 </div>
                 <div className="h-[1px] bg-border my-2" />
                 <div className="flex justify-between font-bold text-lg">
                   <span>Net Payable</span>
-                  <span className="text-success">₨ {selectedPayslip.payroll.netPay.toLocaleString()}</span>
+                  <span className="text-success">₨ {(selectedPayslip.payroll.netPay || 0).toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -2705,7 +2723,7 @@ const HRStaff = () => {
             <Button className="gap-2" onClick={() => {
               toast.success("Downloading payslip as PDF...");
               // Simulated PDF download
-              const content = `Payslip for ${selectedPayslip?.staff.name} - ${selectedPayslip?.payroll.month}\nNet Pay: Rs ${selectedPayslip?.payroll.netPay.toLocaleString()}`;
+              const content = `Payslip for ${selectedPayslip?.staff.name} - ${selectedPayslip?.payroll.month}\nNet Pay: Rs ${ (selectedPayslip?.payroll.netPay || 0).toLocaleString()}`;
               const blob = new Blob([content], { type: 'text/plain' });
               const link = document.createElement("a");
               link.href = URL.createObjectURL(blob);
@@ -2752,7 +2770,7 @@ const HRStaff = () => {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Salary</Label>
-                    <p className="text-sm font-bold text-success">₨ {selectedStaff.salary?.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-success">₨ {(selectedStaff.salary || 0)?.toLocaleString()}</p>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Email Address</Label>
@@ -2937,7 +2955,7 @@ const HRStaff = () => {
               <Select onValueChange={v => setOutsidePaymentForm({ ...outsidePaymentForm, workerId: v })}>
                 <SelectTrigger><SelectValue placeholder="Choose Worker" /></SelectTrigger>
                 <SelectContent>
-                  {outsideWorkers.map(w => <SelectItem key={w.id} value={w.id}>{w.name} (₨ {w.totalPaid.toLocaleString()} paid)</SelectItem>)}
+                  {outsideWorkers.map(w => <SelectItem key={w.id} value={w.id}>{w.name} (₨ {(w.totalPaid || 0).toLocaleString()} paid)</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -3095,7 +3113,7 @@ const HRStaff = () => {
                   label: "Total Paid (Month)", 
                   value: `₨ ${staff.reduce((acc, s) => {
                     const latestPayroll = s.payrollHistory?.find(h => h.month === format(new Date(), 'MMMM yyyy'));
-                    return acc + (latestPayroll?.status === 'paid' ? latestPayroll.netPay : 0);
+                    return acc + ((latestPayroll?.status === 'paid' ? latestPayroll.netPay : 0) || 0);
                   }, 0).toLocaleString()}`,
                   icon: DollarSign,
                   color: "text-success",
@@ -3117,14 +3135,14 @@ const HRStaff = () => {
                 },
                 { 
                   label: "Total Advances", 
-                  value: `₨ ${staff.reduce((acc, s) => acc + (s.payrollHistory?.reduce((sum, h) => sum + h.deductions.loans, 0) || 0), 0).toLocaleString()}`,
+                  value: `₨ ${staff.reduce((acc, s) => acc + ((s.payrollHistory?.reduce((sum, h) => sum + (h.deductions.loans || 0), 0) || 0)), 0).toLocaleString()}`,
                   icon: Receipt,
                   color: "text-destructive",
                   bg: "bg-destructive/10"
                 },
                 { 
                   label: "Total Deductions", 
-                  value: `₨ ${staff.reduce((acc, s) => acc + (s.payrollHistory?.reduce((sum, h) => sum + (h.deductions.tax + h.deductions.absences), 0) || 0), 0).toLocaleString()}`,
+                  value: `₨ ${staff.reduce((acc, s) => acc + ((s.payrollHistory?.reduce((sum, h) => sum + ((h.deductions.tax || 0) + (h.deductions.absences || 0)), 0) || 0)), 0).toLocaleString()}`,
                   icon: TrendingDown,
                   color: "text-destructive",
                   bg: "bg-destructive/10"
@@ -3165,7 +3183,7 @@ const HRStaff = () => {
                       <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
                       <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `₨${v/1000}k`} />
                       <Tooltip 
-                        formatter={(v: any) => [`₨ ${v.toLocaleString()}`, 'Total Payroll']}
+                        formatter={(v: any) => [`₨ ${(v || 0).toLocaleString()}`, 'Total Payroll']}
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                       />
                       <Bar dataKey="total" fill="#4f46e5" radius={[4, 4, 0, 0]} />
@@ -3199,7 +3217,7 @@ const HRStaff = () => {
                           <Cell key={`cell-${index}`} fill={color} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(v: any) => [`₨ ${v.toLocaleString()}`, 'Salary']} />
+                      <Tooltip formatter={(v: any) => [`₨ ${(v || 0).toLocaleString()}`, 'Salary']} />
                       <Legend verticalAlign="bottom" height={36}/>
                     </PieChart>
                   </ResponsiveContainer>
@@ -3249,11 +3267,11 @@ const HRStaff = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-4 text-right text-xs">₨ {basic.toLocaleString()}</td>
-                          <td className="px-4 py-4 text-right text-xs text-success">₨ {bonus.toLocaleString()}</td>
-                          <td className="px-4 py-4 text-right text-xs text-primary">₨ {allowances.toLocaleString()}</td>
-                          <td className="px-4 py-4 text-right text-xs text-destructive">₨ {deductions.toLocaleString()}</td>
-                          <td className="px-4 py-4 text-right font-bold text-success">₨ {netPay.toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right text-xs">₨ {(basic || 0).toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right text-xs text-success">₨ {(bonus || 0).toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right text-xs text-primary">₨ {(allowances || 0).toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right text-xs text-destructive">₨ {(deductions || 0).toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right font-bold text-success">₨ {(netPay || 0).toLocaleString()}</td>
                           <td className="px-4 py-4 text-center">
                             <Badge variant="outline" className={`text-[10px] px-2 py-0 ${statusColor(latestPayroll ? "paid" : "pending")}`}>
                               {latestPayroll ? "Paid" : "Pending"}
@@ -3269,10 +3287,10 @@ const HRStaff = () => {
                       <td className="px-4 py-6 text-sm uppercase tracking-wider">Grand Total</td>
                       <td colSpan={4}></td>
                       <td className="px-4 py-6 text-right text-lg text-success">
-                        ₨ {staff.reduce((acc, s) => {
+                        ₨ {(staff.reduce((acc, s) => {
                           const latestPayroll = s.payrollHistory?.[s.payrollHistory.length - 1];
-                          return acc + (latestPayroll ? latestPayroll.netPay : s.salary);
-                        }, 0).toLocaleString()}
+                          return acc + ((latestPayroll ? latestPayroll.netPay : s.salary) || 0);
+                        }, 0) || 0).toLocaleString()}
                       </td>
                       <td colSpan={2}></td>
                     </tr>
