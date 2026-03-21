@@ -146,7 +146,7 @@ const HRStaff = () => {
     try {
       const { data: staffData, error: staffError } = await supabase
         .from('staff')
-        .select('id, name, role, department, salary, phone, email, joining_date, status, avatar')
+        .select('id, name, role, department, salary, phone, email, joining_date, status, avatar, address, emergency_contact')
         .order('name');
       if (staffError) throw staffError;
 
@@ -402,6 +402,8 @@ const HRStaff = () => {
         salary: Number(editStaff.salary ?? 0),
         phone: editStaff.phone,
         email: editStaff.email,
+        address: editStaff.address,
+        emergency_contact: editStaff.emergency_contact || editStaff.emergencyContact,
         joining_date: editStaff.joining_date || editStaff.joinDate,
         status: editStaff.status,
         avatar: editStaff.avatar
@@ -1599,6 +1601,7 @@ const HRStaff = () => {
                   </Select>
                 </div>
                 <div className="space-y-1.5"><Label>Phone Number</Label><Input value={editStaff.phone} onChange={e => setEditStaff({ ...editStaff, phone: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Emergency Contact</Label><Input value={editStaff.emergency_contact || editStaff.emergencyContact || ""} onChange={e => setEditStaff({ ...editStaff, emergency_contact: e.target.value })} /></div>
                 <div className="col-span-full space-y-1.5"><Label>Residential Address</Label><Textarea value={editStaff.address} onChange={e => setEditStaff({ ...editStaff, address: e.target.value })} className="resize-none" /></div>
               </div>
             </div>

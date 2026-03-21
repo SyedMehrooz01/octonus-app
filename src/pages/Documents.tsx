@@ -8,7 +8,9 @@ import {
   Loader2, 
   PlusCircle, 
   Save, 
-  FileDown 
+  FileDown,
+  Receipt,
+  History
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -283,12 +285,12 @@ const Documents = () => {
     }
 
     // Table
-    const tableData = doc.items.map((item, index) => [
+    const tableData = (doc?.items ?? []).map((item, index) => [
       index + 1,
-      item.description,
-      item.qty,
-      item.rate.toLocaleString(),
-      item.amount.toLocaleString()
+      item?.description ?? "N/A",
+      item?.qty ?? 0,
+      (item?.rate ?? 0).toLocaleString(),
+      (item?.amount ?? 0).toLocaleString()
     ]);
 
     autoTable(pdf, {
@@ -365,22 +367,22 @@ const Documents = () => {
       ["S.NO", "DESCRIPTION", "QTY", "RATE (RS.)", "AMOUNT (RS.)"]
     ];
 
-    const itemRows = doc.items.map((item, index) => [
+    const itemRows = (doc?.items ?? []).map((item, index) => [
       index + 1,
-      item.description,
-      item.qty,
-      item.rate,
-      item.amount
+      item?.description ?? "N/A",
+      item?.qty ?? 0,
+      item?.rate ?? 0,
+      item?.amount ?? 0
     ]);
 
     const totalRows = [
       [],
-      ["", "", "", "TOTAL AMOUNT:", doc.total_amount],
-      ["", "", "", "SRB (15%):", doc.srb_amount],
-      ["", "", "", "SUB TOTAL:", doc.sub_total],
+      ["", "", "", "TOTAL AMOUNT:", doc?.total_amount ?? 0],
+      ["", "", "", "SRB (15%):", doc?.srb_amount ?? 0],
+      ["", "", "", "SUB TOTAL:", doc?.sub_total ?? 0],
       [],
       ["TERMS & CONDITIONS:"],
-      ...doc.terms.split("\n").map(line => [line]),
+      ...(doc?.terms ?? "").split("\n").map(line => [line]),
       [],
       ["E.&O.E."]
     ];
@@ -415,10 +417,10 @@ const Documents = () => {
     }
   };
 
-  const filteredDocs = documents.filter(doc => 
-    doc.client_company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.event_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.doc_no.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredDocs = (documents ?? []).filter(doc => 
+    (doc?.client_company ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (doc?.event_name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (doc?.doc_no ?? "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -437,6 +439,9 @@ const Documents = () => {
           </TabsTrigger>
           <TabsTrigger value="Invoice" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
             <Receipt className="h-4 w-4" /> Invoice
+          </TabsTrigger>
+          <TabsTrigger value="archive" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
+            <History className="h-4 w-4" /> Archive
           </TabsTrigger>
         </TabsList>
 
@@ -509,13 +514,13 @@ const Documents = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {items.map((item, index) => (
+                        {(items ?? []).map((item, index) => (
                           <tr key={index} className="group hover:bg-slate-50/50">
                             <td className="px-4 py-3 text-center font-bold text-slate-400">{index + 1}</td>
                             <td className="px-4 py-3">
                               <Input 
                                 placeholder="Item description" 
-                                value={item.description} 
+                                value={item?.description ?? ""} 
                                 onChange={e => handleItemChange(index, "description", e.target.value)}
                                 className="border-none focus-visible:ring-0 bg-transparent font-bold"
                               />
@@ -523,7 +528,7 @@ const Documents = () => {
                             <td className="px-4 py-3">
                               <Input 
                                 type="number" 
-                                value={item.qty} 
+                                value={item?.qty ?? 0} 
                                 onChange={e => handleItemChange(index, "qty", e.target.value)}
                                 className="text-center font-bold h-9 rounded-lg"
                               />
@@ -531,12 +536,12 @@ const Documents = () => {
                             <td className="px-4 py-3">
                               <Input 
                                 type="number" 
-                                value={item.rate} 
+                                value={item?.rate ?? 0} 
                                 onChange={e => handleItemChange(index, "rate", e.target.value)}
                                 className="text-right font-bold h-9 rounded-lg"
                               />
                             </td>
-                            <td className="px-4 py-3 text-right font-black text-slate-700">{item.amount.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-right font-black text-slate-700">{(item?.amount ?? 0).toLocaleString()}</td>
                             <td className="px-4 py-3 text-center">
                               <Button 
                                 variant="ghost" 
@@ -658,27 +663,27 @@ const Documents = () => {
                           <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mt-4">Retrieving Archives...</p>
                         </td>
                       </tr>
-                    ) : filteredDocs.length === 0 ? (
+                    ) : (filteredDocs ?? []).length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-20 text-center">
                           <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No documents found in archive</p>
                         </td>
                       </tr>
                     ) : (
-                      filteredDocs.map((doc, idx) => (
-                        <tr key={doc.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
-                          <td className="px-8 py-6 font-black text-blue-600 tracking-tight">{doc.doc_no}</td>
+                      (filteredDocs ?? []).map((doc, idx) => (
+                        <tr key={doc?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
+                          <td className="px-8 py-6 font-black text-blue-600 tracking-tight">{doc?.doc_no}</td>
                           <td className="px-8 py-6">
-                            <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${doc.type === 'Quotation' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                              {doc.type}
+                            <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${doc?.type === 'Quotation' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                              {doc?.type}
                             </Badge>
                           </td>
                           <td className="px-8 py-6">
-                            <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{doc.client_company}</p>
-                            <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">{doc.event_name}</p>
+                            <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{doc?.client_company}</p>
+                            <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">{doc?.event_name}</p>
                           </td>
-                          <td className="px-8 py-6 text-sm font-black text-slate-500 tracking-tight">{format(new Date(doc.date), 'MMM dd, yyyy')}</td>
-                          <td className="px-8 py-6 text-right font-black text-[#0f172a] tracking-tight">{formatCurrency(doc.sub_total)}</td>
+                          <td className="px-8 py-6 text-sm font-black text-slate-500 tracking-tight">{doc?.date ? format(new Date(doc.date), 'MMM dd, yyyy') : "N/A"}</td>
+                          <td className="px-8 py-6 text-right font-black text-[#0f172a] tracking-tight">{formatCurrency(doc?.sub_total ?? 0)}</td>
                           <td className="px-8 py-6 text-right">
                             <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
                               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 shadow-sm" onClick={() => generatePDF(doc)}>
@@ -687,7 +692,7 @@ const Documents = () => {
                               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-100/50 shadow-sm" onClick={() => generateExcel(doc)}>
                                 <Download className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 shadow-sm" onClick={() => doc.id && handleDelete(doc.id)}>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 shadow-sm" onClick={() => doc?.id && handleDelete(doc.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>

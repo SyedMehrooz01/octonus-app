@@ -528,33 +528,33 @@ const EventBooking = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {loading ? (
+                      {loading ? (
                     Array(5).fill(0).map((_, i) => (
                       <tr key={i}><td colSpan={7} className="px-8 py-10"><div className="h-14 w-full animate-pulse rounded-2xl bg-slate-50" /></td></tr>
                     ))
-                  ) : paginatedBookings.length > 0 ? (
-                    paginatedBookings.map((b, idx) => (
-                      <tr key={b.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'} hover:bg-blue-50/50 transition-colors group`}>
+                  ) : (paginatedBookings ?? []).length > 0 ? (
+                    (paginatedBookings ?? []).map((b, idx) => (
+                      <tr key={b?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'} hover:bg-blue-50/50 transition-colors group`}>
                         <td className="px-8 py-6">
-                          <button onClick={() => openClientProfile(b.clientName, b.phone)} className="text-left group/client">
-                            <p className="text-base font-black text-[#0f172a] leading-none group-hover/client:text-blue-600 transition-colors">{b.clientName}</p>
-                            <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">{b.phone}</p>
+                          <button onClick={() => b?.clientName && b?.phone && openClientProfile(b.clientName, b.phone)} className="text-left group/client">
+                            <p className="text-base font-black text-[#0f172a] leading-none group-hover/client:text-blue-600 transition-colors">{b?.clientName}</p>
+                            <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">{b?.phone}</p>
                           </button>
                         </td>
                         <td className="px-8 py-6">
                           <Badge variant="outline" className="rounded-lg font-black text-[9px] uppercase tracking-widest bg-white border-slate-200 text-slate-600 px-2.5 py-1 shadow-sm">
-                            {b.eventType}
+                            {b?.eventType}
                           </Badge>
                         </td>
                         <td className="px-8 py-6">
                           <div className="flex flex-col">
-                            <span className="text-sm font-black text-slate-700 tracking-tight">{format(new Date(b.eventDate), 'MMM dd, yyyy')}</span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{b.venue}</span>
+                            <span className="text-sm font-black text-slate-700 tracking-tight">{b?.eventDate ? format(new Date(b.eventDate), 'MMM dd, yyyy') : "N/A"}</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{b?.venue}</span>
                           </div>
                         </td>
                         <td className="px-8 py-6 text-center">
                           <span className="inline-flex items-center justify-center h-9 w-14 rounded-xl bg-slate-50 font-black text-[11px] text-slate-600 border border-slate-200/50 shadow-sm">
-                            {b.guests}
+                            {b?.guests ?? 0}
                           </span>
                         </td>
                         <td className="px-8 py-6">
@@ -655,14 +655,14 @@ const EventBooking = () => {
                   return <div key={day.toISOString()} className={`min-h-[120px] rounded-xl border p-2 transition-all ${isToday ? "border-primary bg-primary/5 shadow-sm" : db.length>0?"border-blue-100 bg-blue-50/30":"border-border/50 hover:bg-muted/30"}`}>
                     <div className={`mb-2 text-xs font-black ${isToday ? "text-primary" : "text-muted-foreground"}`}>{format(day,"d")}</div>
                     <div className="space-y-1">
-                      {db.map((b,i)=>(
-                        <div key={i} className="truncate rounded-lg px-2 py-1.5 text-[9px] font-black border shadow-sm cursor-pointer hover:brightness-95 transition-all uppercase tracking-tighter" onClick={() => { setSelected(bookings.find(x => x.clientName === b.name) || null); setShowView(true); }}
+                      {(db ?? []).map((b,i)=>(
+                        <div key={i} className="truncate rounded-lg px-2 py-1.5 text-[9px] font-black border shadow-sm cursor-pointer hover:brightness-95 transition-all uppercase tracking-tighter" onClick={() => { setSelected((bookings ?? []).find(x => x?.clientName === b?.name) || null); setShowView(true); }}
                           style={{
-                            backgroundColor: b.status === "confirmed" ? "#dcfce7" : b.status === "tentative" ? "#fef9c3" : b.status === "cancelled" ? "#fee2e2" : "#ffedd5",
-                            color: b.status === "confirmed" ? "#166534" : b.status === "tentative" ? "#854f0b" : b.status === "cancelled" ? "#991b1b" : "#9a3412",
-                            borderColor: b.status === "confirmed" ? "#bbf7d0" : b.status === "tentative" ? "#fef08a" : b.status === "cancelled" ? "#fecaca" : "#fed7aa"
+                            backgroundColor: b?.status === "confirmed" ? "#dcfce7" : b?.status === "tentative" ? "#fef9c3" : b?.status === "cancelled" ? "#fee2e2" : "#ffedd5",
+                            color: b?.status === "confirmed" ? "#166534" : b?.status === "tentative" ? "#854f0b" : b?.status === "cancelled" ? "#991b1b" : "#9a3412",
+                            borderColor: b?.status === "confirmed" ? "#bbf7d0" : b?.status === "tentative" ? "#fef08a" : b?.status === "cancelled" ? "#fecaca" : "#fed7aa"
                           }}>
-                          {b.name}
+                          {b?.name}
                         </div>
                       ))}
                     </div>
@@ -678,14 +678,14 @@ const EventBooking = () => {
             {loadingMenus ? (
               Array(2).fill(0).map((_, i) => <div key={i} className="h-64 w-full animate-pulse rounded-2xl bg-muted" />)
             ) : (
-              menus.filter(m=>m.name!=="Custom").map(menu=>(
-                <div key={menu.id} className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md">
+              (menus ?? []).filter(m=>m?.name!=="Custom").map(menu=>(
+                <div key={menu?.id} className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md">
                   <div className="flex items-center justify-between border-b border-border p-6 bg-muted/5">
                     <div>
-                      <h3 className="text-lg font-black text-foreground tracking-tight">{menu.name}</h3>
-                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-1">{menu.items.length} Production Items</p>
+                      <h3 className="text-lg font-black text-foreground tracking-tight">{menu?.name}</h3>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-1">{(menu?.items ?? []).length} Production Items</p>
                     </div>
-                    {canDo("add") && (
+                    {canDo("add") && menu?.id && (
                       <Button variant="outline" size="sm" onClick={() => handleAddClick(menu.id)} className="rounded-xl font-bold border-primary/20 text-primary hover:bg-primary/5 h-9">
                         <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item
                       </Button>
@@ -702,13 +702,13 @@ const EventBooking = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
-                        {menu.items.map((item,idx)=>(
-                          <tr key={item.id || idx} className="hover:bg-muted/10 transition-colors group">
-                            <td className="px-6 py-4 text-sm font-bold text-foreground">{item.item}</td>
-                            <td className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase">{item.unit}</td>
-                            <td className="px-6 py-4 text-sm font-black text-primary">₨ {item.rate}</td>
+                        {(menu?.items ?? []).map((item,idx)=>(
+                          <tr key={item?.id || idx} className="hover:bg-muted/10 transition-colors group">
+                            <td className="px-6 py-4 text-sm font-bold text-foreground">{item?.item}</td>
+                            <td className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase">{item?.unit}</td>
+                            <td className="px-6 py-4 text-sm font-black text-primary">₨ {item?.rate}</td>
                             <td className="px-6 py-4 text-right">
-                              {canDo("edit") && (
+                              {canDo("edit") && menu?.id && (
                                 <button onClick={() => handleEditClick(item, menu.id)} className="rounded-lg p-2 hover:bg-emerald-50 text-emerald-600 transition-colors opacity-0 group-hover:opacity-100">
                                   <Edit className="h-4 w-4"/>
                                 </button>
@@ -746,7 +746,7 @@ const EventBooking = () => {
                       <SelectValue placeholder="Select an upcoming event schedule..."/>
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-border shadow-2xl p-2">
-                      {bookings.filter(b=>b.status!=="cancelled").map(b=><SelectItem key={b.id} value={String(b.id)} className="py-3 rounded-xl font-bold">{b.clientName} — {format(new Date(b.eventDate), 'MMMM dd, yyyy')}</SelectItem>)}
+                      {(bookings ?? []).filter(b=>b?.status!=="cancelled").map(b=><SelectItem key={b?.id} value={String(b?.id)} className="py-3 rounded-xl font-bold">{b?.clientName} — {b?.eventDate ? format(new Date(b.eventDate), 'MMMM dd, yyyy') : "N/A"}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -854,14 +854,14 @@ const EventBooking = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {bookings.filter(b=>b.thirdParty).map(b=>{
-                    const profit=b.sellingRate-b.supplierCost;
-                    const margin=b.sellingRate>0?Math.round((profit/b.sellingRate)*100):0;
+                  {(bookings ?? []).filter(b=>b?.thirdParty).map(b=>{
+                    const profit=(b?.sellingRate ?? 0)-(b?.supplierCost ?? 0);
+                    const margin=(b?.sellingRate ?? 0)>0?Math.round((profit/(b?.sellingRate ?? 1))*100):0;
                     return(
-                      <tr key={b.id} className="hover:bg-primary/5 transition-colors">
+                      <tr key={b?.id} className="hover:bg-primary/5 transition-colors">
                         <td className="px-8 py-6">
-                          <p className="text-sm font-black text-foreground">{b.clientName}</p>
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter mt-1">{format(new Date(b.eventDate), 'MMMM dd, yyyy')}</p>
+                          <p className="text-sm font-black text-foreground">{b?.clientName}</p>
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter mt-1">{b?.eventDate ? format(new Date(b.eventDate), 'MMMM dd, yyyy') : "N/A"}</p>
                         </td>
                         <td className="px-8 py-6 text-sm font-black text-rose-500">₨ {(b?.supplierCost ?? 0).toLocaleString()}</td>
                         <td className="px-8 py-6 text-sm font-black text-foreground">₨ {(b?.sellingRate ?? 0).toLocaleString()}</td>
