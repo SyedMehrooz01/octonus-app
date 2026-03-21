@@ -526,7 +526,6 @@ const HRStaff = () => {
       toast.success(`Successfully marked ${absentRecords.length} staff members as absent`);
       logAction(`Auto-marked ${absentRecords.length} staff as absent for ${today}`, "HR & Staff");
     } catch (err: any) {
-      console.error("Auto absent error:", err);
       toast.error(err?.message || "Failed to run auto-absent process");
     }
   };
@@ -1055,14 +1054,14 @@ const HRStaff = () => {
 
   const handleExportEOBIReport = () => {
     const data = (staff ?? []).map(s => {
-      const latestPayroll = (s.payrollHistory ?? [])[0];
+      const latestPayroll = (s?.payrollHistory ?? [])[0];
       return {
-        "Employee ID": s.id,
-        "Name": s.name,
-        "Department": s.department,
-        "Basic Salary": s.salary ?? 0,
-        "EOBI Contribution": (s.salary ?? 0) * 0.01,
-        "Month": latestPayroll ? latestPayroll.month : format(new Date(), "MMMM yyyy")
+        "Employee ID": s?.id ?? "N/A",
+        "Name": s?.name ?? "Unknown",
+        "Department": s?.department ?? "N/A",
+        "Basic Salary": s?.salary ?? 0,
+        "EOBI Contribution": (s?.salary ?? 0) * 0.01,
+        "Month": latestPayroll ? (latestPayroll?.month ?? "N/A") : format(new Date(), "MMMM yyyy")
       };
     });
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -1076,14 +1075,14 @@ const HRStaff = () => {
 
   const handleExportTaxReport = () => {
     const data = (staff ?? []).map(s => {
-      const latestPayroll = (s.payrollHistory ?? [])[0];
+      const latestPayroll = (s?.payrollHistory ?? [])[0];
       return {
-        "Employee ID": s.id,
-        "Name": s.name,
-        "Department": s.department,
-        "Annual Salary": (s.salary ?? 0) * 12,
-        "Monthly Tax Deduction": calculateTax((s.salary ?? 0) * 12),
-        "Month": latestPayroll ? latestPayroll.month : format(new Date(), "MMMM yyyy")
+        "Employee ID": s?.id ?? "N/A",
+        "Name": s?.name ?? "Unknown",
+        "Department": s?.department ?? "N/A",
+        "Annual Salary": (s?.salary ?? 0) * 12,
+        "Monthly Tax Deduction": calculateTax((s?.salary ?? 0) * 12),
+        "Month": latestPayroll ? (latestPayroll?.month ?? "N/A") : format(new Date(), "MMMM yyyy")
       };
     });
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -1110,11 +1109,11 @@ const HRStaff = () => {
   const handlePrintCard = (staff: any) => {
     const printWindow = window.open('', '_blank', 'width=600,height=400');
     if (!printWindow) return;
-    const initials = staff.name.split(' ').map((n:any) => n[0]).join('').toUpperCase();
+    const initials = (staff?.name ?? "U").split(' ').map((n:any) => n[0]).join('').toUpperCase();
     const html = `
       <html>
         <head>
-          <title>ID Card - ${staff.name}</title>
+          <title>ID Card - ${staff?.name ?? "Staff"}</title>
           <style>
             body { font-family: 'Inter', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f0; }
             .card { width: 350px; height: 220px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; display: flex; border: 2px solid #e2e8f0; }
@@ -1132,13 +1131,13 @@ const HRStaff = () => {
         </head>
         <body>
           <div class="card">
-            <div class="left"><div class="avatar">${initials}</div><div class="emp-id">${staff.id}</div></div>
+            <div class="left"><div class="avatar">${initials}</div><div class="emp-id">${staff?.id ?? "N/A"}</div></div>
             <div class="right">
-              <h1 class="name">${staff.name}</h1>
-              <p class="role">${staff.role}</p>
-              <div class="field"><p class="label">Department</p><p class="value">${staff.department}</p></div>
-              <div class="field"><p class="label">Email</p><p class="value">${staff.email}</p></div>
-              <div class="field"><p class="label">Joining Date</p><p class="value">${staff.joinDate}</p></div>
+              <h1 class="name">${staff?.name ?? "Unknown"}</h1>
+              <p class="role">${staff?.role ?? "Staff"}</p>
+              <div class="field"><p class="label">Department</p><p class="value">${staff?.department ?? "N/A"}</p></div>
+              <div class="field"><p class="label">Email</p><p class="value">${staff?.email ?? "N/A"}</p></div>
+              <div class="field"><p class="label">Joining Date</p><p class="value">${staff?.joinDate ?? "N/A"}</p></div>
             </div>
           </div>
           <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 500); }</script>
@@ -1157,7 +1156,8 @@ const HRStaff = () => {
     doc.setTextColor(100);
     doc.text(`Generated on: ${format(new Date(), 'PPP')}`, 14, 30);
     const tableData = (staff ?? []).map(s => {
-      const latestPayroll = s?.payrollHistory?.[s?.payrollHistory?.length - 1];
+      const history = s?.payrollHistory ?? [];
+      const latestPayroll = history[history.length - 1];
       const allowances = latestPayroll ? (latestPayroll?.allowances ?? 0) : 0;
       const deductions = latestPayroll ? (latestPayroll?.deductions ?? 0) : 0;
       const netPay = latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0);
@@ -1165,14 +1165,15 @@ const HRStaff = () => {
       const bonus = latestPayroll ? (latestPayroll?.bonuses ?? 0) : 0;
       return [
         s?.id ?? "N/A", s?.name ?? "Unknown", s?.department ?? "N/A",
-        `Rs ${(basic || 0).toLocaleString()}`, `Rs ${(bonus || 0).toLocaleString()}`,
-        `Rs ${(allowances || 0).toLocaleString()}`, `Rs ${(deductions || 0).toLocaleString()}`,
-        `Rs ${(netPay || 0).toLocaleString()}`, latestPayroll ? (latestPayroll?.status ?? "Paid") : "Pending",
+        `Rs ${(basic ?? 0).toLocaleString()}`, `Rs ${(bonus ?? 0).toLocaleString()}`,
+        `Rs ${(allowances ?? 0).toLocaleString()}`, `Rs ${(deductions ?? 0).toLocaleString()}`,
+        `Rs ${(netPay ?? 0).toLocaleString()}`, latestPayroll ? (latestPayroll?.status ?? "Paid") : "Pending",
         latestPayroll ? (latestPayroll?.date ?? "N/A") : '-'
       ];
     });
     const grandTotal = (staff ?? []).reduce((acc, s) => {
-      const latestPayroll = s?.payrollHistory?.[s?.payrollHistory?.length - 1];
+      const history = s?.payrollHistory ?? [];
+      const latestPayroll = history[history.length - 1];
       return acc + ((latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0)) || 0);
     }, 0);
     autoTable(doc, {
@@ -1817,7 +1818,13 @@ const HRStaff = () => {
           </DialogHeader>
           <div className="py-6 space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              {[ { label: "Total Paid (Month)", value: `₨ ${(staff.reduce((acc, s) => { const latestPayroll = s.payrollHistory?.find(h => h.month === format(new Date(), 'MMMM yyyy')); return acc + ((latestPayroll?.status === 'paid' ? latestPayroll.netPay : 0) || 0); }, 0) || 0).toLocaleString()}`, icon: DollarSign, color: "text-success", bg: "bg-success/10" }, { label: "Total Payments", value: staff.reduce((acc, s) => acc + (s.payrollHistory?.length || 0), 0), icon: CheckCircle, color: "text-primary", bg: "bg-primary/10" }, { label: "Pending Payments", value: staff.filter(s => !s.payrollHistory?.some(h => h.month === format(new Date(), 'MMMM yyyy'))).length, icon: Clock, color: "text-warning", bg: "bg-warning/10" }, { label: "Total Advances", value: `₨ ${(staff.reduce((acc, s) => acc + ((s.payrollHistory?.reduce((sum, h) => sum + (h.deductions.loans || 0), 0) || 0)), 0) || 0).toLocaleString()}`, icon: Receipt, color: "text-destructive", bg: "bg-destructive/10" }, { label: "Total Deductions", value: `₨ ${(staff.reduce((acc, s) => acc + ((s.payrollHistory?.reduce((sum, h) => sum + ((h.deductions.tax || 0) + (h.deductions.absences || 0)), 0) || 0)), 0) || 0).toLocaleString()}`, icon: TrendingDown, color: "text-destructive", bg: "bg-destructive/10" } ].map((card, i) => (
+              {[ 
+                { label: "Total Paid (Month)", value: `₨ ${((staff ?? []).reduce((acc, s) => { const latestPayroll = (s?.payrollHistory ?? []).find(h => h?.month === format(new Date(), 'MMMM yyyy')); return acc + ((latestPayroll?.status === 'paid' ? (latestPayroll?.netPay ?? 0) : 0) || 0); }, 0) || 0).toLocaleString()}`, icon: DollarSign, color: "text-success", bg: "bg-success/10" }, 
+                { label: "Total Payments", value: (staff ?? []).reduce((acc, s) => acc + (s?.payrollHistory ?? []).length, 0), icon: CheckCircle, color: "text-primary", bg: "bg-primary/10" }, 
+                { label: "Pending Payments", value: (staff ?? []).filter(s => !(s?.payrollHistory ?? []).some(h => h?.month === format(new Date(), 'MMMM yyyy'))).length, icon: Clock, color: "text-warning", bg: "bg-warning/10" }, 
+                { label: "Total Advances", value: `₨ ${((staff ?? []).reduce((acc, s) => acc + (((s?.payrollHistory ?? [])?.reduce((sum, h) => sum + (h?.deductions?.loans ?? 0), 0) || 0)), 0) || 0).toLocaleString()}`, icon: Receipt, color: "text-destructive", bg: "bg-destructive/10" }, 
+                { label: "Total Deductions", value: `₨ ${((staff ?? []).reduce((acc, s) => acc + (((s?.payrollHistory ?? [])?.reduce((sum, h) => sum + ((h?.deductions?.tax ?? 0) + (h?.deductions?.absences ?? 0)), 0) || 0)), 0) || 0).toLocaleString()}`, icon: TrendingDown, color: "text-destructive", bg: "bg-destructive/10" } 
+              ].map((card, i) => (
                 <div key={i} className="p-4 rounded-xl border border-border bg-card shadow-sm"><div className="flex items-center gap-3 mb-2"><div className={`p-2 rounded-lg ${card.bg}`}><card.icon className={`h-4 w-4 ${card.color}`} /></div><p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{card.label}</p></div><p className={`text-xl font-bold ${card.color}`}>{card.value}</p></div>
               ))}
             </div>

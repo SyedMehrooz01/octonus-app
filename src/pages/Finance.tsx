@@ -106,30 +106,30 @@ const Finance = () => {
     try {
       const { data: vData } = await supabase.from('suppliers').select('*');
       if (vData) {
-        setVendors(vData.map((v: any) => ({
-          id: v.id,
-          name: v.name,
-          contact: v.contact_number,
-          category: v.service_type,
-          total_bills: v.opening_balance || 0,
-          paid: (v.opening_balance || 0) - (v.current_balance || 0),
-          balance: v.current_balance || 0
+        setVendors((vData ?? []).map((v: any) => ({
+          id: v?.id ?? "",
+          name: v?.name ?? "Unknown",
+          contact: v?.contact_number ?? "N/A",
+          category: v?.service_type ?? "N/A",
+          total_bills: v?.opening_balance ?? 0,
+          paid: (v?.opening_balance ?? 0) - (v?.current_balance ?? 0),
+          balance: v?.current_balance ?? 0
         })));
       }
       
       const { data: pData } = await supabase.from('supplier_payments').select('*').order('date', { ascending: false });
       if (pData) {
-        setVendorPayments(pData.map((p: any) => ({
-          id: p.id,
-          vendor_id: p.supplier_id,
-          date: p.date,
-          amount: p.amount,
-          method: p.method,
-          notes: p.notes
+        setVendorPayments((pData ?? []).map((p: any) => ({
+          id: p?.id ?? "",
+          vendor_id: p?.supplier_id ?? "",
+          date: p?.date ?? format(new Date(), "yyyy-MM-dd"),
+          amount: p?.amount ?? 0,
+          method: p?.method ?? "Cash",
+          notes: p?.notes ?? ""
         })));
       }
     } catch (err) {
-      console.error("Error fetching vendors:", err);
+      toast({ title: "Error", description: "Failed to fetch vendors", variant: "destructive" });
     }
   };
 
@@ -142,29 +142,29 @@ const Finance = () => {
     init();
   }, []);
 
-  const filtered = ledger.filter(l => {
-    const matchesSearch = l.description.toLowerCase().includes(search.toLowerCase());
-    const matchesAccount = accountFilter === "all" || l.account === accountFilter;
-    const matchesDate = isWithinInterval(parseISO(l.date), { 
+  const filtered = (ledger ?? []).filter(l => {
+    const matchesSearch = (l?.description ?? "").toLowerCase().includes((search ?? "").toLowerCase());
+    const matchesAccount = accountFilter === "all" || l?.account === accountFilter;
+    const matchesDate = isWithinInterval(parseISO(l?.date ?? format(new Date(), "yyyy-MM-dd")), { 
       start: parseISO(fromDate), 
       end: parseISO(toDate) 
     });
     return matchesSearch && matchesAccount && matchesDate;
   });
 
-  const totalDebit = ledger.filter(l=>l.type==="debit").reduce((s,l)=>s+l.amount,0);
-  const totalCredit = ledger.filter(l=>l.type==="credit").reduce((s,l)=>s+l.amount,0);
+  const totalDebit = (ledger ?? []).filter(l=>l?.type==="debit").reduce((s,l)=>s+(l?.amount ?? 0),0);
+  const totalCredit = (ledger ?? []).filter(l=>l?.type==="credit").reduce((s,l)=>s+(l?.amount ?? 0),0);
   const netBalance = totalDebit - totalCredit;
-  const totalRevenue = EVENT_FINANCE.filter(e=>e.status!=="cancelled").reduce((s,e)=>s+e.totalAmount,0);
-  const totalPending = EVENT_FINANCE.filter(e=>e.status!=="cancelled").reduce((s,e)=>s+e.balance,0);
-  const totalProfit = EVENT_FINANCE.filter(e=>e.status!=="cancelled").reduce((s,e)=>s+e.profit,0);
+  const totalRevenue = (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.totalAmount ?? 0),0);
+  const totalPending = (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.balance ?? 0),0);
+  const totalProfit = (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.profit ?? 0),0);
 
   const handleAdd = () => {
     if (!newEntry.description||!newEntry.amount) return;
     const amount = Number(newEntry.amount);
-    const lastBal = ledger[ledger.length-1]?.balance||0;
+    const lastBal = (ledger ?? [])[(ledger ?? []).length-1]?.balance||0;
     const balance = newEntry.type==="debit" ? lastBal+amount : lastBal-amount;
-    setLedger([...ledger,{id:Date.now(),...newEntry,amount,balance}]);
+    setLedger([...(ledger ?? []),{id:Date.now(),...newEntry,amount,balance}]);
     setNewEntry({date: format(new Date(), "yyyy-MM-dd"),description:"",account:"Cash",type:"debit",amount:""});
     setShowAdd(false); toast({title:"Entry added"});
   };
@@ -174,15 +174,15 @@ const Finance = () => {
     setIsSaving(true);
     try {
       const amt = Number(payAmount);
-      setSuppliers(suppliers.map(s => s.id === selectedSupplier.id 
-        ? { ...s, paid: s.paid + amt, balance: Math.max(0, s.balance - amt) } 
+      setSuppliers((suppliers ?? []).map(s => s?.id === selectedSupplier?.id 
+        ? { ...s, paid: (s?.paid ?? 0) + amt, balance: Math.max(0, (s?.balance ?? 0) - amt) } 
         : s
       ));
       toast({ title: "Supplier payment recorded" });
       setShowPaySupplier(false);
       setPayAmount("");
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err?.message || "Payment failed", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -194,7 +194,7 @@ const Finance = () => {
     try {
       const amt = Number(vendorPayForm.amount);
       const { error: pErr } = await supabase.from('supplier_payments').insert([{
-        supplier_id: selectedVendor.id,
+        supplier_id: selectedVendor?.id,
         amount: amt,
         method: vendorPayForm.method,
         date: vendorPayForm.date,
@@ -203,15 +203,15 @@ const Finance = () => {
       if (pErr) throw pErr;
 
       const { error: sErr } = await supabase.from('suppliers').update({
-        current_balance: selectedVendor.balance - amt
-      }).eq('id', selectedVendor.id);
+        current_balance: (selectedVendor?.balance ?? 0) - amt
+      }).eq('id', selectedVendor?.id);
       if (sErr) throw sErr;
 
       toast({title:"Vendor payment recorded"});
       setShowPayVendor(false);
       fetchVendors();
     } catch (err: any) {
-      toast({title:"Error", description: err.message, variant: "destructive"});
+      toast({title:"Error", description: err?.message || "Payment failed", variant: "destructive"});
     } finally {
       setIsSaving(false);
     }
@@ -239,14 +239,14 @@ const Finance = () => {
   };
 
   const exportPL = (format: 'pdf' | 'excel') => {
-    const data = EVENT_FINANCE.map(e => ({
-      Event: e.event,
-      Date: e.date,
-      Revenue: e.totalAmount,
-      "Menu Cost": e.menuCost,
-      "3rd Party Cost": e.thirdPartyCost,
-      Profit: e.profit,
-      Margin: `${Math.round((e.profit/e.totalAmount)*100)}%`
+    const data = (EVENT_FINANCE ?? []).map(e => ({
+      Event: e?.event ?? "N/A",
+      Date: e?.date ?? "N/A",
+      Revenue: e?.totalAmount ?? 0,
+      "Menu Cost": e?.menuCost ?? 0,
+      "3rd Party Cost": e?.thirdPartyCost ?? 0,
+      Profit: e?.profit ?? 0,
+      Margin: `${Math.round(((e?.profit ?? 0)/(e?.totalAmount ?? 1))*100)}%`
     }));
 
     if (format === 'excel') {
@@ -259,13 +259,13 @@ const Finance = () => {
   };
 
   const exportStatement = (format: 'pdf' | 'excel') => {
-    const data = filtered.map(l => ({
-      Date: l.date,
-      Description: l.description,
-      Account: l.account,
-      Type: l.type,
-      Amount: l.amount,
-      Balance: l.balance
+    const data = (filtered ?? []).map(l => ({
+      Date: l?.date ?? "N/A",
+      Description: l?.description ?? "N/A",
+      Account: l?.account ?? "N/A",
+      Type: l?.type ?? "N/A",
+      Amount: l?.amount ?? 0,
+      Balance: l?.balance ?? 0
     }));
 
     if (format === 'excel') {
@@ -277,7 +277,7 @@ const Finance = () => {
     }
   };
 
-  const totalAdvances = EVENT_FINANCE.reduce((s,e)=>s+e.advance,0);
+  const totalAdvances = (EVENT_FINANCE ?? []).reduce((s,e)=>s+(e?.advance ?? 0),0);
   
   const yearlyMonths = eachMonthOfInterval({
     start: startOfYear(parseISO(`${selectedYear}-01-01`)),
@@ -300,10 +300,10 @@ const Finance = () => {
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          {l:"Total Revenue",v:`₨ ${totalRevenue.toLocaleString()}`,c:"from-emerald-500 to-emerald-700",shadow:"shadow-emerald-500/20",icon:TrendingUp},
-          {l:"Total Expenses",v:`₨ ${totalCredit.toLocaleString()}`,c:"from-rose-500 to-rose-700",shadow:"shadow-rose-500/20",icon:TrendingDown},
-          {l:"Net Cash Balance",v:`₨ ${netBalance.toLocaleString()}`,c:"from-blue-500 to-blue-700",shadow:"shadow-blue-500/20",icon:Landmark},
-          {l:"Pending Receivables",v:`₨ ${totalPending.toLocaleString()}`,c:"from-amber-500 to-amber-700",shadow:"shadow-amber-500/20",icon:Wallet}
+          {l:"Total Revenue",v:`₨ ${(totalRevenue ?? 0).toLocaleString()}`,c:"from-emerald-500 to-emerald-700",shadow:"shadow-emerald-500/20",icon:TrendingUp},
+          {l:"Total Expenses",v:`₨ ${(totalCredit ?? 0).toLocaleString()}`,c:"from-rose-500 to-rose-700",shadow:"shadow-rose-500/20",icon:TrendingDown},
+          {l:"Net Cash Balance",v:`₨ ${(netBalance ?? 0).toLocaleString()}`,c:"from-blue-500 to-blue-700",shadow:"shadow-blue-500/20",icon:Landmark},
+          {l:"Pending Receivables",v:`₨ ${(totalPending ?? 0).toLocaleString()}`,c:"from-amber-500 to-amber-700",shadow:"shadow-amber-500/20",icon:Wallet}
         ].map((c, i)=>(
           <div key={c.l} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${c.c} p-6 text-white shadow-xl ${c.shadow} transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
             <div className="relative z-10 flex flex-col gap-4">
@@ -390,10 +390,10 @@ const Finance = () => {
                           {l.type}
                         </Badge>
                       </td>
-                      <td className={`px-6 py-6 text-sm font-black text-right tracking-tight ${l.type==="debit"?"text-emerald-600":"text-rose-600"}`}>
-                        {l.type==="debit"?"+":"-"} ₨ {l.amount.toLocaleString()}
+                      <td className={`px-6 py-6 text-sm font-black text-right tracking-tight ${l?.type==="debit"?"text-emerald-600":"text-rose-600"}`}>
+                        {l?.type==="debit"?"+":"-"} ₨ {(l?.amount ?? 0).toLocaleString()}
                       </td>
-                      <td className="px-6 py-6 text-sm font-black text-right text-[#0f172a] tracking-tight">₨ {l.balance.toLocaleString()}</td>
+                      <td className="px-6 py-6 text-sm font-black text-right text-[#0f172a] tracking-tight">₨ {(l?.balance ?? 0).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -402,7 +402,7 @@ const Finance = () => {
                     <td colSpan={4} className="px-6 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Aggregate Cash Position</td>
                     <td colSpan={2} className={`px-6 py-8 text-right`}>
                       <span className={`px-8 py-3 rounded-2xl font-black text-xl shadow-xl ${netBalance>=0?"bg-emerald-500 text-white shadow-emerald-500/20":"bg-rose-500 text-white shadow-rose-500/20"}`}>
-                        ₨ {netBalance.toLocaleString()}
+                        ₨ {(netBalance ?? 0).toLocaleString()}
                       </span>
                     </td>
                   </tr>
@@ -432,19 +432,19 @@ const Finance = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {EVENT_FINANCE.map((e, idx)=>(
-                    <tr key={e.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/10'} hover:bg-primary/5 transition-colors`}>
-                      <td className="px-6 py-5 text-sm font-black text-foreground">{e.event}</td>
-                      <td className="px-6 py-5 text-xs font-bold text-muted-foreground uppercase tracking-tighter">{format(new Date(e.date), 'MMM d, yyyy')}</td>
-                      <td className="px-6 py-5 text-sm font-black text-foreground">₨ {e.totalAmount.toLocaleString()}</td>
-                      <td className="px-6 py-5 text-sm font-bold text-emerald-600">₨ {e.advance.toLocaleString()}</td>
-                      <td className="px-6 py-5 text-sm font-bold text-rose-500">₨ {e.balance.toLocaleString()}</td>
+                  {(EVENT_FINANCE ?? []).map((e, idx)=>(
+                    <tr key={e?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/10'} hover:bg-primary/5 transition-colors`}>
+                      <td className="px-6 py-5 text-sm font-black text-foreground">{e?.event}</td>
+                      <td className="px-6 py-5 text-xs font-bold text-muted-foreground uppercase tracking-tighter">{e?.date ? format(new Date(e.date), 'MMM d, yyyy') : "N/A"}</td>
+                      <td className="px-6 py-5 text-sm font-black text-foreground">₨ {(e?.totalAmount ?? 0).toLocaleString()}</td>
+                      <td className="px-6 py-5 text-sm font-bold text-emerald-600">₨ {(e?.advance ?? 0).toLocaleString()}</td>
+                      <td className="px-6 py-5 text-sm font-bold text-rose-500">₨ {(e?.balance ?? 0).toLocaleString()}</td>
                       <td className="px-6 py-5 text-center">
-                        <span className="inline-flex px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-black text-sm">₨ {e.profit.toLocaleString()}</span>
+                        <span className="inline-flex px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-black text-sm">₨ {(e?.profit ?? 0).toLocaleString()}</span>
                       </td>
                       <td className="px-6 py-5 text-right">
-                        <Badge className={`${e.status === 'confirmed' ? 'bg-emerald-500' : 'bg-amber-500'} text-white border-none rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tighter`}>
-                          {e.status}
+                        <Badge className={`${e?.status === 'confirmed' ? 'bg-emerald-500' : 'bg-amber-500'} text-white border-none rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tighter`}>
+                          {e?.status}
                         </Badge>
                       </td>
                     </tr>
@@ -460,21 +460,21 @@ const Finance = () => {
           <div className="rounded-lg border border-border bg-card p-6">
             <h3 className="mb-4 text-base font-semibold text-card-foreground">Advance Tracking — Live Summary</h3>
             <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Total Advances Received</p><p className="text-xl font-bold text-primary">₨{totalAdvances.toLocaleString()}</p></div>
-              <div className="rounded-lg bg-success/5 border border-success/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Total Revenue</p><p className="text-xl font-bold text-success">₨{totalRevenue.toLocaleString()}</p></div>
-              <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Pending Balance</p><p className="text-xl font-bold text-destructive">₨{totalPending.toLocaleString()}</p></div>
+              <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Total Advances Received</p><p className="text-xl font-bold text-primary">₨{(totalAdvances ?? 0).toLocaleString()}</p></div>
+              <div className="rounded-lg bg-success/5 border border-success/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Total Revenue</p><p className="text-xl font-bold text-success">₨{(totalRevenue ?? 0).toLocaleString()}</p></div>
+              <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Pending Balance</p><p className="text-xl font-bold text-destructive">₨{(totalPending ?? 0).toLocaleString()}</p></div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[700px]">
               <thead><tr className="border-b border-border bg-muted/40">{["Event","Total","Advance","Balance","% Paid"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
               <tbody>
-                {EVENT_FINANCE.map(e=>{
-                  const pct = Math.round((e.advance/e.totalAmount)*100);
-                  return <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="px-4 py-3 text-sm font-medium text-card-foreground">{e.event}</td>
-                    <td className="px-4 py-3 text-sm text-card-foreground">₨{e.totalAmount.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-success">₨{e.advance.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-destructive">₨{e.balance.toLocaleString()}</td>
+                {(EVENT_FINANCE ?? []).map(e=>{
+                  const pct = Math.round(((e?.advance ?? 0)/(e?.totalAmount ?? 1))*100);
+                  return <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                    <td className="px-4 py-3 text-sm font-medium text-card-foreground">{e?.event}</td>
+                    <td className="px-4 py-3 text-sm text-card-foreground">₨{(e?.totalAmount ?? 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm text-success">₨{(e?.advance ?? 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm text-destructive">₨{(e?.balance ?? 0).toLocaleString()}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-24 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${pct>=100?"bg-success":pct>=50?"bg-primary":"bg-warning"}`} style={{width:`${pct}%`}}/></div>
@@ -497,20 +497,20 @@ const Finance = () => {
               <table className="w-full min-w-[800px]">
                 <thead><tr className="border-b border-border bg-muted/40">{["Supplier","Contact","Total Bills","Paid","Balance","Action"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                 <tbody>
-                  {suppliers.map(s=>(
-                    <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 text-sm font-medium text-card-foreground">{s.name}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{s.contact}</td>
-                      <td className="px-4 py-3 text-sm text-card-foreground">₨{s.totalBills.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-success">₨{s.paid.toLocaleString()}</td>
-                      <td className={`px-4 py-3 text-sm font-bold ${s.balance>0?"text-destructive":"text-success"}`}>₨{s.balance.toLocaleString()}</td>
-                      <td className="px-4 py-3">{s.balance>0&&<button onClick={()=>{ setSelectedSupplier(s); setShowPaySupplier(true); }} className="rounded bg-primary/10 px-2 py-1 text-xs text-primary hover:bg-primary/20">Pay Now</button>}</td>
+                  {(suppliers ?? []).map(s=>(
+                    <tr key={s?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-3 text-sm font-medium text-card-foreground">{s?.name}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{s?.contact}</td>
+                      <td className="px-4 py-3 text-sm text-card-foreground">₨{(s?.totalBills ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-success">₨{(s?.paid ?? 0).toLocaleString()}</td>
+                      <td className={`px-4 py-3 text-sm font-bold ${(s?.balance ?? 0)>0?"text-destructive":"text-success"}`}>₨{(s?.balance ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3">{(s?.balance ?? 0)>0&&<button onClick={()=>{ setSelectedSupplier(s); setShowPaySupplier(true); }} className="rounded bg-primary/10 px-2 py-1 text-xs text-primary hover:bg-primary/20">Pay Now</button>}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot><tr className="bg-muted/40">
                   <td colSpan={3} className="px-4 py-3 text-sm font-semibold">Total Outstanding</td>
-                  <td colSpan={3} className="px-4 py-3 text-sm font-bold text-destructive">₨{suppliers.reduce((s,x)=>s+x.balance,0).toLocaleString()}</td>
+                  <td colSpan={3} className="px-4 py-3 text-sm font-bold text-destructive">₨{(suppliers ?? []).reduce((s,x)=>s+(x?.balance ?? 0),0).toLocaleString()}</td>
                 </tr></tfoot>
               </table>
             </div>
@@ -531,23 +531,23 @@ const Finance = () => {
               <table className="w-full min-w-[800px]">
                 <thead><tr className="border-b border-border bg-muted/40">{["Vendor","Service","Opening Bal","Paid","Outstanding","Action"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                 <tbody>
-                  {vendors.map(v=>(
-                    <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                  {(vendors ?? []).map(v=>(
+                    <tr key={v?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                       <td className="px-4 py-3 text-sm font-medium text-card-foreground flex items-center gap-2">
                         <Users className="h-4 w-4 text-muted-foreground"/>
-                        {v.name}
+                        {v?.name}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{v.category}</td>
-                      <td className="px-4 py-3 text-sm">₨{v.total_bills.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-success">₨{v.paid.toLocaleString()}</td>
-                      <td className={`px-4 py-3 text-sm font-bold ${v.balance>0?"text-destructive":"text-success"}`}>₨{v.balance.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{v?.category}</td>
+                      <td className="px-4 py-3 text-sm">₨{(v?.total_bills ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-success">₨{(v?.paid ?? 0).toLocaleString()}</td>
+                      <td className={`px-4 py-3 text-sm font-bold ${(v?.balance ?? 0)>0?"text-destructive":"text-success"}`}>₨{(v?.balance ?? 0).toLocaleString()}</td>
                       <td className="px-4 py-3 flex gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => { setSelectedVendor(v); setShowVendorHistory(true); }} className="h-8 px-2"><Eye className="h-4 w-4"/></Button>
-                        {v.balance > 0 && <Button size="sm" onClick={() => { setSelectedVendor(v); setVendorPayForm({...vendorPayForm, amount: ""}); setShowPayVendor(true); }} className="h-8 px-2">Pay</Button>}
+                        <Button size="sm" variant="ghost" onClick={() => { setSelectedVendor(v); setShowVendorHistory(true); }} className="h-8 px-2"><FileText className="h-4 w-4"/></Button>
+                        {(v?.balance ?? 0) > 0 && <Button size="sm" onClick={() => { setSelectedVendor(v); setVendorPayForm({...vendorPayForm, amount: ""}); setShowPayVendor(true); }} className="h-8 px-2">Pay</Button>}
                       </td>
                     </tr>
                   ))}
-                  {vendors.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No vendors found. Add them in Event Booking - Supplier Ledger.</td></tr>}
+                  {(vendors ?? []).length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No vendors found. Add them in Event Booking - Supplier Ledger.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -593,23 +593,23 @@ const Finance = () => {
                   <table className="w-full min-w-[900px]">
                     <thead><tr className="border-b border-border bg-muted/40">{["Event","Revenue","Menu Cost","3rd Party Cost","Net Profit","Margin"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                     <tbody>
-                      {EVENT_FINANCE.map(e=>{
-                        const margin = Math.round((e.profit/e.totalAmount)*100);
-                        return <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                          <td className="px-4 py-3 text-sm font-medium text-card-foreground">{e.event}</td>
-                          <td className="px-4 py-3 text-sm text-success">₨{e.totalAmount.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-sm text-destructive">{e.menuCost>0?`₨${e.menuCost.toLocaleString()}`:"-"}</td>
-                          <td className="px-4 py-3 text-sm text-destructive">{e.thirdPartyCost>0?`₨${e.thirdPartyCost.toLocaleString()}`:"-"}</td>
-                          <td className="px-4 py-3 text-sm font-bold text-success">₨{e.profit.toLocaleString()}</td>
+                      {(EVENT_FINANCE ?? []).map(e=>{
+                        const margin = Math.round(((e?.profit ?? 0)/(e?.totalAmount ?? 1))*100);
+                        return <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                          <td className="px-4 py-3 text-sm font-medium text-card-foreground">{e?.event}</td>
+                          <td className="px-4 py-3 text-sm text-success">₨{(e?.totalAmount ?? 0).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sm text-destructive">{(e?.menuCost ?? 0)>0?`₨${(e?.menuCost ?? 0).toLocaleString()}`:"-"}</td>
+                          <td className="px-4 py-3 text-sm text-destructive">{(e?.thirdPartyCost ?? 0)>0?`₨${(e?.thirdPartyCost ?? 0).toLocaleString()}`:"-"}</td>
+                          <td className="px-4 py-3 text-sm font-bold text-success">₨{(e?.profit ?? 0).toLocaleString()}</td>
                           <td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${margin>=50?"bg-success/10 text-success border-success/20":margin>=30?"bg-warning/10 text-warning border-warning/20":"bg-destructive/10 text-destructive border-destructive/20"}`}>{margin}%</span></td>
                         </tr>;
                       })}
                     </tbody>
                     <tfoot><tr className="bg-muted/40">
                       <td className="px-4 py-3 text-sm font-semibold">Monthly Total</td>
-                      <td className="px-4 py-3 text-sm font-bold text-success">₨{totalRevenue.toLocaleString()}</td>
-                      <td colSpan={2} className="px-4 py-3 text-sm font-bold text-destructive">₨{EVENT_FINANCE.reduce((s,e)=>s+e.menuCost+e.thirdPartyCost,0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-success">₨{totalProfit.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-success">₨{(totalRevenue ?? 0).toLocaleString()}</td>
+                      <td colSpan={2} className="px-4 py-3 text-sm font-bold text-destructive">₨{(EVENT_FINANCE ?? []).reduce((s,e)=>s+(e?.menuCost ?? 0)+(e?.thirdPartyCost ?? 0),0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-success">₨{(totalProfit ?? 0).toLocaleString()}</td>
                       <td/>
                     </tr></tfoot>
                   </table>
@@ -621,25 +621,25 @@ const Finance = () => {
                     <tbody>
                       {yearlyMonths.map(month => {
                         const monthStr = format(month, "MM");
-                        const monthEvents = EVENT_FINANCE.filter(e => e.date.startsWith(`${selectedYear}-${monthStr}`));
-                        const mIncome = monthEvents.reduce((s, e) => s + e.totalAmount, 0);
-                        const mExpenses = monthEvents.reduce((s, e) => s + e.menuCost + e.thirdPartyCost, 0);
+                        const monthEvents = (EVENT_FINANCE ?? []).filter(e => (e?.date ?? "").startsWith(`${selectedYear}-${monthStr}`));
+                        const mIncome = monthEvents.reduce((s, e) => s + (e?.totalAmount ?? 0), 0);
+                        const mExpenses = monthEvents.reduce((s, e) => s + (e?.menuCost ?? 0) + (e?.thirdPartyCost ?? 0), 0);
                         const mProfit = mIncome - mExpenses;
                         return (
                           <tr key={month.toISOString()} className="border-b border-border last:border-0 hover:bg-muted/20">
                             <td className="px-4 py-3 text-sm font-medium text-card-foreground">{format(month, "MMMM")}</td>
-                            <td className="px-4 py-3 text-sm text-success font-bold">₨{mIncome.toLocaleString()}</td>
-                            <td className="px-4 py-3 text-sm text-destructive font-bold">₨{mExpenses.toLocaleString()}</td>
-                            <td className={`px-4 py-3 text-sm font-black ${mProfit >= 0 ? "text-primary" : "text-destructive"}`}>₨{mProfit.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-sm text-success font-bold">₨{(mIncome ?? 0).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-sm text-destructive font-bold">₨{(mExpenses ?? 0).toLocaleString()}</td>
+                            <td className={`px-4 py-3 text-sm font-black ${mProfit >= 0 ? "text-primary" : "text-destructive"}`}>₨{(mProfit ?? 0).toLocaleString()}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                     <tfoot><tr className="bg-muted/40">
                       <td className="px-4 py-3 text-sm font-bold uppercase tracking-widest">Yearly Totals</td>
-                      <td className="px-4 py-3 text-lg font-black text-success">₨{totalRevenue.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-lg font-black text-destructive">₨{EVENT_FINANCE.reduce((s,e)=>s+e.menuCost+e.thirdPartyCost,0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-xl font-black text-primary">₨{totalProfit.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-lg font-black text-success">₨{(totalRevenue ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-lg font-black text-destructive">₨{(EVENT_FINANCE ?? []).reduce((s,e)=>s+(e?.menuCost ?? 0)+(e?.thirdPartyCost ?? 0),0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-xl font-black text-primary">₨{(totalProfit ?? 0).toLocaleString()}</td>
                     </tr></tfoot>
                   </table>
                 </div>
@@ -652,20 +652,20 @@ const Finance = () => {
               <div className="space-y-3">
                 <div className="rounded-lg bg-success/5 border border-success/20 p-4">
                   <h4 className="mb-2 text-sm font-semibold text-success">Income</h4>
-                  {ledger.filter(l=>l.type==="debit").map(l=>(
-                    <div key={l.id} className="flex justify-between py-1 text-sm"><span className="text-muted-foreground">{l.description}</span><span className="font-medium text-card-foreground">₨{l.amount.toLocaleString()}</span></div>
+                  {(ledger ?? []).filter(l=>l?.type==="debit").map(l=>(
+                    <div key={l?.id} className="flex justify-between py-1 text-sm"><span className="text-muted-foreground">{l?.description}</span><span className="font-medium text-card-foreground">₨{(l?.amount ?? 0).toLocaleString()}</span></div>
                   ))}
-                  <div className="mt-2 flex justify-between border-t border-success/20 pt-2 text-sm font-bold"><span>Total Income</span><span className="text-success">₨{totalDebit.toLocaleString()}</span></div>
+                  <div className="mt-2 flex justify-between border-t border-success/20 pt-2 text-sm font-bold"><span>Total Income</span><span className="text-success">₨{(totalDebit ?? 0).toLocaleString()}</span></div>
                 </div>
                 <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-4">
                   <h4 className="mb-2 text-sm font-semibold text-destructive">Expenses</h4>
-                  {ledger.filter(l=>l.type==="credit").map(l=>(
-                    <div key={l.id} className="flex justify-between py-1 text-sm"><span className="text-muted-foreground">{l.description}</span><span className="font-medium text-card-foreground">₨{l.amount.toLocaleString()}</span></div>
+                  {(ledger ?? []).filter(l=>l?.type==="credit").map(l=>(
+                    <div key={l?.id} className="flex justify-between py-1 text-sm"><span className="text-muted-foreground">{l?.description}</span><span className="font-medium text-card-foreground">₨{(l?.amount ?? 0).toLocaleString()}</span></div>
                   ))}
-                  <div className="mt-2 flex justify-between border-t border-destructive/20 pt-2 text-sm font-bold"><span>Total Expenses</span><span className="text-destructive">₨{totalCredit.toLocaleString()}</span></div>
+                  <div className="mt-2 flex justify-between border-t border-destructive/20 pt-2 text-sm font-bold"><span>Total Expenses</span><span className="text-destructive">₨{(totalCredit ?? 0).toLocaleString()}</span></div>
                 </div>
-                <div className={`rounded-lg p-4 ${netBalance>=0?"bg-primary/10 border border-primary/20":"bg-destructive/10 border border-destructive/20"}`}>
-                  <div className="flex justify-between text-base font-bold"><span>Net Profit / Loss</span><span className={netBalance>=0?"text-primary":"text-destructive"}>₨{netBalance.toLocaleString()}</span></div>
+                <div className={`rounded-lg p-4 ${(netBalance ?? 0)>=0?"bg-primary/10 border border-primary/20":"bg-destructive/10 border border-destructive/20"}`}>
+                  <div className="flex justify-between text-base font-bold"><span>Net Profit / Loss</span><span className={(netBalance ?? 0)>=0?"text-primary":"text-destructive"}>₨{(netBalance ?? 0).toLocaleString()}</span></div>
                 </div>
               </div>
             </div>
@@ -695,7 +695,7 @@ const Finance = () => {
         <DialogContent>
           <DialogHeader><DialogTitle>Pay Supplier — {selectedSupplier?.name}</DialogTitle></DialogHeader>
           {selectedSupplier&&<div className="space-y-4">
-            <div className="rounded-lg bg-muted/40 p-3 text-sm"><span className="text-muted-foreground">Outstanding Balance: </span><span className="font-bold text-destructive">₨{selectedSupplier.balance.toLocaleString()}</span></div>
+            <div className="rounded-lg bg-muted/40 p-3 text-sm"><span className="text-muted-foreground">Outstanding Balance: </span><span className="font-bold text-destructive">₨{(selectedSupplier?.balance ?? 0).toLocaleString()}</span></div>
             <div className="space-y-1.5"><Label>Payment Amount (₨)</Label><Input type="number" placeholder="Enter amount" value={payAmount} onChange={e=>setPayAmount(e.target.value)}/></div>
           </div>}
           <DialogFooter><Button variant="outline" onClick={()=>setShowPaySupplier(false)}>Cancel</Button><Button onClick={handlePaySupplier}>Record Payment</Button></DialogFooter>
@@ -713,15 +713,15 @@ const Finance = () => {
             <div className="grid grid-cols-3 gap-4 mb-4">
               <div className="rounded-lg bg-muted/40 p-3 text-center">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground">Opening Bal</p>
-                <p className="text-sm font-bold">₨{selectedVendor?.total_bills.toLocaleString()}</p>
+                <p className="text-sm font-bold">₨{(selectedVendor?.total_bills ?? 0).toLocaleString()}</p>
               </div>
               <div className="rounded-lg bg-success/10 p-3 text-center">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Paid</p>
-                <p className="text-sm font-bold text-success">₨{selectedVendor?.paid.toLocaleString()}</p>
+                <p className="text-sm font-bold text-success">₨{(selectedVendor?.paid ?? 0).toLocaleString()}</p>
               </div>
               <div className="rounded-lg bg-destructive/10 p-3 text-center">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground">Outstanding</p>
-                <p className="text-sm font-bold text-destructive">₨{selectedVendor?.balance.toLocaleString()}</p>
+                <p className="text-sm font-bold text-destructive">₨{(selectedVendor?.balance ?? 0).toLocaleString()}</p>
               </div>
             </div>
             <table className="w-full text-sm">
@@ -733,17 +733,17 @@ const Finance = () => {
                 </tr>
               </thead>
               <tbody>
-                {vendorPayments.filter(p => p.vendor_id === selectedVendor?.id).map(p => (
-                  <tr key={p.id} className="border-b border-border last:border-0">
-                    <td className="px-3 py-2 text-muted-foreground">{p.date}</td>
-                    <td className="px-3 py-2">Payment via {p.method} {p.notes ? `(${p.notes})` : ""}</td>
-                    <td className="px-3 py-2 text-right text-success font-medium">- ₨{p.amount.toLocaleString()}</td>
+                {(vendorPayments ?? []).filter(p => p?.vendor_id === selectedVendor?.id).map(p => (
+                  <tr key={p?.id} className="border-b border-border last:border-0">
+                    <td className="px-3 py-2 text-muted-foreground">{p?.date}</td>
+                    <td className="px-3 py-2">Payment via {p?.method} {p?.notes ? `(${p.notes})` : ""}</td>
+                    <td className="px-3 py-2 text-right text-success font-medium">- ₨{(p?.amount ?? 0).toLocaleString()}</td>
                   </tr>
                 ))}
                 <tr className="bg-muted/20">
                   <td className="px-3 py-2 text-muted-foreground">Opening</td>
                   <td className="px-3 py-2">Initial Balance</td>
-                  <td className="px-3 py-2 text-right font-medium">₨{selectedVendor?.total_bills.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right font-medium">₨{(selectedVendor?.total_bills ?? 0).toLocaleString()}</td>
                 </tr>
               </tbody>
             </table>
@@ -764,7 +764,7 @@ const Finance = () => {
           <div className="space-y-4 py-4">
             <div className="rounded-lg bg-destructive/10 p-3 flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Outstanding Balance:</span>
-              <span className="text-lg font-bold text-destructive">₨{selectedVendor?.balance.toLocaleString()}</span>
+              <span className="text-lg font-bold text-destructive">₨{(selectedVendor?.balance ?? 0).toLocaleString()}</span>
             </div>
             <div className="space-y-1.5">
               <Label>Payment Amount (₨)</Label>

@@ -70,9 +70,8 @@ const Expenses = () => {
         .order('date', { ascending: false });
 
       if (error) throw error;
-      setExpenses(data || []);
+      setExpenses(data ?? []);
     } catch (error: any) {
-      console.error("Error fetching expenses:", error);
       toast.error("Failed to load expenses");
     } finally {
       setLoading(false);
@@ -113,7 +112,6 @@ const Expenses = () => {
       });
       fetchExpenses();
     } catch (error: any) {
-      console.error("Error adding expense:", error);
       toast.error(error.message || "Failed to add expense");
     } finally {
       setIsSubmitting(false);
@@ -121,20 +119,20 @@ const Expenses = () => {
   };
 
   // Filtered expenses for entries tab
-  const filtered = expenses.filter(e => {
-    const matchSearch = e.description?.toLowerCase().includes(search.toLowerCase());
-    const matchHead = filterHead === "all" || e.head === filterHead;
-    const matchMonth = e.date.startsWith(selectedMonth);
+  const filtered = (expenses ?? []).filter(e => {
+    const matchSearch = (e?.description ?? "").toLowerCase().includes((search ?? "").toLowerCase());
+    const matchHead = filterHead === "all" || e?.head === filterHead;
+    const matchMonth = (e?.date ?? "").startsWith(selectedMonth);
     return matchSearch && matchHead && matchMonth;
   });
 
   // Ledger filtering
   const ledgerFiltered = useMemo(() => {
-    return expenses.filter(e => {
-      const matchSearch = e.description?.toLowerCase().includes(ledgerSearch.toLowerCase());
-      const matchHead = ledgerHead === "all" || e.head === ledgerHead;
-      const matchMode = ledgerMode === "all" || e.payment_mode === ledgerMode;
-      const matchDate = isWithinInterval(parseISO(e.date), {
+    return (expenses ?? []).filter(e => {
+      const matchSearch = (e?.description ?? "").toLowerCase().includes((ledgerSearch ?? "").toLowerCase());
+      const matchHead = ledgerHead === "all" || e?.head === ledgerHead;
+      const matchMode = ledgerMode === "all" || e?.payment_mode === ledgerMode;
+      const matchDate = isWithinInterval(parseISO(e?.date ?? format(new Date(), "yyyy-MM-dd")), {
         start: parseISO(fromDate),
         end: parseISO(toDate)
       });
@@ -142,15 +140,15 @@ const Expenses = () => {
     });
   }, [expenses, ledgerSearch, ledgerHead, ledgerMode, fromDate, toDate]);
 
-  const totalPages = Math.ceil(ledgerFiltered.length / itemsPerPage);
-  const paginatedLedger = ledgerFiltered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil((ledgerFiltered ?? []).length / itemsPerPage);
+  const paginatedLedger = (ledgerFiltered ?? []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const todayStr = format(startOfToday(), "yyyy-MM-dd");
   const currentMonthStr = format(new Date(), "yyyy-MM");
 
-  const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
-  const todayExpenses = expenses.filter(e => e.date === todayStr).reduce((s, e) => s + (e.amount || 0), 0);
-  const monthExpenses = expenses.filter(e => e.date?.startsWith(currentMonthStr)).reduce((s, e) => s + (e.amount || 0), 0);
+  const totalExpenses = (expenses ?? []).reduce((s, e) => s + (e?.amount ?? 0), 0);
+  const todayExpenses = (expenses ?? []).filter(e => e?.date === todayStr).reduce((s, e) => s + (e?.amount ?? 0), 0);
+  const monthExpenses = (expenses ?? []).filter(e => e?.date?.startsWith(currentMonthStr)).reduce((s, e) => s + (e?.amount ?? 0), 0);
 
   // Yearly Breakdown logic
   const yearlyMonths = useMemo(() => {
@@ -160,35 +158,35 @@ const Expenses = () => {
     });
   }, [selectedYear]);
 
-  const yearlyExpenses = expenses.filter(e => e.date.startsWith(selectedYear));
-  const totalYearly = yearlyExpenses.reduce((s, e) => s + e.amount, 0);
+  const yearlyExpenses = (expenses ?? []).filter(e => (e?.date ?? "").startsWith(selectedYear));
+  const totalYearly = (yearlyExpenses ?? []).reduce((s, e) => s + (e?.amount ?? 0), 0);
 
   const yearlyByMonth = yearlyMonths.map(month => {
     const mStr = format(month, "yyyy-MM");
     return {
       label: format(month, "MMMM"),
-      total: expenses.filter(e => e.date.startsWith(mStr)).reduce((s, e) => s + e.amount, 0)
+      total: (expenses ?? []).filter(e => (e?.date ?? "").startsWith(mStr)).reduce((s, e) => s + (e?.amount ?? 0), 0)
     };
   });
 
   const yearlyByHead = EXPENSE_HEADS.map(head => ({
     head,
-    total: yearlyExpenses.filter(e => e.head === head).reduce((s, e) => s + e.amount, 0)
-  })).filter(h => h.total > 0).sort((a, b) => b.total - a.total);
+    total: (yearlyExpenses ?? []).filter(e => e?.head === head).reduce((s, e) => s + (e?.amount ?? 0), 0)
+  })).filter(h => (h?.total ?? 0) > 0).sort((a, b) => (b?.total ?? 0) - (a?.total ?? 0));
 
   // Grouping logic for reports
   const groupByCategory = useMemo(() => {
     return EXPENSE_HEADS.map(head => ({
       name: head,
-      total: expenses.filter(e => e.head === head).reduce((s, e) => s + e.amount, 0)
-    })).filter(g => g.total > 0).sort((a, b) => b.total - a.total);
+      total: (expenses ?? []).filter(e => e?.head === head).reduce((s, e) => s + (e?.amount ?? 0), 0)
+    })).filter(g => (g?.total ?? 0) > 0).sort((a, b) => (b?.total ?? 0) - (a?.total ?? 0));
   }, [expenses]);
 
   const groupByPayment = useMemo(() => {
     return PAYMENT_MODES.map(mode => ({
       name: mode,
-      total: expenses.filter(e => e.payment_mode === mode).reduce((s, e) => s + e.amount, 0)
-    })).filter(g => g.total > 0).sort((a, b) => b.total - a.total);
+      total: (expenses ?? []).filter(e => e?.payment_mode === mode).reduce((s, e) => s + (e?.amount ?? 0), 0)
+    })).filter(g => (g?.total ?? 0) > 0).sort((a, b) => (b?.total ?? 0) - (a?.total ?? 0));
   }, [expenses]);
 
   // Export functions
@@ -221,12 +219,12 @@ const Expenses = () => {
   };
 
   const exportLedger = (type: 'pdf' | 'excel') => {
-    const data = ledgerFiltered.map(e => ({
-      Date: e.date,
-      Description: e.description,
-      Category: e.head,
-      Mode: e.payment_mode,
-      Amount: e.amount
+    const data = (ledgerFiltered ?? []).map(e => ({
+      Date: e?.date ?? "N/A",
+      Description: e?.description ?? "N/A",
+      Category: e?.head ?? "N/A",
+      Mode: e?.payment_mode ?? "N/A",
+      Amount: e?.amount ?? 0
     }));
 
     if (type === 'excel') {
@@ -240,11 +238,11 @@ const Expenses = () => {
 
   const exportYearly = (type: 'pdf' | 'excel') => {
     if (type === 'excel') {
-      const data = yearlyByMonth.map(m => ({ Month: m.label, Total: m.total }));
+      const data = (yearlyByMonth ?? []).map(m => ({ Month: m?.label ?? "N/A", Total: m?.total ?? 0 }));
       exportToExcel(data, `Yearly_Expense_Report_${selectedYear}`);
     } else {
       const headers = ["Month", "Total Expense"];
-      const rows = yearlyByMonth.map(m => [m.label, `₨ ${m.total.toLocaleString()}`]);
+      const rows = (yearlyByMonth ?? []).map(m => [m?.label ?? "N/A", `₨ ${(m?.total ?? 0).toLocaleString()}`]);
       exportToPDF(headers, rows, `Yearly Expense Report - ${selectedYear}`, `Yearly_Report_${selectedYear}`);
     }
   };
@@ -278,16 +276,16 @@ const Expenses = () => {
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {[
-          { label: "Today's Burn Rate", value: `₨ ${todayExpenses.toLocaleString()}`, icon: Calendar, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20", sub: format(new Date(), "PP") },
+          { label: "Today's Burn Rate", value: `₨ ${(todayExpenses ?? 0).toLocaleString()}`, icon: Calendar, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20", sub: format(new Date(), "PP") },
           { 
             label: viewType === "monthly" ? "Current Month Burn" : "Annual Burn Rate", 
-            value: `₨ ${(viewType === "monthly" ? monthExpenses : totalYearly).toLocaleString()}`, 
+            value: `₨ ${((viewType === "monthly" ? monthExpenses : totalYearly) ?? 0).toLocaleString()}`, 
             icon: TrendingDown, 
             color: "from-orange-500 to-orange-700",
             shadow: "shadow-orange-500/20",
             sub: viewType === "monthly" ? format(new Date(), "MMMM yyyy") : selectedYear
           },
-          { label: "Aggregate Burn", value: `₨ ${totalExpenses.toLocaleString()}`, icon: Receipt, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20", sub: "All time records" },
+          { label: "Aggregate Burn", value: `₨ ${(totalExpenses ?? 0).toLocaleString()}`, icon: Receipt, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20", sub: "All time records" },
         ].map((card, i) => (
           <div key={card.label} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.color} p-6 text-white shadow-xl ${card.shadow} transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
             <div className="relative z-10 flex flex-col gap-4">
@@ -349,7 +347,7 @@ const Expenses = () => {
                     Array(5).fill(0).map((_, i) => (
                       <tr key={i}><td colSpan={5} className="px-6 py-8"><div className="h-12 w-full animate-pulse rounded-2xl bg-slate-100" /></td></tr>
                     ))
-                  ) : filtered.length === 0 ? (
+                  ) : (filtered ?? []).length === 0 ? (
                     <tr><td colSpan={5} className="px-6 py-24 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center">
@@ -358,24 +356,24 @@ const Expenses = () => {
                         <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No matching records found</p>
                       </div>
                     </td></tr>
-                  ) : filtered.map((e, idx) => (
-                    <tr key={e.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-rose-50/40 transition-all duration-200 group`}>
-                      <td className="px-6 py-6 text-sm font-black text-slate-500 whitespace-nowrap tracking-tight">{format(new Date(e.date), 'MMM d, yyyy')}</td>
+                  ) : (filtered ?? []).map((e, idx) => (
+                    <tr key={e?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-rose-50/40 transition-all duration-200 group`}>
+                      <td className="px-6 py-6 text-sm font-black text-slate-500 whitespace-nowrap tracking-tight">{e?.date ? format(new Date(e.date), 'MMM d, yyyy') : "N/A"}</td>
                       <td className="px-6 py-6">
-                        <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-rose-600 transition-colors">{e.description}</p>
-                        {e.event_id && <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter mt-2 flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-blue-300" /> Event: {e.event_id}</p>}
+                        <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-rose-600 transition-colors">{e?.description}</p>
+                        {e?.event_id && <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter mt-2 flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-blue-300" /> Event: {e?.event_id}</p>}
                       </td>
                       <td className="px-6 py-6">
                         <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm">
-                          {e.head}
+                          {e?.head}
                         </Badge>
                       </td>
                       <td className="px-6 py-6">
-                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${e.payment_mode === "Cash" ? "bg-amber-500 text-white" : "bg-blue-500 text-white"}`}>
-                          {e.payment_mode}
+                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${e?.payment_mode === "Cash" ? "bg-amber-500 text-white" : "bg-blue-500 text-white"}`}>
+                          {e?.payment_mode}
                         </Badge>
                       </td>
-                      <td className="px-6 py-6 text-sm font-black text-right text-rose-600 tracking-tight">₨ {e.amount.toLocaleString()}</td>
+                      <td className="px-6 py-6 text-sm font-black text-right text-rose-600 tracking-tight">₨ {(e?.amount ?? 0).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -384,7 +382,7 @@ const Expenses = () => {
                     <td colSpan={4} className="px-6 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Monthly Aggregate Log</td>
                     <td className="px-6 py-8 text-right">
                       <span className="px-6 py-3 rounded-2xl bg-rose-500 text-white font-black text-xl shadow-xl shadow-rose-500/20">
-                        ₨ {filtered.reduce((s, e) => s + (e.amount || 0), 0).toLocaleString()}
+                        ₨ {(filtered ?? []).reduce((s, e) => s + (e?.amount ?? 0), 0).toLocaleString()}
                       </span>
                     </td>
                   </tr>
@@ -445,20 +443,20 @@ const Expenses = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedLedger.map(e => (
-                    <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{e.date}</td>
-                      <td className="px-4 py-3 text-sm font-medium">{e.description}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{e.head}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{e.payment_mode}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-destructive">₨ {e.amount.toLocaleString()}</td>
+                  {(paginatedLedger ?? []).map(e => (
+                    <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{e?.date}</td>
+                      <td className="px-4 py-3 text-sm font-medium">{e?.description}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{e?.head}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{e?.payment_mode}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-destructive">₨ {(e?.amount ?? 0).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="bg-muted/40">
                     <td colSpan={4} className="px-4 py-3 text-sm font-bold">Running Total (Filtered)</td>
-                    <td className="px-4 py-3 text-sm font-bold text-destructive">₨ {ledgerFiltered.reduce((s,e)=>s+e.amount,0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm font-bold text-destructive">₨ {(ledgerFiltered ?? []).reduce((s,e)=>s+(e?.amount ?? 0),0).toLocaleString()}</td>
                   </tr>
                 </tfoot>
               </table>

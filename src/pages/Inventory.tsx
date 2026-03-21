@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from "react";
-import { Package, Plus, Search, AlertTriangle, ArrowUp, ArrowDown, RotateCcw, FileText, Download, Loader2 } from "lucide-react";
+import { Package, Plus, Search, AlertTriangle, ArrowUp, ArrowDown, RotateCcw, FileText, Download, Loader2, Wallet, Landmark, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -72,13 +72,22 @@ const Inventory = () => {
     try {
       const { data: itemsData, error: itemsError } = await supabase.from('inventory_items').select('*');
       if (itemsError) throw itemsError;
-      setItems(itemsData || []);
+      setItems((itemsData ?? []).map(i => ({
+        id: i?.id ?? "",
+        name: i?.name ?? "Unknown",
+        category: i?.category ?? "Other",
+        unit: i?.unit ?? "Unit",
+        stock: i?.stock ?? 0,
+        minStock: i?.min_stock ?? 0,
+        purchasePrice: i?.purchase_price ?? 0,
+        supplier: i?.supplier ?? "N/A",
+        type: i?.type ?? "consumable"
+      })));
 
       const { data: historyData, error: historyError } = await supabase.from('stock_movements').select('*').order('date', { ascending: false });
       if (historyError) throw historyError;
-      setHistory(historyData || []);
+      setHistory(historyData ?? []);
     } catch (err: any) {
-      console.error("Error fetching inventory data:", err);
       toast.error("Failed to load inventory data");
     } finally {
       setLoading(false);
@@ -89,17 +98,17 @@ const Inventory = () => {
     fetchData();
   }, []);
 
-  const filteredItems = items.filter(i =>
-    i.name.toLowerCase().includes(search.toLowerCase()) ||
-    i.category.toLowerCase().includes(search.toLowerCase())
+  const filteredItems = (items ?? []).filter(i =>
+    (i?.name ?? "").toLowerCase().includes((search ?? "").toLowerCase()) ||
+    (i?.category ?? "").toLowerCase().includes((search ?? "").toLowerCase())
   );
 
-  const filteredHistory = history.filter(h => {
-    const matchesSearch = h.item_name.toLowerCase().includes(historySearch.toLowerCase());
-    const matchesCategory = categoryFilter === "all" || h.category === categoryFilter;
+  const filteredHistory = (history ?? []).filter(h => {
+    const matchesSearch = (h?.item_name ?? "").toLowerCase().includes((historySearch ?? "").toLowerCase());
+    const matchesCategory = categoryFilter === "all" || h?.category === categoryFilter;
     let matchesDate = true;
     if (fromDate && toDate) {
-      matchesDate = isWithinInterval(parseISO(h.date), {
+      matchesDate = isWithinInterval(parseISO(h?.date ?? format(new Date(), "yyyy-MM-dd")), {
         start: parseISO(fromDate),
         end: parseISO(toDate)
       });
@@ -107,11 +116,11 @@ const Inventory = () => {
     return matchesSearch && matchesCategory && matchesDate;
   });
 
-  const lowStock = items.filter(i => i.stock <= i.minStock);
-  const totalValue = items.reduce((s, i) => s + (i.stock ?? 0) * (i.purchasePrice ?? 0), 0);
+  const lowStock = (items ?? []).filter(i => (i?.stock ?? 0) <= (i?.minStock ?? 0));
+  const totalValue = (items ?? []).reduce((s, i) => s + ((i?.stock ?? 0) * (i?.purchasePrice ?? 0)), 0);
 
   const handleAdd = async () => {
-    if (!newItem.name) return;
+    if (!newItem?.name) return;
     setIsSaving(true);
     try {
       const { data, error } = await supabase.from('inventory_items').insert([{
@@ -119,8 +128,8 @@ const Inventory = () => {
         category: newItem.category,
         unit: newItem.unit,
         stock: Number(newItem.stock || 0),
-        minStock: Number(newItem.minStock || 0),
-        purchasePrice: Number(newItem.purchasePrice || 0),
+        min_stock: Number(newItem.minStock || 0),
+        purchase_price: Number(newItem.purchasePrice || 0),
         supplier: newItem.supplier,
         type: newItem.type
       }]).select();
@@ -233,14 +242,14 @@ const Inventory = () => {
   };
 
   const exportHistory = () => {
-    const data = filteredHistory.map(h => ({
-      Date: h.date,
-      Item: h.item_name,
-      Type: h.type,
-      Category: h.category,
-      Quantity: h.qty,
-      "Issued To / Returned By": h.issued_to || h.returned_by || "-",
-      Note: h.note
+    const data = (filteredHistory ?? []).map(h => ({
+      Date: h?.date ?? "N/A",
+      Item: h?.item_name ?? "Unknown",
+      Type: h?.type ?? "N/A",
+      Category: h?.category ?? "N/A",
+      Quantity: h?.qty ?? 0,
+      "Issued To / Returned By": h?.issued_to || h?.returned_by || "-",
+      Note: h?.note ?? "-"
     }));
     
     const ws = XLSX.utils.json_to_sheet(data);
@@ -267,10 +276,10 @@ const Inventory = () => {
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Total Asset Types", value: items.length, icon: Package, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20" },
-          { label: "Low Stock Alerts", value: lowStock.length, icon: AlertTriangle, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20" },
-          { label: "Est. Stock Value", value: `₨ ${totalValue.toLocaleString()}`, icon: Wallet2, color: "from-emerald-500 to-emerald-700", shadow: "shadow-emerald-500/20" },
-          { label: "Active Categories", value: [...new Set(items.map(i => i.category))].length, icon: Landmark, color: "from-violet-500 to-violet-700", shadow: "shadow-violet-500/20" },
+          { label: "Total Asset Types", value: (items ?? []).length, icon: Package, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20" },
+          { label: "Low Stock Alerts", value: (lowStock ?? []).length, icon: AlertTriangle, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20" },
+          { label: "Est. Stock Value", value: `₨ ${(totalValue ?? 0).toLocaleString()}`, icon: Wallet, color: "from-emerald-500 to-emerald-700", shadow: "shadow-emerald-500/20" },
+          { label: "Active Categories", value: [...new Set((items ?? []).map(i => i?.category))].length, icon: Landmark, color: "from-violet-500 to-violet-700", shadow: "shadow-violet-500/20" },
         ].map((card, i) => (
           <div key={card.label} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.color} p-6 text-white shadow-xl ${card.shadow} transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
             <div className="relative z-10 flex flex-col gap-4">
@@ -289,19 +298,19 @@ const Inventory = () => {
         ))}
       </div>
 
-      {lowStock.length > 0 && (
+      {(lowStock ?? []).length > 0 && (
         <div className="rounded-3xl border border-rose-100 bg-rose-50/50 p-6 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex items-center gap-4 mb-4">
             <div className="rounded-xl bg-rose-500 p-2.5 text-white shadow-lg shadow-rose-500/30 animate-pulse">
               <AlertTriangle className="h-5 w-5" />
             </div>
-            <h4 className="text-sm font-black text-rose-900 uppercase tracking-[0.1em]">Critical Low Stock Warning ({lowStock.length})</h4>
+            <h4 className="text-sm font-black text-rose-900 uppercase tracking-[0.1em]">Critical Low Stock Warning ({(lowStock ?? []).length})</h4>
           </div>
           <div className="flex flex-wrap gap-3">
-            {lowStock.map(i => (
-              <span key={i.id} className="rounded-xl bg-white border border-rose-100 px-4 py-2.5 text-xs font-black text-rose-600 shadow-sm flex items-center gap-3 group hover:border-rose-300 transition-colors">
+            {(lowStock ?? []).map(i => (
+              <span key={i?.id} className="rounded-xl bg-white border border-rose-100 px-4 py-2.5 text-xs font-black text-rose-600 shadow-sm flex items-center gap-3 group hover:border-rose-300 transition-colors">
                 <div className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
-                {i.name} <span className="text-rose-400 font-bold ml-1">— {i.stock} {i.unit} LEFT</span>
+                {i?.name} <span className="text-rose-400 font-bold ml-1">— {i?.stock} {i?.unit} LEFT</span>
               </span>
             ))}
           </div>
@@ -339,43 +348,43 @@ const Inventory = () => {
                     Array(5).fill(0).map((_, i) => (
                       <tr key={i}><td colSpan={6} className="px-6 py-8"><div className="h-12 w-full animate-pulse rounded-2xl bg-slate-100" /></td></tr>
                     ))
-                  ) : filteredItems.map((item, idx) => (
-                    <tr key={item.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
+                  ) : (filteredItems ?? []).map((item, idx) => (
+                    <tr key={item?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
                       <td className="px-6 py-6">
                         <div className="flex items-center gap-4">
                           <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-blue-600 font-black text-sm shadow-sm border border-blue-100/50 group-hover:scale-110 transition-transform duration-300">
                             <Package className="h-5 w-5" />
                           </div>
                           <div>
-                            <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{item.name}</p>
+                            <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{item?.name}</p>
                             <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter flex items-center gap-2">
                               <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
-                              Supplier: {item.supplier}
+                              Supplier: {item?.supplier}
                             </p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-6">
-                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${item.type === 'consumable' ? 'bg-blue-500 text-white' : 'bg-violet-500 text-white'}`}>
-                          {item.type}
+                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${item?.type === 'consumable' ? 'bg-blue-500 text-white' : 'bg-violet-500 text-white'}`}>
+                          {item?.type}
                         </Badge>
                       </td>
                       <td className="px-6 py-6">
                         <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm">
-                          {item.category}
+                          {item?.category}
                         </Badge>
                       </td>
                       <td className="px-6 py-6">
                         <div className="flex flex-col items-center gap-2">
-                          <span className={`text-sm font-black tracking-tight ${item.stock <= item.minStock ? "text-rose-600" : "text-slate-700"}`}>
-                            {item.stock} {item.unit}
+                          <span className={`text-sm font-black tracking-tight ${(item?.stock ?? 0) <= (item?.minStock ?? 0) ? "text-rose-600" : "text-slate-700"}`}>
+                            {item?.stock} {item?.unit}
                           </span>
                           <div className="h-1.5 w-20 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                            <div className={`h-full transition-all duration-500 ${item.stock <= item.minStock ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"}`} style={{ width: `${Math.min(100, (item.stock / (item.minStock || 1)) * 50)}%` }} />
+                            <div className={`h-full transition-all duration-500 ${(item?.stock ?? 0) <= (item?.minStock ?? 0) ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"}`} style={{ width: `${Math.min(100, ((item?.stock ?? 0) / (item?.minStock || 1)) * 50)}%` }} />
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-6 text-sm font-black text-right text-slate-700 tracking-tight">₨ {(item.stock * item.purchasePrice).toLocaleString()}</td>
+                      <td className="px-6 py-6 text-sm font-black text-right text-slate-700 tracking-tight">₨ {((item?.stock ?? 0) * (item?.purchasePrice ?? 0)).toLocaleString()}</td>
                       <td className="px-6 py-6 text-right">
                         {canDo("edit") && (
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
@@ -435,32 +444,32 @@ const Inventory = () => {
                 <tbody>
                   {loading ? (
                     <tr><td colSpan={7} className="px-4 py-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" /></td></tr>
-                  ) : filteredHistory.map(h => (
-                    <tr key={h.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{h.date}</td>
+                  ) : (filteredHistory ?? []).map(h => (
+                    <tr key={h?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{h?.date}</td>
                       <td className="px-4 py-3 text-sm font-medium text-card-foreground">
-                        {h.item_name}
+                        {h?.item_name}
                         <span className="ml-2 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase border bg-muted/50">
-                          {h.category}
+                          {h?.category}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${h.type === "purchase" ? "bg-success/10 text-success border-success/20" : h.type === "return" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-destructive/10 text-destructive border-destructive/20"}`}>
-                          {h.type === "purchase" ? <ArrowUp className="h-3 w-3" /> : h.type === "return" ? <RotateCcw className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                          {h.type}
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${h?.type === "purchase" ? "bg-success/10 text-success border-success/20" : h?.type === "return" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-destructive/10 text-destructive border-destructive/20"}`}>
+                          {h?.type === "purchase" ? <ArrowUp className="h-3 w-3" /> : h?.type === "return" ? <RotateCcw className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                          {h?.type}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm font-bold text-card-foreground">{h.qty}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{h.issued_to || h.returned_by || "-"}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{h.note}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-card-foreground">{h?.qty}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{h?.issued_to || h?.returned_by || "-"}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{h?.note}</td>
                       <td className="px-4 py-3">
-                        {canDo("edit") && h.type === "issue" && h.category === "non-consumable" && (
+                        {canDo("edit") && h?.type === "issue" && h?.category === "non-consumable" && (
                           <Button variant="ghost" size="sm" onClick={() => {
-                            const item = items.find(i => i.id === h.item_id);
+                            const item = (items ?? []).find(i => i?.id === h?.item_id);
                             if (item) {
                               setSelectedItem(item);
                               setSelectedMovement(h);
-                              setReturnForm({ qty: String(h.qty), returned_by: "", note: "" });
+                              setReturnForm({ qty: String(h?.qty ?? 0), returned_by: "", note: "" });
                               setShowReturnModal(true);
                             }
                           }} className="h-7 px-2 text-[10px] gap-1">
@@ -470,7 +479,7 @@ const Inventory = () => {
                       </td>
                     </tr>
                   ))}
-                  {!loading && filteredHistory.length === 0 && (
+                  {!loading && (filteredHistory ?? []).length === 0 && (
                     <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No stock movements found.</td></tr>
                   )}
                 </tbody>

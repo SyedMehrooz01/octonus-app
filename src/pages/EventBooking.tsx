@@ -128,7 +128,7 @@ const EventBooking = () => {
 
       if (menusError) throw menusError;
 
-      if (menusData && menusData.length > 0) {
+      if (menusData && (menusData ?? []).length > 0) {
         const { data: itemsData, error: itemsError } = await supabase
           .from('menu_items')
           .select('*')
@@ -136,16 +136,15 @@ const EventBooking = () => {
 
         if (itemsError) throw itemsError;
 
-        const formattedMenus = menusData.map(m => ({
+        const formattedMenus = (menusData ?? []).map(m => ({
           ...m,
-          items: itemsData?.filter(i => i.menu_id === m.id) || []
+          items: (itemsData ?? []).filter(i => i?.menu_id === m?.id) || []
         }));
         setMenus(formattedMenus);
       } else {
         setMenus(INITIAL_MENUS);
       }
     } catch (error: any) {
-      console.error("Error fetching menus:", error);
       toast.error("Failed to load menus from database");
       setMenus(INITIAL_MENUS);
     } finally {
@@ -156,12 +155,12 @@ const EventBooking = () => {
   const fetchSuppliers = async () => {
     try {
       const { data: sData } = await supabase.from('suppliers').select('*');
-      if (sData) setSuppliers(sData);
+      if (sData) setSuppliers(sData ?? []);
       
       const { data: pData } = await supabase.from('supplier_payments').select('*').order('date', { ascending: false });
-      if (pData) setSupplierPayments(pData);
+      if (pData) setSupplierPayments(pData ?? []);
     } catch (err) {
-      console.error("Error fetching suppliers:", err);
+      toast.error("Failed to fetch suppliers");
     }
   };
 
@@ -229,14 +228,14 @@ const EventBooking = () => {
   };
 
   const openClientProfile = (clientName: string, phone: string) => {
-    const clientBookings = bookings.filter(b => b.clientName === clientName);
-    const totalPaid = clientBookings.reduce((sum, b) => sum + b.advance, 0);
-    const remainingBalance = clientBookings.reduce((sum, b) => sum + b.balanceRemaining, 0);
+    const clientBookings = (bookings ?? []).filter(b => b?.clientName === clientName);
+    const totalPaid = clientBookings.reduce((sum, b) => sum + (b?.advance ?? 0), 0);
+    const remainingBalance = clientBookings.reduce((sum, b) => sum + (b?.balanceRemaining ?? 0), 0);
     
     const clientPayments = clientBookings.map(b => ({
-      date: b.bookingDate,
-      amount: b.advance,
-      method: b.paymentMethod
+      date: b?.bookingDate ?? format(new Date(), "yyyy-MM-dd"),
+      amount: b?.advance ?? 0,
+      method: b?.paymentMethod ?? "Cash"
     }));
 
     setSelectedClient({
@@ -303,7 +302,6 @@ const EventBooking = () => {
       setShowItemModal(false);
       fetchMenus();
     } catch (error: any) {
-      console.error("Error saving menu item:", error);
       toast.error(error.message || "Failed to save item");
     } finally {
       setIsSaving(false);
@@ -315,19 +313,19 @@ const EventBooking = () => {
       const { data: kiData } = await supabase.from('kitchen_items').select('*').eq('event_id', eventId);
       const { data: rmData } = await supabase.from('raw_materials').select('*').eq('event_id', eventId);
       
-      if (kiData && kiData.length > 0) {
-        setKitchenItems(kiData);
+      if (kiData && (kiData ?? []).length > 0) {
+        setKitchenItems(kiData ?? []);
       } else {
-        const booking = bookings.find(b => b.id === eventId);
+        const booking = (bookings ?? []).find(b => b?.id === eventId);
         if (booking) {
-          const menu = menus.find(m => m.name === booking.menu);
+          const menu = (menus ?? []).find(m => m?.name === booking?.menu);
           if (menu) {
-            const items: KitchenItem[] = menu.items.map(mi => ({
+            const items: KitchenItem[] = (menu?.items ?? []).map(mi => ({
               event_id: eventId,
-              item_name: mi.item,
-              unit: mi.unit,
-              estimated_qty: booking.guests,
-              actual_qty: booking.guests,
+              item_name: mi?.item,
+              unit: mi?.unit,
+              estimated_qty: booking?.guests ?? 0,
+              actual_qty: booking?.guests ?? 0,
               is_adjusted: false
             }));
             setKitchenItems(items);
@@ -335,36 +333,36 @@ const EventBooking = () => {
         }
       }
 
-      if (rmData && rmData.length > 0) {
-        setRawMaterials(rmData);
+      if (rmData && (rmData ?? []).length > 0) {
+        setRawMaterials(rmData ?? []);
       } else {
-        const booking = bookings.find(b => b.id === eventId);
+        const booking = (bookings ?? []).find(b => b?.id === eventId);
         if (booking) {
-          const menu = menus.find(m => m.name === booking.menu);
+          const menu = (menus ?? []).find(m => m?.name === booking?.menu);
           if (menu) {
             const materialsMap = new Map<string, {name: string, unit: string, qty: number}>();
-            menu.items.forEach(mi => {
-              if (mi.raw_materials) {
-                mi.raw_materials.forEach(rm => {
-                  const key = `${rm.material}-${rm.unit}`;
-                  const current = materialsMap.get(key) || { name: rm.material, unit: rm.unit, qty: 0 };
-                  materialsMap.set(key, { ...current, qty: current.qty + ((rm.ratio_per_guest ?? 0) * (booking.guests ?? 0)) });
+            (menu?.items ?? []).forEach(mi => {
+              if (mi?.raw_materials) {
+                (mi?.raw_materials ?? []).forEach(rm => {
+                  const key = `${rm?.material}-${rm?.unit}`;
+                  const current = materialsMap.get(key) || { name: rm?.material, unit: rm?.unit, qty: 0 };
+                  materialsMap.set(key, { ...current, qty: current.qty + ((rm?.ratio_per_guest ?? 0) * (booking?.guests ?? 0)) });
                 });
               }
             });
             const materials: RawMaterial[] = Array.from(materialsMap.values()).map(m => ({
               event_id: eventId,
-              material_name: m.name,
-              unit: m.unit,
-              estimated_qty: m.qty,
-              actual_qty: m.qty
+              material_name: m?.name,
+              unit: m?.unit,
+              estimated_qty: m?.qty,
+              actual_qty: m?.qty
             }));
             setRawMaterials(materials);
           }
         }
       }
     } catch (err) {
-      console.error("Error fetching kitchen data:", err);
+      toast.error("Failed to fetch kitchen data");
     }
   };
 
@@ -396,20 +394,20 @@ const EventBooking = () => {
     window.print();
   };
 
-  const filtered = bookings.filter(b => {
-    const ms = b.clientName.toLowerCase().includes(search.toLowerCase()) || b.eventType.toLowerCase().includes(search.toLowerCase());
-    const mf = statusFilter==="all" || b.status===statusFilter;
+  const filtered = (bookings ?? []).filter(b => {
+    const ms = (b?.clientName ?? "").toLowerCase().includes((search ?? "").toLowerCase()) || (b?.eventType ?? "").toLowerCase().includes((search ?? "").toLowerCase());
+    const mf = statusFilter==="all" || b?.status===statusFilter;
     return ms && mf;
   });
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const paginatedBookings = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil((filtered ?? []).length / itemsPerPage);
+  const paginatedBookings = (filtered ?? []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const checkAvailability = () => {
-    if (!nb.eventDate || !nb.venue) return true;
-    const existing = bookings.find(b => b.eventDate === nb.eventDate && b.venue === nb.venue && b.status !== 'cancelled');
+    if (!nb?.eventDate || !nb?.venue) return true;
+    const existing = (bookings ?? []).find(b => b?.eventDate === nb?.eventDate && b?.venue === nb?.venue && b?.status !== 'cancelled');
     if (existing) {
-      setAvailabilityWarning(`This venue is already booked on this date for "${existing.clientName}" (${existing.eventType})`);
+      setAvailabilityWarning(`This venue is already booked on this date for "${existing?.clientName}" (${existing?.eventType})`);
       return false;
     }
     setAvailabilityWarning(null);
@@ -417,22 +415,22 @@ const EventBooking = () => {
   };
 
   const handleAdd = () => {
-    if (!nb.clientName || !nb.eventDate) return;
+    if (!nb?.clientName || !nb?.eventDate) return;
     if (!proceedWithBooking && !checkAvailability()) {
       setProceedWithBooking(true);
       return;
     }
-    const total = Number(nb.totalAmount), adv = Number(nb.advance);
-    setBookings([...bookings,{id:bookings.length+1,...nb,guests:Number(nb.guests),totalAmount:total,advance:adv,balanceRemaining:total-adv,supplierCost:Number(nb.supplierCost),sellingRate:Number(nb.sellingRate)}]);
+    const total = Number(nb?.totalAmount || 0), adv = Number(nb?.advance || 0);
+    setBookings([...(bookings ?? []),{id:(bookings ?? []).length+1,...nb,guests:Number(nb?.guests || 0),totalAmount:total,advance:adv,balanceRemaining:total-adv,supplierCost:Number(nb?.supplierCost || 0),sellingRate:Number(nb?.sellingRate || 0)}]);
     setNb(EMPTY); setShowAdd(false); setAvailabilityWarning(null); setProceedWithBooking(false);
   };
 
   const monthStart = startOfMonth(calMonth);
   const days = eachDayOfInterval({start:monthStart,end:endOfMonth(calMonth)});
   const startDow = getDay(monthStart);
-  const bookingDates = bookings.map(b=>({date:new Date(b.eventDate),status:b.status,name:b.clientName}));
-  const getDayB = (d:Date) => bookingDates.filter(b=>isSameDay(b.date,d));
-  const tp = bookings.filter(b=>b.thirdParty).reduce((s,b)=>s+(b.sellingRate-b.supplierCost),0);
+  const bookingDates = (bookings ?? []).map(b=>({date:new Date(b?.eventDate ?? ""),status:b?.status,name:b?.clientName}));
+  const getDayB = (d:Date) => (bookingDates ?? []).filter(b=>isSameDay(b?.date,d));
+  const tp = (bookings ?? []).filter(b=>b?.thirdParty).reduce((s,b)=>s+((b?.sellingRate ?? 0)-(b?.supplierCost ?? 0)),0);
 
   return (
     <div className="space-y-8 pb-10">
@@ -448,12 +446,12 @@ const EventBooking = () => {
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
         {[
-          {l:"Total Bookings",v:bookings.length,c:"from-blue-500 to-blue-700",s:"shadow-blue-500/20",i:CalendarDays},
-          {l:"Confirmed",v:bookings.filter(b=>b.status==="confirmed").length,c:"from-emerald-500 to-emerald-700",s:"shadow-emerald-500/20",i:CheckCircle2},
-          {l:"Tentative",v:bookings.filter(b=>b.status==="tentative").length,c:"from-slate-400 to-slate-600",s:"shadow-slate-400/20",i:Clock},
-          {l:"Cancelled",v:bookings.filter(b=>b.status==="cancelled").length,c:"from-rose-500 to-rose-700",s:"shadow-rose-500/20",i:Trash2},
-          {l:"3rd Party Profit",v:`₨ ${tp.toLocaleString()}`,c:"from-indigo-500 to-indigo-700",s:"shadow-indigo-500/20",i:TrendingUp},
-          {l:"Outstanding",v:`₨ ${bookings.reduce((s,b)=>s+b.balanceRemaining,0).toLocaleString()}`,c:"from-amber-500 to-amber-700",s:"shadow-amber-500/20",i:Wallet}
+          {l:"Total Bookings",v:(bookings ?? []).length,c:"from-blue-500 to-blue-700",s:"shadow-blue-500/20",i:CalendarDays},
+          {l:"Confirmed",v:(bookings ?? []).filter(b=>b?.status==="confirmed").length,c:"from-emerald-500 to-emerald-700",s:"shadow-emerald-500/20",i:CheckCircle2},
+          {l:"Tentative",v:(bookings ?? []).filter(b=>b?.status==="tentative").length,c:"from-slate-400 to-slate-600",s:"shadow-slate-400/20",i:Clock},
+          {l:"Cancelled",v:(bookings ?? []).filter(b=>b?.status==="cancelled").length,c:"from-rose-500 to-rose-700",s:"shadow-rose-500/20",i:Trash2},
+          {l:"3rd Party Profit",v:`₨ ${(tp ?? 0).toLocaleString()}`,c:"from-indigo-500 to-indigo-700",s:"shadow-indigo-500/20",i:TrendingUp},
+          {l:"Outstanding",v:`₨ ${(bookings ?? []).reduce((s,b)=>s+(b?.balanceRemaining ?? 0),0).toLocaleString()}`,c:"from-amber-500 to-amber-700",s:"shadow-amber-500/20",i:Wallet}
         ].map((c, idx)=>(
           <div key={c.l} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${c.c} p-5 text-white shadow-xl ${c.s} transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${idx * 50}`}>
             <div className="relative z-10 flex flex-col gap-3">
@@ -561,13 +559,13 @@ const EventBooking = () => {
                         </td>
                         <td className="px-8 py-6">
                           <div className="flex flex-col">
-                            <p className="text-sm font-black text-blue-600 tracking-tight">₨ {b.totalAmount.toLocaleString()}</p>
-                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-tighter mt-1">{b.balanceRemaining > 0 ? `Due: ₨ ${b.balanceRemaining.toLocaleString()}` : 'FULLY PAID'}</p>
+                            <p className="text-sm font-black text-blue-600 tracking-tight">₨ {(b?.totalAmount ?? 0).toLocaleString()}</p>
+                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-tighter mt-1">{(b?.balanceRemaining ?? 0) > 0 ? `Due: ₨ ${(b?.balanceRemaining ?? 0).toLocaleString()}` : 'FULLY PAID'}</p>
                           </div>
                         </td>
                         <td className="px-8 py-6">
-                          <Badge className={`${sc(b.status)} rounded-xl px-3 py-1.5 text-[10px] font-black uppercase tracking-widest border-none shadow-md`}>
-                            {b.status}
+                          <Badge className={`${sc(b?.status)} rounded-xl px-3 py-1.5 text-[10px] font-black uppercase tracking-widest border-none shadow-md`}>
+                            {b?.status}
                           </Badge>
                         </td>
                         <td className="px-8 py-6 text-right">
@@ -575,10 +573,10 @@ const EventBooking = () => {
                             <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 hover:text-blue-700 shadow-sm" onClick={() => { setSelected(b); setShowView(true); }}>
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-100/50 hover:text-emerald-700 shadow-sm" onClick={() => { setSelected(b); setShowAdd(true); setNb({...b, guests: b.guests.toString(), totalAmount: b.totalAmount.toString(), advance: b.advance.toString(), supplierCost: b.supplierCost.toString(), sellingRate: b.sellingRate.toString()}); }}>
+                            <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-100/50 hover:text-emerald-700 shadow-sm" onClick={() => { setSelected(b); setShowAdd(true); setNb({...b, guests: (b?.guests ?? 0).toString(), totalAmount: (b?.totalAmount ?? 0).toString(), advance: (b?.advance ?? 0).toString(), supplierCost: (b?.supplierCost ?? 0).toString(), sellingRate: (b?.sellingRate ?? 0).toString()}); }}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 hover:text-rose-600 shadow-sm" onClick={() => { if(confirm("Permanently delete this booking record?")) setBookings(bookings.filter(bk => bk.id !== b.id)); }}>
+                            <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 hover:text-rose-600 shadow-sm" onClick={() => { if(confirm("Permanently delete this booking record?")) setBookings((bookings ?? []).filter(bk => bk?.id !== b?.id)); }}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -865,11 +863,11 @@ const EventBooking = () => {
                           <p className="text-sm font-black text-foreground">{b.clientName}</p>
                           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter mt-1">{format(new Date(b.eventDate), 'MMMM dd, yyyy')}</p>
                         </td>
-                        <td className="px-8 py-6 text-sm font-black text-rose-500">₨ {b.supplierCost.toLocaleString()}</td>
-                        <td className="px-8 py-6 text-sm font-black text-foreground">₨ {b.sellingRate.toLocaleString()}</td>
+                        <td className="px-8 py-6 text-sm font-black text-rose-500">₨ {(b?.supplierCost ?? 0).toLocaleString()}</td>
+                        <td className="px-8 py-6 text-sm font-black text-foreground">₨ {(b?.sellingRate ?? 0).toLocaleString()}</td>
                         <td className="px-8 py-6 text-center">
                           <span className={`inline-flex px-4 py-1.5 rounded-xl font-black text-xs shadow-sm ${profit>=0?"bg-emerald-50 text-emerald-700 border border-emerald-100":"bg-rose-50 text-rose-700 border border-rose-100"}`}>
-                            ₨ {profit.toLocaleString()}
+                            ₨ {(profit ?? 0).toLocaleString()}
                           </span>
                         </td>
                         <td className="px-8 py-6 text-center">
@@ -890,11 +888,11 @@ const EventBooking = () => {
                 <tfoot className="bg-muted/40 border-t-2 border-border">
                   <tr>
                     <td className="px-8 py-8 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Consolidated Portfolio Performance</td>
-                    <td className="px-8 py-8 text-sm font-black text-rose-600">₨ {bookings.filter(b=>b.thirdParty).reduce((s,b)=>s+b.supplierCost,0).toLocaleString()}</td>
-                    <td className="px-8 py-8 text-sm font-black text-foreground">₨ {bookings.filter(b=>b.thirdParty).reduce((s,b)=>s+b.sellingRate,0).toLocaleString()}</td>
+                    <td className="px-8 py-8 text-sm font-black text-rose-600">₨ {(bookings ?? []).filter(b=>b?.thirdParty).reduce((s,b)=>s+(b?.supplierCost ?? 0),0).toLocaleString()}</td>
+                    <td className="px-8 py-8 text-sm font-black text-foreground">₨ {(bookings ?? []).filter(b=>b?.thirdParty).reduce((s,b)=>s+(b?.sellingRate ?? 0),0).toLocaleString()}</td>
                     <td className="px-8 py-8 text-center">
                       <div className="px-6 py-3 rounded-2xl bg-emerald-500 text-white font-black shadow-xl shadow-emerald-500/20 text-lg">
-                        ₨ {tp.toLocaleString()}
+                        ₨ {(tp ?? 0).toLocaleString()}
                       </div>
                     </td>
                     <td colSpan={2}/>
@@ -912,21 +910,21 @@ const EventBooking = () => {
             </Button>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {suppliers.map(s => (
-              <div key={s.id} className="rounded-3xl border border-border bg-white shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-xl hover:-translate-y-1">
+            {(suppliers ?? []).map(s => (
+              <div key={s?.id} className="rounded-3xl border border-border bg-white shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-xl hover:-translate-y-1">
                 <div className="flex items-center justify-between border-b border-border p-8 bg-muted/5">
                   <div className="flex items-center gap-5">
                     <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-primary to-blue-400 flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-primary/20">
-                      {s.name[0].toUpperCase()}
+                      {(s?.name ?? "U")[0].toUpperCase()}
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-foreground tracking-tight">{s.name}</h3>
-                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mt-1">{s.service_type} • {s.contact_number}</p>
+                      <h3 className="text-xl font-black text-foreground tracking-tight">{s?.name}</h3>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mt-1">{s?.service_type} • {s?.contact_number}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Net Payable</p>
-                    <p className="text-2xl font-black text-rose-500">₨ {s.current_balance.toLocaleString()}</p>
+                    <p className="text-2xl font-black text-rose-500">₨ {(s?.current_balance ?? 0).toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8 flex-1">
@@ -935,13 +933,13 @@ const EventBooking = () => {
                       <History className="h-4 w-4 text-primary"/> Sourcing Ledger
                     </h4>
                     <div className="space-y-2.5 max-h-56 overflow-y-auto pr-3 custom-scrollbar">
-                      {supplierPayments.filter(p => p.supplier_id === s.id).map(p => (
-                        <div key={p.id} className="flex justify-between items-center p-3 rounded-xl bg-muted/30 border border-border/50 transition-all hover:bg-white hover:shadow-sm">
-                          <span className="text-[10px] font-black text-muted-foreground uppercase">{format(new Date(p.date), 'MMM d, yyyy')}</span>
-                          <span className="text-xs font-black text-foreground">₨ {p.amount.toLocaleString()} <span className="text-[9px] font-bold text-muted-foreground/60 uppercase ml-1">[{p.method}]</span></span>
+                      {(supplierPayments ?? []).filter(p => p?.supplier_id === s?.id).map(p => (
+                        <div key={p?.id} className="flex justify-between items-center p-3 rounded-xl bg-muted/30 border border-border/50 transition-all hover:bg-white hover:shadow-sm">
+                          <span className="text-[10px] font-black text-muted-foreground uppercase">{p?.date ? format(new Date(p.date), 'MMM d, yyyy') : "N/A"}</span>
+                          <span className="text-xs font-black text-foreground">₨ {(p?.amount ?? 0).toLocaleString()} <span className="text-[9px] font-bold text-muted-foreground/60 uppercase ml-1">[{p?.method}]</span></span>
                         </div>
                       ))}
-                      {supplierPayments.filter(p => p.supplier_id === s.id).length === 0 && (
+                      {(supplierPayments ?? []).filter(p => p?.supplier_id === s?.id).length === 0 && (
                         <div className="py-12 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic border-2 border-dashed border-border/50 rounded-2xl">
                           Zero transaction history
                         </div>
@@ -952,12 +950,12 @@ const EventBooking = () => {
                     <div className="p-6 rounded-2xl bg-muted/20 border border-border/50 space-y-4 shadow-inner">
                       <div className="flex justify-between text-[11px] font-black">
                         <span className="text-muted-foreground uppercase tracking-widest">Opening Bal:</span>
-                        <span className="text-foreground">₨ {s.opening_balance.toLocaleString()}</span>
+                        <span className="text-foreground">₨ {(s?.opening_balance ?? 0).toLocaleString()}</span>
                       </div>
                       <div className="h-[1px] bg-border/50 w-full" />
                       <div className="flex justify-between text-[11px] font-black">
                         <span className="text-muted-foreground uppercase tracking-widest text-emerald-600">Total Settled:</span>
-                        <span className="text-emerald-600">₨ {(s.opening_balance - s.current_balance).toLocaleString()}</span>
+                        <span className="text-emerald-600">₨ {((s?.opening_balance ?? 0) - (s?.current_balance ?? 0)).toLocaleString()}</span>
                       </div>
                     </div>
                     <Button className="mt-6 w-full h-12 rounded-xl bg-white border border-border text-foreground font-black hover:bg-muted shadow-sm uppercase tracking-widest text-[11px] gap-2" onClick={() => { setSelectedSupplier(s); setSupplierPaymentForm({ ...supplierPaymentForm, amount: 0 }); setShowSupplierPaymentModal(true); }}>

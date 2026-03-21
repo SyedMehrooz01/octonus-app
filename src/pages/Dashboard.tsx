@@ -1,5 +1,26 @@
 import { useState, useEffect, memo, useMemo } from "react";
-import { CalendarDays, Users, Landmark, Clock, Plus, Receipt, CheckCircle, Wallet, ArrowRight, Activity, TrendingUp, TrendingDown, Search, Filter, Eye, Edit, Trash2, AlertTriangle, Loader2 } from "lucide-react";
+import { 
+  CalendarDays, 
+  Users, 
+  Landmark, 
+  Clock, 
+  Plus, 
+  Receipt, 
+  CheckCircle, 
+  Wallet, 
+  ArrowRight, 
+  Activity, 
+  TrendingUp, 
+  TrendingDown, 
+  Search, 
+  Filter, 
+  Eye, 
+  Edit, 
+  Trash2, 
+  AlertTriangle, 
+  Loader2, 
+  Package 
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, startOfToday, endOfToday, addDays, subMonths } from "date-fns";
 import { useNavigate } from "react-router-dom";
@@ -64,14 +85,14 @@ const Dashboard = () => {
           .select('balance_remaining')
           .neq('status', 'cancelled')
           .gt('balance_remaining', 0);
-        const totalDue = balanceData?.reduce((sum, e) => sum + (e.balance_remaining || 0), 0) || 0;
+        const totalDue = (balanceData ?? []).reduce((sum, e) => sum + (e?.balance_remaining ?? 0), 0);
         setPaymentsDue(totalDue);
 
         // 4. Fetch Low Inventory Alerts
         const { data: inventoryData } = await supabase
           .from('inventory_items')
           .select('id, stock, min_stock');
-        const lowStock = inventoryData?.filter(i => (i.stock ?? 0) <= (i.min_stock ?? 0)).length || 0;
+        const lowStock = (inventoryData ?? []).filter(i => (i?.stock ?? 0) <= (i?.min_stock ?? 0)).length;
         setLowInventoryCount(lowStock);
 
         // 5. Fetch Active Staff Count
@@ -79,7 +100,7 @@ const Dashboard = () => {
           .from('staff')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'active');
-        setActiveStaffCount(staffCount || 0);
+        setActiveStaffCount(staffCount ?? 0);
 
         // 6. Check if attendance marked for today
         const { count: attendanceCount } = await supabase
@@ -94,7 +115,7 @@ const Dashboard = () => {
           .select('amount')
           .gte('date', monthStart)
           .lte('date', monthEnd);
-        const totalRevenue = monthlyPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+        const totalRevenue = (monthlyPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
         setThisMonthRevenue(totalRevenue);
 
         // 8. Fetch Upcoming Events Table
@@ -116,7 +137,7 @@ const Dashboard = () => {
             .select('amount')
             .gte('date', start)
             .lte('date', end);
-          const total = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+          const total = (payments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
           last6Months.push({
             month: format(date, 'MMM'),
             revenue: total
@@ -146,8 +167,8 @@ const Dashboard = () => {
           .limit(3);
         recentPayments?.forEach(p => activity.push({
           type: 'payment',
-          title: `Payment of ₨ ${p.amount.toLocaleString()} received from ${(p as any).events?.client_name}`,
-          time: p.date,
+          title: `Payment of ₨ ${(p?.amount ?? 0).toLocaleString()} received from ${(p as any).events?.client_name}`,
+          time: p?.date,
           icon: Wallet,
           color: 'text-emerald-500'
         }));
@@ -159,16 +180,16 @@ const Dashboard = () => {
           .limit(3);
         recentAttendance?.forEach(a => activity.push({
           type: 'attendance',
-          title: `Attendance marked for ${(a as any).staff?.name}: ${a.status}`,
-          time: a.date,
+          title: `Attendance marked for ${(a as any).staff?.name}: ${a?.status}`,
+          time: a?.date,
           icon: CheckCircle,
           color: 'text-violet-500'
         }));
 
-        setRecentActivity(activity.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 6));
+        setRecentActivity(activity.sort((a, b) => new Date(b?.time ?? 0).getTime() - new Date(a?.time ?? 0).getTime()).slice(0, 6));
 
       } catch (error) {
-        console.error("Error fetching dashboard data:", error);
+        toast.error("Failed to fetch dashboard data");
       } finally {
         setLoading(false);
       }
@@ -202,21 +223,21 @@ const Dashboard = () => {
       setUpcomingEvents(prev => prev.filter(e => e.id !== id));
       toast.success("Event deleted successfully");
       logAction("Deleted an event from dashboard", "Dashboard");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete event");
+    } catch (error) {
+      toast.error("Failed to delete event");
     }
   };
 
   const filteredEvents = useMemo(() => {
-    return upcomingEvents.filter(e => 
-      e.client_name?.toLowerCase().includes(search.toLowerCase()) ||
-      e.event_type?.toLowerCase().includes(search.toLowerCase()) ||
-      e.venue?.toLowerCase().includes(search.toLowerCase())
+    return (upcomingEvents ?? []).filter(e => 
+      e?.client_name?.toLowerCase().includes((search ?? "").toLowerCase()) ||
+      e?.event_type?.toLowerCase().includes((search ?? "").toLowerCase()) ||
+      e?.venue?.toLowerCase().includes((search ?? "").toLowerCase())
     );
   }, [upcomingEvents, search]);
 
-  const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
-  const paginatedEvents = filteredEvents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil((filteredEvents ?? []).length / itemsPerPage);
+  const paginatedEvents = (filteredEvents ?? []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase();
@@ -258,7 +279,7 @@ const Dashboard = () => {
             </div>
             <div>
               <p className="text-xs font-black text-blue-100/80 uppercase tracking-widest">Total Events</p>
-              <h3 className="text-4xl font-black text-white mt-1 tracking-tight">{totalEventsCount.toLocaleString()}</h3>
+              <h3 className="text-4xl font-black text-white mt-1 tracking-tight">{(totalEventsCount ?? 0).toLocaleString()}</h3>
             </div>
           </div>
           <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
@@ -274,7 +295,7 @@ const Dashboard = () => {
             </div>
             <div>
               <p className="text-xs font-black text-emerald-50/80 uppercase tracking-widest">Upcoming Events</p>
-              <h3 className="text-4xl font-black text-white mt-1 tracking-tight">{upcomingEventsCount.toLocaleString()}</h3>
+              <h3 className="text-4xl font-black text-white mt-1 tracking-tight">{(upcomingEventsCount ?? 0).toLocaleString()}</h3>
             </div>
           </div>
           <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-6">
@@ -290,7 +311,7 @@ const Dashboard = () => {
             </div>
             <div>
               <p className="text-xs font-black text-teal-50/80 uppercase tracking-widest">Payments Due</p>
-              <h3 className="text-3xl font-black text-white mt-1 tracking-tight">₨ {paymentsDue.toLocaleString()}</h3>
+              <h3 className="text-3xl font-black text-white mt-1 tracking-tight">₨ {(paymentsDue ?? 0).toLocaleString()}</h3>
             </div>
           </div>
           <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
@@ -306,7 +327,7 @@ const Dashboard = () => {
             </div>
             <div>
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Low Inventory</p>
-              <h3 className="text-4xl font-black text-[#0f172a] mt-1 tracking-tight">{lowInventoryCount.toLocaleString()}</h3>
+              <h3 className="text-4xl font-black text-[#0f172a] mt-1 tracking-tight">{(lowInventoryCount ?? 0).toLocaleString()}</h3>
             </div>
           </div>
           <div className="absolute -right-6 -bottom-6 opacity-5 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3">
@@ -362,40 +383,40 @@ const Dashboard = () => {
                         </div>
                       </td>
                     </tr>
-                  ) : paginatedEvents.length > 0 ? (
-                    paginatedEvents.map((event, idx) => (
-                      <tr key={event.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
+                  ) : (paginatedEvents ?? []).length > 0 ? (
+                    (paginatedEvents ?? []).map((event, idx) => (
+                      <tr key={event?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
                         <td className="px-6 py-6">
                           <div className="flex items-center gap-4">
                             <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-blue-600 font-black text-sm shadow-sm border border-blue-100/50 group-hover:scale-110 transition-transform duration-300">
-                              {event.event_type?.[0]?.toUpperCase() || 'E'}
+                              {event?.event_type?.[0]?.toUpperCase() || 'E'}
                             </div>
                             <div>
-                              <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{event.client_name}</p>
+                              <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{event?.client_name}</p>
                               <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter flex items-center gap-2">
                                 <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
-                                {event.event_type} • {event.venue}
+                                {event?.event_type} • {event?.venue}
                               </p>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-6">
                           <div className="flex flex-col">
-                            <span className="text-sm font-black text-slate-600 tracking-tight">{format(new Date(event.event_date), 'MMM dd, yyyy')}</span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase mt-1 tracking-widest">{format(new Date(event.event_date), 'EEEE')}</span>
+                            <span className="text-sm font-black text-slate-600 tracking-tight">{event?.event_date ? format(new Date(event.event_date), 'MMM dd, yyyy') : "N/A"}</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase mt-1 tracking-widest">{event?.event_date ? format(new Date(event.event_date), 'EEEE') : ""}</span>
                           </div>
                         </td>
                         <td className="px-6 py-6">
                           <Badge variant="outline" className="rounded-lg border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black text-slate-600 shadow-sm">
-                            {event.guests} GUESTS
+                            {event?.guests ?? 0} GUESTS
                           </Badge>
                         </td>
                         <td className="px-6 py-6">
-                          {getStatusBadge(event.status)}
+                          {getStatusBadge(event?.status)}
                         </td>
                         <td className="px-6 py-6 text-right">
                           <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
-                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 hover:text-blue-700 shadow-sm" onClick={() => navigate(`/events?id=${event.id}`)}>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 hover:text-blue-700 shadow-sm" onClick={() => navigate(`/events?id=${event?.id}`)}>
                               <Eye className="h-4 w-4" />
                             </Button>
                             {canDo('edit') && (
@@ -404,7 +425,7 @@ const Dashboard = () => {
                               </Button>
                             )}
                             {canDo('delete') && (
-                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 hover:text-rose-600 shadow-sm" onClick={() => handleDeleteEvent(event.id)}>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 hover:text-rose-600 shadow-sm" onClick={() => handleDeleteEvent(event?.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
@@ -432,7 +453,7 @@ const Dashboard = () => {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-8 py-6 bg-slate-50/50 border-t border-slate-100">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                  Showing {Math.min(filteredEvents.length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(filteredEvents.length, currentPage * itemsPerPage)} of {filteredEvents.length} results
+                  Showing {Math.min((filteredEvents ?? []).length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min((filteredEvents ?? []).length, currentPage * itemsPerPage)} of {(filteredEvents ?? []).length} results
                 </p>
                 <div className="flex gap-3">
                   <Button 
@@ -489,8 +510,8 @@ const Dashboard = () => {
                     contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', fontWeight: 900, fontSize: '11px', padding: '12px' }}
                   />
                   <Bar dataKey="revenue" radius={[8, 8, 0, 0]} barSize={32}>
-                    {revenueData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === revenueData.length - 1 ? '#2563eb' : '#e2e8f0'} className="transition-all duration-500" />
+                    {(revenueData ?? []).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === (revenueData ?? []).length - 1 ? '#2563eb' : '#e2e8f0'} className="transition-all duration-500" />
                     ))}
                   </Bar>
                 </BarChart>
@@ -499,7 +520,7 @@ const Dashboard = () => {
             <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">MTD REVENUE</p>
-                <p className="text-xl font-black text-[#0f172a] mt-0.5">₨ {thisMonthRevenue.toLocaleString()}</p>
+                <p className="text-xl font-black text-[#0f172a] mt-0.5">₨ {(thisMonthRevenue ?? 0).toLocaleString()}</p>
               </div>
               <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none px-3 py-1 font-black text-[10px]">
                 +12.5%
@@ -514,16 +535,16 @@ const Dashboard = () => {
               <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
             </div>
             <div className="space-y-7">
-              {recentActivity.map((activity, i) => (
+              {(recentActivity ?? []).map((activity, i) => (
                 <div key={i} className="flex gap-4 group cursor-default">
                   <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-50 transition-all duration-300 group-hover:bg-white group-hover:shadow-lg group-hover:scale-110 border border-transparent group-hover:border-slate-100`}>
-                    <activity.icon className={`h-5 w-5 ${activity.color}`} />
+                    <activity.icon className={`h-5 w-5 ${activity.color ?? ""}`} />
                   </div>
                   <div className="flex flex-col gap-1.5 overflow-hidden">
                     <p className="text-[13px] font-black text-slate-700 leading-snug group-hover:text-blue-600 transition-colors">{activity.title}</p>
                     <div className="flex items-center gap-2">
                       <Clock className="h-3 w-3 text-slate-300" />
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{format(new Date(activity.time), 'MMM dd, HH:mm')}</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{activity.time ? format(new Date(activity.time), 'MMM dd, HH:mm') : "N/A"}</p>
                     </div>
                   </div>
                 </div>

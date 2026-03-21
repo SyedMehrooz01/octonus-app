@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
       } catch (e) {
-        console.error("Error parsing saved user", e);
+        // Silently fail parsing saved user
       }
     }
 
@@ -79,7 +79,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const authUser = mapSupabaseUser(session.user);
         // Security check: Hard block any non-env user from gaining 'admin' role
         if (authUser.role === "admin") {
-          console.warn(`Supabase user has admin role but is not the hardcoded admin. Denying access.`);
           setUser(null);
         } else {
           setUser(authUser);
@@ -165,7 +164,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         // 3. Security check: Hard block any non-env user from gaining 'admin' role
         if (authUser.role === "admin") {
-          console.warn(`Access denied: User ${email} attempted to log in with admin role but is not the hardcoded admin.`);
           return { success: false, error: "Access denied. Invalid role configuration." };
         }
 
@@ -175,7 +173,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       return { success: false, error: "Login failed. Please check your credentials." };
     } catch (err: any) {
-      console.error("Login error:", err);
       return { success: false, error: err.message || "Invalid credentials." };
     }
   };
@@ -211,9 +208,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           timestamp: new Date().toISOString(),
         },
       ]);
-      if (error) console.error("Error logging action:", error);
     } catch (err) {
-      console.error("Audit log failed:", err);
+      // Audit log failed
     }
   };
 

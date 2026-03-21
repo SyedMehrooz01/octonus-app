@@ -107,7 +107,7 @@ const Documents = () => {
       if (error) throw error;
       setDocuments(data || []);
     } catch (err: any) {
-      console.error("Error fetching documents:", err.message);
+      toast.error("Failed to fetch documents archive");
     } finally {
       setLoading(false);
     }
@@ -135,7 +135,7 @@ const Documents = () => {
       }
       setDocNo(`${prefix}-${nextNum.toString().padStart(3, "0")}`);
     } catch (err: any) {
-      console.error("Error generating doc no:", err.message);
+      toast.error("Failed to generate document number");
     }
   };
 
