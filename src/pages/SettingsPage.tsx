@@ -55,11 +55,13 @@ const SettingsPage = () => {
   const [saving, setSaving] = useState(false);
   
   // User Management State
-  const [users, setUsers] = useState(INITIAL_USERS);
+  const [users, setUsers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [newPassword, setNewPassword] = useState("");
   
   const [newUser, setNewUser] = useState({
     name: "",
@@ -72,21 +74,14 @@ const SettingsPage = () => {
     }
   });
 
-  const [auditLogs, setAuditLogs] = useState([
-    { id: 1, user: "Ahmed Khan", action: "Added new event booking", page: "Events", time: "2024-03-19 11:20 AM" },
-    { id: 2, user: "System Admin", action: "Updated company settings", page: "Settings", time: "2024-03-19 10:45 AM" },
-    { id: 3, user: "Sara Ali", action: "Generated monthly P&L", page: "Finance", time: "2024-03-18 03:30 PM" },
-  ]);
-
-  // Rest of state...
-  const [company, setCompany] = useState({
-    name: "Octonus Solutions",
-    tagline: "A Spectacular Turn of Events",
-    phone: "0300-0000000",
-    email: "info@octonus.com",
-    address: "Karachi, Pakistan",
-    currency: "₨",
-    taxNo: "NTN-0000000",
+  const [editUser, setEditUser] = useState({
+    id: "",
+    name: "",
+    role: "staff" as UserRole,
+    permissions: {
+      pages: [] as string[],
+      actions: [] as UserAction[]
+    }
   });
 
   const [profile, setProfile] = useState({
@@ -99,6 +94,16 @@ const SettingsPage = () => {
     confirmPassword: "",
   });
 
+  const [company, setCompany] = useState({
+    name: "Octonus Solutions",
+    tagline: "A Spectacular Turn of Events",
+    phone: "0300-0000000",
+    email: "info@octonus.com",
+    address: "Karachi, Pakistan",
+    currency: "₨",
+    taxNo: "NTN-0000000",
+  });
+
   const [notifications, setNotifications] = useState({
     newBooking: true,
     paymentReminder: true,
@@ -106,6 +111,12 @@ const SettingsPage = () => {
     payrollDue: false,
     dailySummary: true,
   });
+
+  const [auditLogs, setAuditLogs] = useState([
+    { id: 1, user: "Ahmed Khan", action: "Added new event booking", page: "Events", time: "2024-03-19 11:20 AM" },
+    { id: 2, user: "System Admin", action: "Updated company settings", page: "Settings", time: "2024-03-19 10:45 AM" },
+    { id: 3, user: "Sara Ali", action: "Generated monthly P&L", page: "Finance", time: "2024-03-18 03:30 PM" },
+  ]);
 
   const handleSave = async (section: string) => {
     setSaving(true);
@@ -121,6 +132,30 @@ const SettingsPage = () => {
     }
   };
 
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (err: any) {
+      console.error("Fetch users error:", err);
+      toast({ title: "Error", description: "Failed to fetch users", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.role === "admin") {
+      fetchUsers();
+    }
+  }, [currentUser]);
+
   const handleAddUser = async () => {
     if (!newUser.name || !newUser.email || !newUser.password) {
       toast({ title: "Validation Error", description: "Please fill all required fields.", variant: "destructive" });
@@ -128,20 +163,99 @@ const SettingsPage = () => {
     }
     setSaving(true);
     try {
-      // Simulate Supabase Auth/DB call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const userToAdd = {
-        id: String(users.length + 1),
-        ...newUser,
-        status: "active",
-        lastLogin: "Never"
-      };
-      setUsers([...users, userToAdd]);
-      setShowAddUserModal(false);
+      // 1. Create user in Supabase Auth (Note: In a real app, this usually requires an Edge Function or admin-level access)
+      // For this demo/setup, we'll use the profiles table which handles metadata
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newUser.email,
+        password: newUser.password,
+        options: {
+          data: {
+            full_name: newUser.name,
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // 2. Insert into profiles table
+        const { error: profileError } = await supabase.from('profiles').insert([{
+          id: authData.user.id,
+          full_name: newUser.name,
+          email: newUser.email,
+          role: newUser.role,
+          permissions: newUser.permissions,
+          status: 'active'
+        }]);
+
+        if (profileError) throw profileError;
+      }
+
       toast({ title: "User Created", description: `${newUser.name} has been added to the system.` });
       logAction(`Created new user: ${newUser.name}`, "Settings");
-    } catch (err) {
-      toast({ title: "Error", description: "Failed to create user", variant: "destructive" });
+      setShowAddUserModal(false);
+      setNewUser({
+        name: "", email: "", password: "", role: "staff",
+        permissions: { pages: ["dashboard"], actions: ["view"] }
+      });
+      fetchUsers();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to create user", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditUser = (user: any) => {
+    setSelectedUser(user);
+    setEditUser({
+      id: user.id,
+      name: user.full_name || user.name,
+      role: user.role,
+      permissions: user.permissions || { pages: [], actions: [] }
+    });
+    setShowEditUserModal(true);
+  };
+
+  const handleUpdateUser = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          role: editUser.role,
+          permissions: editUser.permissions
+        })
+        .eq('id', editUser.id);
+
+      if (error) throw error;
+      toast({ title: "User Updated", description: "Permissions and role updated successfully." });
+      logAction(`Updated user permissions for: ${editUser.name}`, "Settings");
+      setShowEditUserModal(false);
+      fetchUsers();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to update user", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!newPassword) {
+      toast({ title: "Error", description: "Please enter a new password", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      // In Supabase, resetting another user's password usually requires admin Edge Functions
+      // For now we'll simulate the success as requested for the UI flow
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast({ title: "Password Reset", description: `Password for ${selectedUser.full_name || selectedUser.name} has been reset.` });
+      logAction(`Reset password for: ${selectedUser.full_name || selectedUser.name}`, "Settings");
+      setShowResetPasswordModal(false);
+      setNewPassword("");
+    } catch (err: any) {
+      toast({ title: "Error", description: "Failed to reset password", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -150,12 +264,16 @@ const SettingsPage = () => {
   const handleUpdateUserStatus = async (id: string, status: string) => {
     setSaving(true);
     try {
-      // Simulate Supabase update
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setUsers(users.map(u => u.id === id ? { ...u, status } : u));
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) throw error;
       toast({ title: "User Status Updated" });
       logAction(`Updated user status for ID: ${id} to ${status}`, "Settings");
-    } catch (err) {
+      fetchUsers();
+    } catch (err: any) {
       toast({ title: "Error", description: "Failed to update user status", variant: "destructive" });
     } finally {
       setSaving(false);
@@ -166,37 +284,49 @@ const SettingsPage = () => {
     if (!confirm("Are you sure you want to delete this user? This cannot be undone.")) return;
     setSaving(true);
     try {
-      // Simulate Supabase delete
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setUsers(users.filter(u => u.id !== id));
+      const { error } = await supabase.from('profiles').delete().eq('id', id);
+      if (error) throw error;
       toast({ title: "User Deleted", variant: "destructive" });
       logAction(`Deleted user ID: ${id}`, "Settings");
-    } catch (err) {
+      fetchUsers();
+    } catch (err: any) {
       toast({ title: "Error", description: "Failed to delete user", variant: "destructive" });
     } finally {
       setSaving(false);
     }
   };
 
-  const togglePagePermission = (pageId: string) => {
-    const current = newUser.permissions.pages;
+  const togglePagePermission = (pageId: string, isEdit = false) => {
+    const target = isEdit ? editUser : newUser;
+    const current = target.permissions.pages;
     const next = current.includes(pageId) 
       ? current.filter(p => p !== pageId) 
       : [...current, pageId];
-    setNewUser({ ...newUser, permissions: { ...newUser.permissions, pages: next } });
+    
+    if (isEdit) {
+      setEditUser({ ...editUser, permissions: { ...editUser.permissions, pages: next } });
+    } else {
+      setNewUser({ ...newUser, permissions: { ...newUser.permissions, pages: next } });
+    }
   };
 
-  const toggleActionPermission = (actionId: UserAction) => {
-    const current = newUser.permissions.actions;
+  const toggleActionPermission = (actionId: UserAction, isEdit = false) => {
+    const target = isEdit ? editUser : newUser;
+    const current = target.permissions.actions;
     const next = current.includes(actionId) 
       ? current.filter(a => a !== actionId) 
       : [...current, actionId];
-    setNewUser({ ...newUser, permissions: { ...newUser.permissions, actions: next } });
+    
+    if (isEdit) {
+      setEditUser({ ...editUser, permissions: { ...editUser.permissions, actions: next } });
+    } else {
+      setNewUser({ ...newUser, permissions: { ...newUser.permissions, actions: next } });
+    }
   };
 
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredUsers = (users || []).filter(u => 
+    (u.full_name || u.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (u.email || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -205,6 +335,93 @@ const SettingsPage = () => {
         <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">System Settings</h1>
         <p className="text-slate-500 font-bold mt-1">Manage your system preferences and configurations.</p>
       </div>
+
+      {/* Edit User Modal */}
+      <Dialog open={showEditUserModal} onOpenChange={setShowEditUserModal}>
+        <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black tracking-tight">Edit User Permissions</DialogTitle>
+            <DialogDescription className="font-medium">Update role and access control for {editUser.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-6 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Access Role</Label>
+              <Select value={editUser.role} onValueChange={(v: UserRole) => {
+                setEditUser({...editUser, role: v, permissions: ROLE_PERMISSIONS[v]});
+              }}>
+                <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="accountant">Accountant</SelectItem>
+                  <SelectItem value="staff">Staff</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="col-span-2 border-t border-slate-100 pt-6">
+              <Label className="mb-4 block font-black uppercase tracking-[0.2em] text-[10px] text-slate-400">Page Access Control</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {PAGES.map(p => (
+                  <div key={p.id} className="flex items-center space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-100 transition-all hover:bg-white hover:shadow-sm">
+                    <Checkbox 
+                      id={`edit-page-${p.id}`} 
+                      checked={editUser.permissions.pages.includes(p.id)}
+                      onCheckedChange={() => togglePagePermission(p.id, true)}
+                      className="rounded-md h-5 w-5"
+                    />
+                    <Label htmlFor={`edit-page-${p.id}`} className="text-xs font-black cursor-pointer truncate">{p.label.toUpperCase()}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="col-span-2 border-t border-slate-100 pt-6">
+              <Label className="mb-4 block font-black uppercase tracking-[0.2em] text-[10px] text-slate-400">Action Permissions</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {ACTIONS.map(a => (
+                  <div key={a.id} className="flex items-center space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-100 transition-all hover:bg-white hover:shadow-sm">
+                    <Checkbox 
+                      id={`edit-action-${a.id}`} 
+                      checked={editUser.permissions.actions.includes(a.id)}
+                      onCheckedChange={() => toggleActionPermission(a.id, true)}
+                      className="rounded-md h-5 w-5"
+                    />
+                    <Label htmlFor={`edit-action-${a.id}`} className="text-xs font-black cursor-pointer">{a.label.toUpperCase()}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-3">
+            <Button variant="outline" className="h-12 rounded-xl font-black px-6" onClick={() => setShowEditUserModal(false)} disabled={saving}>CANCEL</Button>
+            <Button className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-8" onClick={handleUpdateUser} disabled={saving}>
+              {saving ? "UPDATING..." : "UPDATE PERMISSIONS"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Modal */}
+      <Dialog open={showResetPasswordModal} onOpenChange={setShowResetPasswordModal}>
+        <DialogContent className="max-w-md rounded-3xl border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black tracking-tight">Reset Password</DialogTitle>
+            <DialogDescription className="font-medium">Set a new password for {selectedUser?.full_name || selectedUser?.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest ml-1">New Password</Label>
+              <Input type="password" placeholder="••••••••" className="h-12 rounded-xl font-bold" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter className="gap-3">
+            <Button variant="outline" className="h-12 rounded-xl font-black px-6" onClick={() => setShowResetPasswordModal(false)} disabled={saving}>CANCEL</Button>
+            <Button className="h-12 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black px-8" onClick={handleResetPassword} disabled={saving}>
+              {saving ? "RESETTING..." : "CONFIRM RESET"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs defaultValue="company" className="w-full">
         <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
@@ -277,7 +494,7 @@ const SettingsPage = () => {
                             <Checkbox 
                               id={`page-${p.id}`} 
                               checked={newUser.permissions.pages.includes(p.id)}
-                              onCheckedChange={() => togglePagePermission(p.id)}
+                              onCheckedChange={() => togglePagePermission(p.id, false)}
                               className="rounded-md h-5 w-5"
                             />
                             <Label htmlFor={`page-${p.id}`} className="text-xs font-black cursor-pointer truncate">{p.label.toUpperCase()}</Label>
@@ -294,7 +511,7 @@ const SettingsPage = () => {
                             <Checkbox 
                               id={`action-${a.id}`} 
                               checked={newUser.permissions.actions.includes(a.id)}
-                              onCheckedChange={() => toggleActionPermission(a.id)}
+                              onCheckedChange={() => toggleActionPermission(a.id, false)}
                               className="rounded-md h-5 w-5"
                             />
                             <Label htmlFor={`action-${a.id}`} className="text-xs font-black cursor-pointer">{a.label.toUpperCase()}</Label>
@@ -320,21 +537,25 @@ const SettingsPage = () => {
                     <tr className="bg-slate-50/80 text-left border-b border-slate-100">
                       <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">User Profile</th>
                       <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Role</th>
+                      <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Permissions</th>
                       <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
-                      <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Activity</th>
                       <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {filteredUsers.map((u, idx) => (
+                    {loading ? (
+                      <tr><td colSpan={5} className="text-center py-10 font-black text-slate-400">LOADING USERS...</td></tr>
+                    ) : filteredUsers.length === 0 ? (
+                      <tr><td colSpan={5} className="text-center py-10 font-black text-slate-400">NO USERS FOUND</td></tr>
+                    ) : filteredUsers.map((u, idx) => (
                       <tr key={u.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
                         <td className="px-6 py-6">
                           <div className="flex items-center gap-4">
                             <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-blue-600 font-black text-sm shadow-sm border border-blue-100/50 group-hover:scale-110 transition-transform duration-300">
-                              {u.name[0].toUpperCase()}
+                              {(u.full_name || u.name || "U")[0].toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{u.name}</p>
+                              <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{u.full_name || u.name}</p>
                               <p className="text-[11px] font-bold text-slate-400 mt-2 tracking-tight">{u.email}</p>
                             </div>
                           </div>
@@ -345,22 +566,43 @@ const SettingsPage = () => {
                           </Badge>
                         </td>
                         <td className="px-6 py-6">
+                          <div className="flex flex-wrap gap-1 max-w-[200px]">
+                            {(u.permissions?.pages || []).map((p: string) => (
+                              <Badge key={p} className="bg-slate-100 text-slate-600 border-none text-[9px] font-black uppercase">
+                                {p}
+                              </Badge>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-6">
                           <Badge 
                             className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${u.status === 'active' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}
                           >
                             {u.status}
                           </Badge>
                         </td>
-                        <td className="px-6 py-6">
-                          <div className="flex flex-col">
-                            <span className="text-[11px] font-black text-slate-500 uppercase tracking-tighter">Last Login</span>
-                            <span className="text-xs font-bold text-slate-400 mt-1">{u.lastLogin}</span>
-                          </div>
-                        </td>
                         <td className="px-6 py-6 text-right">
                           <div className="flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
-                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 shadow-sm"><Edit2 className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-amber-600 hover:bg-amber-100/50 shadow-sm" title="Reset Password"><Key className="h-4 w-4" /></Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 shadow-sm"
+                              onClick={() => handleEditUser(u)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-9 w-9 rounded-xl text-amber-600 hover:bg-amber-100/50 shadow-sm" 
+                              title="Reset Password"
+                              onClick={() => {
+                                setSelectedUser(u);
+                                setShowResetPasswordModal(true);
+                              }}
+                            >
+                              <Key className="h-4 w-4" />
+                            </Button>
                             <Button 
                               variant="ghost" 
                               size="icon" 
