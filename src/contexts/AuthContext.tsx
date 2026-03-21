@@ -28,15 +28,15 @@ export const ROLE_PERMISSIONS: Record<UserRole, UserPermissions> = {
     actions: ["view", "add", "edit", "delete", "export"]
   },
   manager: {
-    pages: ["dashboard", "hr", "events", "inventory", "expenses", "documents"],
+    pages: ["dashboard", "hr", "events", "inventory", "expenses", "documents", "files"],
     actions: ["view", "add", "edit", "export"]
   },
   staff: {
-    pages: ["dashboard", "events", "inventory", "documents"],
+    pages: ["dashboard", "events", "inventory", "documents", "files"],
     actions: ["view", "add"]
   },
   accountant: {
-    pages: ["dashboard", "finance", "expenses", "documents"],
+    pages: ["dashboard", "finance", "expenses", "documents", "files"],
     actions: ["view", "add", "edit", "export"]
   },
 };
