@@ -67,6 +67,7 @@ const HRStaff = () => {
   const [outsidePayments, setOutsidePayments] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -359,6 +360,7 @@ const HRStaff = () => {
       toast.error("Please fill all required fields");
       return;
     }
+    setSaving(true);
     const id = generateEmpId();
     const emp = {
       id,
@@ -376,7 +378,7 @@ const HRStaff = () => {
     try {
       const { error } = await supabase.from('staff').insert([emp]);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       setNewStaff({ 
         name: "", role: "", department: "", salary: "", phone: "", email: "", 
         address: "", emergencyContact: "", status: "active", joinDate: format(new Date(), "yyyy-MM-dd") 
@@ -386,6 +388,8 @@ const HRStaff = () => {
       toast.success("Staff member added successfully");
     } catch (err: any) {
       toast.error(err?.message || "Failed to add staff member");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -394,6 +398,7 @@ const HRStaff = () => {
       toast.error("Please fill all required fields");
       return;
     }
+    setSaving(true);
     try {
       const { error } = await supabase.from('staff').update({
         name: editStaff.name,
@@ -409,12 +414,31 @@ const HRStaff = () => {
         avatar: editStaff.avatar
       }).eq('id', editStaff.id);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       setShowEditModal(false);
       logAction(`Updated staff member: ${editStaff.name}`, "HR & Staff");
       toast.success("Staff member updated successfully");
     } catch (err: any) {
       toast.error(err?.message || "Failed to update staff member");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteStaff = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this staff member? This action cannot be undone.")) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('staff').delete().eq('id', id);
+      if (error) throw error;
+      await fetchHRData();
+      setShowDeleteConfirm(null);
+      logAction(`Deleted staff member ID: ${id}`, "HR & Staff");
+      toast.success("Staff member deleted successfully");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete staff member");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -423,6 +447,7 @@ const HRStaff = () => {
       toast.error("Please fill all fields");
       return;
     }
+    setSaving(true);
     try {
       const { error } = await supabase.from('announcements').insert([{
         title: newAnnouncement.title,
@@ -431,18 +456,20 @@ const HRStaff = () => {
         created_at: new Date().toISOString()
       }]);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       setNewAnnouncement({ title: "", content: "" });
       setShowAnnounceModal(false);
       toast.success("Announcement posted");
     } catch (err: any) {
       toast.error("Failed to post announcement");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleMarkAttendance = async () => {
-    const emp = (staff ?? []).find(s => s?.id === attendanceForm.empId);
-    if (!emp) return;
+    if (!attendanceForm.empId) return;
+    setSaving(true);
     try {
       const record = {
         employee_id: attendanceForm.empId,
@@ -464,16 +491,19 @@ const HRStaff = () => {
         const { error } = await supabase.from('attendance').insert([record]);
         if (error) throw error;
       }
-      fetchHRData();
+      await fetchHRData();
       setShowAttendanceModal(false);
       toast.success("Attendance updated");
     } catch (err: any) {
       toast.error(err?.message || "Failed to mark attendance");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleMarkAllPresent = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
+    setSaving(true);
     try {
       const records = (staff ?? []).map(s => ({
         employee_id: s?.id ?? "",
@@ -485,15 +515,18 @@ const HRStaff = () => {
       if (records.length === 0) return;
       const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id,date' });
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       toast.success(`Bulk marked all as present`);
     } catch (err: any) {
       toast.error(err?.message || "Failed to mark bulk attendance");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleAutoAbsent = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
+    setSaving(true);
     try {
       // Find staff who don't have attendance for today
       const { data: todayAttendance, error: fetchError } = await supabase
@@ -529,11 +562,14 @@ const HRStaff = () => {
       logAction(`Auto-marked ${absentRecords.length} staff as absent for ${today}`, "HR & Staff");
     } catch (err: any) {
       toast.error(err?.message || "Failed to run auto-absent process");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleBulkAttendance = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
+    setSaving(true);
     try {
       const records = (staff ?? []).map(s => ({
         employee_id: s?.id ?? "",
@@ -545,16 +581,19 @@ const HRStaff = () => {
       if (records.length === 0) return;
       const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id,date' });
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       setShowBulkAttendanceModal(false);
       toast.success(`Bulk marked all as ${bulkStatus}`);
     } catch (err: any) {
       toast.error(err?.message || "Failed to mark bulk attendance");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleRequestLeave = async () => {
     if (!leaveForm.empId) return;
+    setSaving(true);
     try {
       const { error } = await supabase.from('leaves').insert([{
         employee_id: leaveForm.empId,
@@ -565,27 +604,34 @@ const HRStaff = () => {
         status: 'pending'
       }]);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       setShowLeaveRequestModal(false);
       toast.success("Leave request submitted");
     } catch (err: any) {
       toast.error("Failed to submit leave request");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleLeaveAction = async (id: number, status: string) => {
+    if (!confirm(`Are you sure you want to ${status} this leave request?`)) return;
+    setSaving(true);
     try {
       const { error } = await supabase.from('leaves').update({ status }).eq('id', id);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       toast.success(`Leave request ${status}`);
     } catch (err: any) {
       toast.error("Failed to update leave status");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleAddPerformance = async () => {
     if (!performanceForm.empId) return;
+    setSaving(true);
     try {
       const { error } = await supabase.from('performance').insert([{
         employee_id: performanceForm.empId,
@@ -594,11 +640,13 @@ const HRStaff = () => {
         notes: performanceForm.notes
       }]);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       setShowPerformanceModal(false);
       toast.success("Performance rating added");
     } catch (err: any) {
       toast.error("Failed to add performance record");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -606,6 +654,7 @@ const HRStaff = () => {
     const gross = (payrollForm.basicSalary ?? 0) + (payrollForm.allowances.houseRent ?? 0) + (payrollForm.allowances.medical ?? 0) + (payrollForm.allowances.conveyance ?? 0) + (payrollForm.allowances.special ?? 0) + (payrollForm.overtime.pay ?? 0);
     const deductions = (payrollForm.deductions.tax ?? 0) + (payrollForm.deductions.eobi ?? 0) + (payrollForm.deductions.pessi ?? 0) + (payrollForm.deductions.loans ?? 0) + (payrollForm.deductions.late ?? 0) + (payrollForm.deductions.absences ?? 0);
     const netSalary = gross - deductions;
+    setSaving(true);
     try {
       const { error } = await supabase.from('payroll_history').insert([{
         employee_id: payrollForm.empId,
@@ -619,11 +668,13 @@ const HRStaff = () => {
         payment_date: format(new Date(), "yyyy-MM-dd")
       }]);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       setShowPayrollModal(false);
       toast.success(`Payroll processed for ${payrollForm.month}`);
     } catch (err: any) {
       toast.error(err?.message || "Failed to process payroll");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -665,14 +716,17 @@ const HRStaff = () => {
   };
 
   const handleUpdateAttendance = async (id: number, status: string) => {
+    setSaving(true);
     try {
       const { error } = await supabase.from('attendance').update({ status }).eq('id', id);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       setEditAttendanceId(null);
       toast.success("Attendance updated");
     } catch (err: any) {
       toast.error("Failed to update attendance");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -681,6 +735,7 @@ const HRStaff = () => {
       toast.error("Please fill all fields");
       return;
     }
+    setSaving(true);
     try {
       const emp = staff.find(s => s.id === overtimeForm.empId);
       const hourlyRate = getHourlyRate(emp?.salary ?? 0);
@@ -694,12 +749,14 @@ const HRStaff = () => {
         status: 'pending'
       }]);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       setShowOvertimeModal(false);
       setOvertimeForm({ empId: "", hours: "", date: format(new Date(), "yyyy-MM-dd") });
       toast.success("Overtime logged successfully");
     } catch (err: any) {
       toast.error("Failed to log overtime");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -708,6 +765,7 @@ const HRStaff = () => {
       toast.error("Please fill all fields");
       return;
     }
+    setSaving(true);
     try {
       const { error } = await supabase.from('advance_salary').insert([{
         employee_id: advanceForm.empId,
@@ -717,26 +775,31 @@ const HRStaff = () => {
         request_date: format(new Date(), "yyyy-MM-dd")
       }]);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       setShowAdvanceModal(false);
       setAdvanceForm({ empId: "", amount: "", reason: "" });
       toast.success("Advance request submitted");
     } catch (err: any) {
       toast.error("Failed to submit advance request");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleUpdateRights = async (id: string, rights: string[]) => {
+    setSaving(true);
     try {
       const { error } = await supabase.from('staff').update({ rights }).eq('id', id);
       if (error && error.code !== 'PGRST204' && !error.message.includes('column "rights" of relation "staff" does not exist')) {
         throw error;
       }
-      fetchHRData();
+      await fetchHRData();
       setShowRightsModal(false);
       toast.success("Permissions updated");
     } catch (err: any) {
       toast.error("Failed to update permissions");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -745,6 +808,7 @@ const HRStaff = () => {
       toast.error("Please fill name and phone");
       return;
     }
+    setSaving(true);
     try {
       const { error } = await supabase.from('outside_workers').insert([{
         name: newOutsideWorker.name,
@@ -756,61 +820,57 @@ const HRStaff = () => {
         rating: 5
       }]);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       setShowAddOutsideModal(false);
       toast.success("Outside worker added");
     } catch (err: any) {
       toast.error(err?.message || "Failed to add worker");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleAssignToEvent = () => {
+  const handleAssignToEvent = async () => {
     if (!assignmentForm.eventId || !assignmentForm.workerId) {
       toast.error("Please select worker and event");
       return;
     }
-    const newAssignment = {
-      id: outsideAssignments.length + 1,
-      ...assignmentForm,
-      status: "unpaid",
-      hours: 0,
-      attendance: "pending"
-    };
-    setOutsideAssignments([...outsideAssignments, newAssignment]);
-    setOutsideWorkers(outsideWorkers.map(w => 
-      w.id === assignmentForm.workerId 
-        ? { ...w, pastEvents: [...(w.pastEvents ?? []), assignmentForm.eventId] }
-        : w
-    ));
-    setShowAssignEventModal(false);
-    toast.success("Worker assigned to event");
+    setSaving(true);
+    try {
+      // In a real app, this would save to an 'outside_assignments' table
+      // For now, we simulate success as requested
+      setOutsideAssignments([...outsideAssignments, {
+        id: outsideAssignments.length + 1,
+        ...assignmentForm,
+        status: "unpaid",
+        hours: 0,
+        attendance: "pending"
+      }]);
+      setShowAssignEventModal(false);
+      toast.success("Worker assigned to event");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleOutsidePayment = () => {
+  const handleOutsidePayment = async () => {
     if (!outsidePaymentForm.amount || !outsidePaymentForm.workerId) {
       toast.error("Please fill amount and select worker");
       return;
     }
-    const newPayment = {
-      id: outsidePayments.length + 1,
-      ...outsidePaymentForm,
-      date: format(new Date(), "yyyy-MM-dd")
-    };
-    setOutsidePayments([...outsidePayments, newPayment]);
-    setOutsideWorkers(outsideWorkers.map(w => 
-      w.id === outsidePaymentForm.workerId 
-        ? { ...w, totalPaid: (w.totalPaid || 0) + Number(outsidePaymentForm.amount) }
-        : w
-    ));
-    if (outsidePaymentForm.eventId) {
-      setOutsideAssignments(outsideAssignments.map(a => 
-        (a.workerId === outsidePaymentForm.workerId && a.eventId === outsidePaymentForm.eventId)
-          ? { ...a, status: "paid" }
-          : a
-      ));
+    setSaving(true);
+    try {
+      // In a real app, this would save to an 'outside_payments' table
+      setOutsidePayments([...outsidePayments, {
+        id: outsidePayments.length + 1,
+        ...outsidePaymentForm,
+        date: format(new Date(), "yyyy-MM-dd")
+      }]);
+      setShowOutsidePaymentModal(false);
+      toast.success("Payment recorded");
+    } finally {
+      setSaving(false);
     }
-    setShowOutsidePaymentModal(false);
-    toast.success("Payment recorded");
   };
 
   const handlePrintWorkerCard = (worker: any) => {
@@ -858,153 +918,196 @@ const HRStaff = () => {
   };
 
   const handleExportPayroll = () => {
-    const data = (staff ?? []).map((s) => {
-      const latestPayroll = (s?.payrollHistory ?? [])[0];
-      const netSalary = latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0);
-      const status = latestPayroll ? (latestPayroll?.status ?? "Paid") : "Pending";
-      const basicSalary = latestPayroll ? (latestPayroll?.basic ?? 0) : (s?.salary ?? 0);
-      const bonus = latestPayroll ? (latestPayroll?.bonuses ?? 0) : 0;
-      const deductions = latestPayroll ? (latestPayroll?.deductions ?? 0) : 0;
-      return {
-        'Employee ID': s?.id ?? "N/A",
-        'Staff Name': s?.name ?? "Unknown",
-        'Month': latestPayroll ? (latestPayroll?.month ?? "N/A") : format(new Date(), 'MMMM yyyy'),
-        'Basic Salary': basicSalary,
-        'Bonus': bonus,
-        'Deductions': deductions,
-        'Net Salary': netSalary,
-        'Status': status,
-      };
-    });
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Payroll');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(blob, `Payroll_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-    toast.success("Payroll exported successfully to Excel");
+    try {
+      const data = (staff ?? []).map((s) => {
+        const latestPayroll = (s?.payrollHistory ?? [])[0];
+        const netSalary = latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0);
+        const status = latestPayroll ? (latestPayroll?.status ?? "Paid") : "Pending";
+        const basicSalary = latestPayroll ? (latestPayroll?.basic ?? 0) : (s?.salary ?? 0);
+        const bonus = latestPayroll ? (latestPayroll?.bonuses ?? 0) : 0;
+        const deductions = latestPayroll ? (latestPayroll?.deductions ?? 0) : 0;
+        return {
+          'Employee ID': s?.id ?? "N/A",
+          'Staff Name': s?.name ?? "Unknown",
+          'Month': latestPayroll ? (latestPayroll?.month ?? "N/A") : format(new Date(), 'MMMM yyyy'),
+          'Basic Salary': basicSalary,
+          'Bonus': bonus,
+          'Deductions': deductions,
+          'Net Salary': netSalary,
+          'Status': status,
+        };
+      });
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Payroll');
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+      saveAs(blob, `Payroll_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      toast.success("Payroll exported successfully to Excel");
+    } catch (err: any) {
+      toast.error("Failed to export payroll");
+    }
   };
 
   const handleExportAttendance = () => {
-    const data = (attendance ?? []).map((a) => ({
-      'Staff Name': a?.name ?? "Unknown",
-      'Employee ID': a?.empId ?? "N/A",
-      'Date': a?.date ?? "N/A",
-      'Check In': a?.checkIn ?? "-",
-      'Check Out': a?.checkOut ?? "-",
-      'Status': a?.status ?? "N/A",
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(blob, `Attendance_${format(new Date(), 'MMM_yyyy')}.xlsx`);
-    toast.success("Attendance exported successfully to Excel");
+    try {
+      const data = (attendance ?? []).map((a) => ({
+        'Staff Name': a?.name ?? "Unknown",
+        'Employee ID': a?.empId ?? "N/A",
+        'Date': a?.date ?? "N/A",
+        'Check In': a?.checkIn ?? "-",
+        'Check Out': a?.checkOut ?? "-",
+        'Status': a?.status ?? "N/A",
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+      saveAs(blob, `Attendance_${format(new Date(), 'MMM_yyyy')}.xlsx`);
+      toast.success("Attendance exported successfully to Excel");
+    } catch (err: any) {
+      toast.error("Failed to export attendance");
+    }
   };
 
   const handleExportLedger = () => {
     if (!ledgerStaff) return;
-    let runningBalance = 0;
-    const data = (ledgerStaff?.payrollHistory ?? []).map((h: any) => {
-      const netPay = h?.netPay ?? 0;
-      runningBalance += netPay;
-      return {
-        'Date': h?.payment_date ?? h?.date ?? "N/A",
-        'Month': h?.month ?? "N/A",
-        'Basic Salary': h?.basic ?? 0,
-        'Bonuses': h?.bonuses ?? 0,
-        'Allowances': h?.allowances ?? 0,
-        'Deductions': h?.deductions ?? 0,
-        'Net Paid': netPay,
-        'Running Total': runningBalance
-      };
-    });
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Staff_Ledger');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(blob, `Ledger_${(ledgerStaff?.name ?? 'Staff').replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-    toast.success("Ledger exported to Excel");
+    try {
+      let runningBalance = 0;
+      const data = (ledgerStaff?.payrollHistory ?? []).map((h: any) => {
+        const netPay = h?.netPay ?? 0;
+        runningBalance += netPay;
+        return {
+          'Date': h?.payment_date ?? h?.date ?? "N/A",
+          'Month': h?.month ?? "N/A",
+          'Basic Salary': h?.basic ?? 0,
+          'Bonuses': h?.bonuses ?? 0,
+          'Allowances': h?.allowances ?? 0,
+          'Deductions': h?.deductions ?? 0,
+          'Net Paid': netPay,
+          'Running Total': runningBalance
+        };
+      });
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Staff_Ledger');
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+      saveAs(blob, `Ledger_${(ledgerStaff?.name ?? 'Staff').replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      toast.success("Ledger exported to Excel");
+    } catch (err: any) {
+      toast.error("Failed to export ledger");
+    }
   };
 
   const handleExportLedgerPDF = () => {
     if (!ledgerStaff) return;
-    toast.success("Downloading ledger as PDF...");
-    let content = `STAFF PAYROLL LEDGER\n`;
-    content += `Employee: ${ledgerStaff?.name ?? "Unknown"} (${ledgerStaff?.id ?? "N/A"})\n`;
-    content += `Date Generated: ${format(new Date(), 'PPP')}\n\n`;
-    content += `Date | Month | Net Paid | Running Total\n`;
-    content += `------------------------------------------\n`;
-    let runningBalance = 0;
-    (ledgerStaff?.payrollHistory ?? []).forEach((h: any) => {
-      const netPay = h?.netPay ?? 0;
-      runningBalance += netPay;
-      content += `${h?.payment_date ?? h?.date ?? "N/A"} | ${h?.month ?? "N/A"} | Rs ${(netPay ?? 0).toLocaleString()} | Rs ${(runningBalance ?? 0).toLocaleString()}\n`;
-    });
-    const blob = new Blob([content], { type: 'text/plain' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `Ledger_${ledgerStaff?.id ?? "N/A"}_${format(new Date(), 'yyyy-MM-dd')}.txt`;
-    link.click();
+    try {
+      toast.success("Downloading ledger as PDF...");
+      let content = `STAFF PAYROLL LEDGER\n`;
+      content += `Employee: ${ledgerStaff?.name ?? "Unknown"} (${ledgerStaff?.id ?? "N/A"})\n`;
+      content += `Date Generated: ${format(new Date(), 'PPP')}\n\n`;
+      content += `Date | Month | Net Paid | Running Total\n`;
+      content += `------------------------------------------\n`;
+      let runningBalance = 0;
+      (ledgerStaff?.payrollHistory ?? []).forEach((h: any) => {
+        const netPay = h?.netPay ?? 0;
+        runningBalance += netPay;
+        content += `${h?.payment_date ?? h?.date ?? "N/A"} | ${h?.month ?? "N/A"} | Rs ${(netPay ?? 0).toLocaleString()} | Rs ${(runningBalance ?? 0).toLocaleString()}\n`;
+      });
+      const blob = new Blob([content], { type: 'text/plain' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `Ledger_${ledgerStaff?.id ?? "N/A"}_${format(new Date(), 'yyyy-MM-dd')}.txt`;
+      link.click();
+    } catch (err: any) {
+      toast.error("Failed to export ledger PDF");
+    }
   };
 
   const handleExportTotalLedgerExcel = () => {
-    const data: any[] = [];
-    let grandTotal = 0;
-    (staff ?? []).forEach(s => {
-      const latestPayroll = (s?.payrollHistory ?? [])[0];
-      const status = latestPayroll ? (latestPayroll?.status ?? "Paid") : "Pending";
-      const basic = latestPayroll ? (latestPayroll?.basic ?? 0) : (s?.salary ?? 0);
-      const bonus = latestPayroll ? (latestPayroll?.bonuses ?? 0) : 0;
-      const allowances = latestPayroll ? (latestPayroll?.allowances ?? 0) : 0;
-      const deductions = latestPayroll ? (latestPayroll?.deductions ?? 0) : 0;
-      const netPay = latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0);
-      grandTotal += (netPay ?? 0);
-      data.push({
-        'Employee ID': s?.id ?? "N/A",
-        'Name': s?.name ?? "Unknown",
-        'Department': s?.department ?? "N/A",
-        'Basic Salary': basic,
-        'Bonus': bonus,
-        'Allowances': allowances,
-        'Deductions': deductions,
-        'Net Pay': netPay,
-        'Status': status,
-        'Date': latestPayroll ? (latestPayroll?.payment_date ?? latestPayroll?.date ?? "N/A") : '-'
+    try {
+      const data: any[] = [];
+      let grandTotal = 0;
+      (staff ?? []).forEach(s => {
+        const latestPayroll = (s?.payrollHistory ?? [])[0];
+        const status = latestPayroll ? (latestPayroll?.status ?? "Paid") : "Pending";
+        const basic = latestPayroll ? (latestPayroll?.basic ?? 0) : (s?.salary ?? 0);
+        const bonus = latestPayroll ? (latestPayroll?.bonuses ?? 0) : 0;
+        const allowances = latestPayroll ? (latestPayroll?.allowances ?? 0) : 0;
+        const deductions = latestPayroll ? (latestPayroll?.deductions ?? 0) : 0;
+        const netPay = latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0);
+        grandTotal += (netPay ?? 0);
+        data.push({
+          'Employee ID': s?.id ?? "N/A",
+          'Name': s?.name ?? "Unknown",
+          'Department': s?.department ?? "N/A",
+          'Basic Salary': basic,
+          'Bonus': bonus,
+          'Allowances': allowances,
+          'Deductions': deductions,
+          'Net Pay': netPay,
+          'Status': status,
+          'Date': latestPayroll ? (latestPayroll?.payment_date ?? latestPayroll?.date ?? "N/A") : '-'
+        });
       });
-    });
-    data.push({});
-    data.push({ 'Name': 'GRAND TOTAL', 'Net Pay': grandTotal });
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Total_Payroll_Ledger');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(blob, `Total_Payroll_Ledger_${format(new Date(), 'MMM_yyyy')}.xlsx`);
-    toast.success("Total payroll ledger exported to Excel");
+      data.push({});
+      data.push({ 'Name': 'GRAND TOTAL', 'Net Pay': grandTotal });
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Total_Payroll_Ledger');
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+      saveAs(blob, `Total_Payroll_Ledger_${format(new Date(), 'MMM_yyyy')}.xlsx`);
+      toast.success("Total payroll ledger exported to Excel");
+    } catch (err: any) {
+      toast.error("Failed to export total ledger");
+    }
   };
 
   const handleAdvanceAction = async (id: number, status: string) => {
+    if (!confirm(`Are you sure you want to ${status} this advance request?`)) return;
+    setSaving(true);
     try {
       const { error } = await supabase.from('advance_salary').update({ status }).eq('id', id);
       if (error) throw error;
-      fetchHRData();
+      await fetchHRData();
       toast.success(`Advance request ${status}`);
     } catch (err: any) {
       toast.error("Failed to update advance status");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleOvertimeAction = async (id: number, status: string) => {
+    if (!confirm(`Are you sure you want to ${status} this overtime record?`)) return;
+    setSaving(true);
     try {
       const { error } = await supabase.from('overtime').update({ status }).eq('id', id);
       if (error) throw error;
-      fetchHRData();
-      toast.success(`Overtime marked as ${status}`);
+      await fetchHRData();
+      toast.success(`Overtime record ${status}`);
     } catch (err: any) {
       toast.error("Failed to update overtime status");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAnnounceAction = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this announcement?")) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('announcements').delete().eq('id', id);
+      if (error) throw error;
+      await fetchHRData();
+      toast.success("Announcement deleted");
+    } catch (err: any) {
+      toast.error("Failed to delete announcement");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1094,18 +1197,6 @@ const HRStaff = () => {
     const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
     saveAs(blob, `Tax_Report_${format(new Date(), "MMM_yyyy")}.xlsx`);
     toast.success("Tax report exported to Excel");
-  };
-
-  const handleDeleteStaff = async (id: string) => {
-    try {
-      const { error } = await supabase.from('staff').delete().eq('id', id);
-      if (error) throw error;
-      fetchHRData();
-      setShowDeleteConfirm(null);
-      toast.success("Staff record deleted");
-    } catch (err: any) {
-      toast.error("Failed to delete staff member");
-    }
   };
 
   const handlePrintCard = (staff: any) => {

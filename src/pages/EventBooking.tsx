@@ -77,8 +77,9 @@ const sc = (status: BookingStatus) => {
 const EMPTY = { clientName:"",phone:"",eventType:"",eventDate:"",bookingDate:new Date().toISOString().split("T")[0],venue:"",guests:"",totalAmount:"",advance:"",paymentMethod:"Cash",status:"tentative" as BookingStatus,menu:"Menu A - Desi",notes:"",thirdParty:false,supplierCost:"",sellingRate:"" };
 
 const EventBooking = () => {
-  const { canDo, logAction } = useAuth();
+  const { user, canDo, logAction } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [menus, setMenus] = useState<Menu[]>(INITIAL_MENUS);
   const [loadingMenus, setLoadingMenus] = useState(false);
   const [showItemModal, setShowItemModal] = useState(false);
@@ -390,6 +391,146 @@ const EventBooking = () => {
     }
   };
 
+  const fetchBookingsData = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('event_bookings')
+        .select('*')
+        .order('event_date', { ascending: true });
+
+      if (error) throw error;
+      if (data) {
+        setBookings(data.map(b => ({
+          id: b.id,
+          clientName: b.client_name,
+          phone: b.phone,
+          eventType: b.event_type,
+          eventDate: b.event_date,
+          bookingDate: b.booking_date,
+          venue: b.venue,
+          guests: b.guests,
+          totalAmount: b.total_amount,
+          advance: b.advance,
+          balanceRemaining: b.balance_remaining,
+          status: b.status,
+          paymentMethod: b.payment_method,
+          menu: b.menu,
+          notes: b.notes,
+          thirdParty: b.third_party,
+          supplierCost: b.supplier_cost,
+          sellingRate: b.selling_rate
+        })));
+      }
+    } catch (err: any) {
+      toast.error("Failed to fetch bookings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      await Promise.all([fetchBookingsData(), fetchMenus(), fetchSuppliers()]);
+      setLoading(false);
+    };
+    init();
+  }, []);
+
+  const handleAdd = async () => {
+    if (!nb?.clientName || !nb?.eventDate) {
+      toast.error("Client name and event date are required");
+      return;
+    }
+    if (!proceedWithBooking && !checkAvailability()) {
+      setProceedWithBooking(true);
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      const total = Number(nb?.totalAmount || 0);
+      const adv = Number(nb?.advance || 0);
+      const bookingData = {
+        client_name: nb.clientName,
+        phone: nb.phone,
+        event_type: nb.eventType,
+        event_date: nb.eventDate,
+        booking_date: nb.bookingDate,
+        venue: nb.venue,
+        guests: Number(nb.guests || 0),
+        total_amount: total,
+        advance: adv,
+        balance_remaining: total - adv,
+        status: nb.status,
+        payment_method: nb.paymentMethod,
+        menu: nb.menu,
+        notes: nb.notes,
+        third_party: nb.thirdParty,
+        supplier_cost: Number(nb.supplierCost || 0),
+        selling_rate: Number(nb.sellingRate || 0),
+        created_by: user?.email
+      };
+
+      if ((nb as any).id) {
+        const { error } = await supabase.from('event_bookings').update(bookingData).eq('id', (nb as any).id);
+        if (error) throw error;
+        toast.success("Booking updated successfully");
+      } else {
+        const { error } = await supabase.from('event_bookings').insert([bookingData]);
+        if (error) throw error;
+        toast.success("Booking created successfully");
+      }
+
+      await fetchBookingsData();
+      setNb(EMPTY); 
+      setShowAdd(false); 
+      setAvailabilityWarning(null); 
+      setProceedWithBooking(false);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save booking");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteBooking = async (id: number) => {
+    if (!confirm("Are you sure you want to permanently delete this booking?")) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('event_bookings').delete().eq('id', id);
+      if (error) throw error;
+      await fetchBookingsData();
+      toast.success("Booking deleted successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete booking");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleStatusChange = async (id: number, status: BookingStatus) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('event_bookings').update({ status }).eq('id', id);
+      if (error) throw error;
+      await fetchBookingsData();
+      toast.success(`Booking status updated to ${status}`);
+    } catch (err: any) {
+      toast.error("Failed to update status");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const monthStart = startOfMonth(calMonth);
+  const days = eachDayOfInterval({start:monthStart,end:endOfMonth(calMonth)});
+  const startDow = getDay(monthStart);
+  const bookingDates = (bookings ?? []).map(b=>({date:new Date(b?.eventDate ?? ""),status:b?.status,name:b?.clientName}));
+  const getDayB = (d:Date) => (bookingDates ?? []).filter(b=>isSameDay(b?.date,d));
+  const tp = (bookings ?? []).filter(b=>b?.thirdParty).reduce((s,b)=>s+((b?.sellingRate ?? 0)-(b?.supplierCost ?? 0)),0);
+
   const handlePrint = () => {
     window.print();
   };
@@ -413,24 +554,6 @@ const EventBooking = () => {
     setAvailabilityWarning(null);
     return true;
   };
-
-  const handleAdd = () => {
-    if (!nb?.clientName || !nb?.eventDate) return;
-    if (!proceedWithBooking && !checkAvailability()) {
-      setProceedWithBooking(true);
-      return;
-    }
-    const total = Number(nb?.totalAmount || 0), adv = Number(nb?.advance || 0);
-    setBookings([...(bookings ?? []),{id:(bookings ?? []).length+1,...nb,guests:Number(nb?.guests || 0),totalAmount:total,advance:adv,balanceRemaining:total-adv,supplierCost:Number(nb?.supplierCost || 0),sellingRate:Number(nb?.sellingRate || 0)}]);
-    setNb(EMPTY); setShowAdd(false); setAvailabilityWarning(null); setProceedWithBooking(false);
-  };
-
-  const monthStart = startOfMonth(calMonth);
-  const days = eachDayOfInterval({start:monthStart,end:endOfMonth(calMonth)});
-  const startDow = getDay(monthStart);
-  const bookingDates = (bookings ?? []).map(b=>({date:new Date(b?.eventDate ?? ""),status:b?.status,name:b?.clientName}));
-  const getDayB = (d:Date) => (bookingDates ?? []).filter(b=>isSameDay(b?.date,d));
-  const tp = (bookings ?? []).filter(b=>b?.thirdParty).reduce((s,b)=>s+((b?.sellingRate ?? 0)-(b?.supplierCost ?? 0)),0);
 
   return (
     <div className="space-y-8 pb-10">

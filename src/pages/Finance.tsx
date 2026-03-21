@@ -73,10 +73,11 @@ const ACCOUNTS = ["Cash","Bank","Supplier","Vendor","Other"];
 const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque", "Online Transfer"];
 
 const Finance = () => {
-  const { canDo, logAction } = useAuth();
+  const { user, canDo, logAction } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [ledger, setLedger] = useState<LedgerEntry[]>(INIT_LEDGER);
+  const [saving, setSaving] = useState(false);
+  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [suppliers, setSuppliers] = useState(INIT_SUPPLIERS);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
@@ -102,6 +103,35 @@ const Finance = () => {
   const [showVendorHistory, setShowVendorHistory] = useState(false);
   const [showPayVendor, setShowPayVendor] = useState(false);
   const [vendorPayForm, setVendorPayForm] = useState({ amount: "", method: "Cash", date: format(new Date(), "yyyy-MM-dd"), notes: "" });
+
+  const fetchFinanceData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('finance_ledger')
+        .select('*')
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+      
+      let runningBalance = 0;
+      const ledgerData = (data ?? []).map((entry: any) => {
+        const amount = Number(entry.amount);
+        runningBalance = entry.type === 'debit' ? runningBalance + amount : runningBalance - amount;
+        return {
+          id: entry.id,
+          date: entry.date,
+          description: entry.description,
+          account: entry.account,
+          type: entry.type,
+          amount: amount,
+          balance: runningBalance
+        };
+      });
+      setLedger(ledgerData);
+    } catch (err: any) {
+      toast({ title: "Error", description: "Failed to fetch ledger entries", variant: "destructive" });
+    }
+  };
 
   const fetchVendors = async () => {
     try {
@@ -137,7 +167,7 @@ const Finance = () => {
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      await fetchVendors();
+      await Promise.all([fetchFinanceData(), fetchVendors()]);
       setLoading(false);
     };
     init();
@@ -160,14 +190,50 @@ const Finance = () => {
   const totalPending = (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.balance ?? 0),0);
   const totalProfit = (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.profit ?? 0),0);
 
-  const handleAdd = () => {
-    if (!newEntry.description||!newEntry.amount) return;
-    const amount = Number(newEntry.amount);
-    const lastBal = (ledger ?? [])[(ledger ?? []).length-1]?.balance||0;
-    const balance = newEntry.type==="debit" ? lastBal+amount : lastBal-amount;
-    setLedger([...(ledger ?? []),{id:Date.now(),...newEntry,amount,balance}]);
-    setNewEntry({date: format(new Date(), "yyyy-MM-dd"),description:"",account:"Cash",type:"debit",amount:""});
-    setShowAdd(false); toast({title:"Entry added"});
+  const handleAdd = async () => {
+    if (!newEntry.description || !newEntry.amount) {
+      toast({ title: "Validation Error", description: "Please fill all required fields", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('finance_ledger').insert([{
+        date: newEntry.date,
+        description: newEntry.description,
+        account: newEntry.account,
+        type: newEntry.type,
+        amount: Number(newEntry.amount),
+        created_by: user?.email
+      }]);
+
+      if (error) throw error;
+      
+      await fetchFinanceData();
+      setNewEntry({date: format(new Date(), "yyyy-MM-dd"), description:"", account:"Cash", type:"debit", amount:""});
+      setShowAdd(false); 
+      toast({ title: "Success", description: "Ledger entry saved successfully" });
+      logAction(`Added ledger entry: ${newEntry.description}`, "Finance");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to save entry", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteEntry = async (id: string | number) => {
+    if (!confirm("Are you sure you want to delete this entry?")) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('finance_ledger').delete().eq('id', id);
+      if (error) throw error;
+      await fetchFinanceData();
+      toast({ title: "Success", description: "Entry deleted successfully" });
+      logAction(`Deleted ledger entry ID: ${id}`, "Finance");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to delete entry", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handlePaySupplier = async () => {

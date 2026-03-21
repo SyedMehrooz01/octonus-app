@@ -26,17 +26,22 @@ interface Expense {
   amount: number;
   payment_mode: string;
   event_id?: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  approved_by?: string | null;
+  approved_at?: string | null;
+  rejection_reason?: string | null;
   created_at?: string;
 }
 
 const Expenses = () => {
-  const { canDo, logAction } = useAuth();
+  const { user, canDo, logAction } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterHead, setFilterHead] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rejectionModal, setRejectionModal] = useState<{show: boolean, id: string, reason: string}>({ show: false, id: "", reason: "" });
   
   // New States
   const [viewType, setPlViewType] = useState<"monthly" | "yearly">("monthly");
@@ -94,7 +99,9 @@ const Expenses = () => {
         .from('expenses')
         .insert([{
           ...newExpense,
-          amount: Number(newExpense.amount)
+          amount: Number(newExpense.amount),
+          status: 'pending',
+          created_by: user?.email
         }]);
 
       if (error) throw error;
@@ -116,6 +123,91 @@ const Expenses = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleApprove = async (id: string) => {
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .update({
+          status: 'approved',
+          approved_by: user?.name || user?.email,
+          approved_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success("Expense approved");
+      fetchExpenses();
+    } catch (error: any) {
+      toast.error("Failed to approve expense");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!rejectionModal.reason) {
+      toast.error("Please provide a reason for rejection");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .update({
+          status: 'rejected',
+          rejection_reason: rejectionModal.reason
+        })
+        .eq('id', rejectionModal.id);
+
+      if (error) throw error;
+      toast.success("Expense rejected");
+      setRejectionModal({ show: false, id: "", reason: "" });
+      fetchExpenses();
+    } catch (error: any) {
+      toast.error("Failed to reject expense");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const downloadVoucher = (expense: Expense) => {
+    if (expense.status !== 'approved') {
+      toast.error("Only approved expenses can have vouchers");
+      return;
+    }
+    const doc = new jsPDF();
+    doc.setFontSize(22);
+    doc.text("EXPENSE VOUCHER", 105, 20, { align: "center" });
+    
+    doc.setFontSize(12);
+    doc.text(`Voucher ID: ${expense.id.slice(0, 8)}`, 20, 40);
+    doc.text(`Date: ${expense.date}`, 20, 50);
+    
+    doc.line(20, 55, 190, 55);
+    
+    doc.text("Description:", 20, 70);
+    doc.text(expense.description, 60, 70);
+    
+    doc.text("Category:", 20, 80);
+    doc.text(expense.head, 60, 80);
+    
+    doc.text("Amount:", 20, 90);
+    doc.text(`Rs. ${expense.amount.toLocaleString()}`, 60, 90);
+    
+    doc.text("Payment Mode:", 20, 100);
+    doc.text(expense.payment_mode, 60, 100);
+    
+    doc.line(20, 110, 190, 110);
+    
+    doc.text("Approved By:", 20, 130);
+    doc.text(expense.approved_by || "Admin", 60, 130);
+    doc.text("Signature:", 140, 130);
+    doc.line(140, 135, 180, 135);
+    
+    doc.save(`Voucher_${expense.id.slice(0, 8)}.pdf`);
   };
 
   // Filtered expenses for entries tab
@@ -339,16 +431,18 @@ const Expenses = () => {
                     <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Description</th>
                     <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Category</th>
                     <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Payment Mode</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
                     <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Amount</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {loading ? (
                     Array(5).fill(0).map((_, i) => (
-                      <tr key={i}><td colSpan={5} className="px-6 py-8"><div className="h-12 w-full animate-pulse rounded-2xl bg-slate-100" /></td></tr>
+                      <tr key={i}><td colSpan={6} className="px-6 py-8"><div className="h-12 w-full animate-pulse rounded-2xl bg-slate-100" /></td></tr>
                     ))
                   ) : (filtered ?? []).length === 0 ? (
-                    <tr><td colSpan={5} className="px-6 py-24 text-center">
+                    <tr><td colSpan={6} className="px-6 py-24 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center">
                           <Search className="h-8 w-8 text-slate-200" />
@@ -373,13 +467,33 @@ const Expenses = () => {
                           {e?.payment_mode}
                         </Badge>
                       </td>
+                      <td className="px-6 py-6">
+                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${e?.status === 'approved' ? 'bg-emerald-500 text-white' : e?.status === 'rejected' ? 'bg-rose-500 text-white' : 'bg-slate-400 text-white'}`}>
+                          {e?.status}
+                        </Badge>
+                      </td>
                       <td className="px-6 py-6 text-sm font-black text-right text-rose-600 tracking-tight">₨ {(e?.amount ?? 0).toLocaleString()}</td>
+                      <td className="px-6 py-6 text-right">
+                        <div className="flex justify-end gap-2">
+                          {e?.status === 'pending' && canDo('edit') && (
+                            <>
+                              <Button size="sm" onClick={() => handleApprove(e.id)} className="h-8 bg-emerald-500 hover:bg-emerald-600 text-white">Approve</Button>
+                              <Button size="sm" variant="outline" onClick={() => setRejectionModal({ show: true, id: e.id, reason: "" })} className="h-8 text-rose-500 border-rose-200 hover:bg-rose-50">Reject</Button>
+                            </>
+                          )}
+                          {e?.status === 'approved' && (
+                            <Button size="sm" variant="ghost" onClick={() => downloadVoucher(e)} className="h-8 text-blue-600">
+                              <Download className="h-4 w-4 mr-1"/> Voucher
+                            </Button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-slate-50/80 border-t border-slate-200">
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Monthly Aggregate Log</td>
+                    <td colSpan={5} className="px-6 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Monthly Aggregate Log</td>
                     <td className="px-6 py-8 text-right">
                       <span className="px-6 py-3 rounded-2xl bg-rose-500 text-white font-black text-xl shadow-xl shadow-rose-500/20">
                         ₨ {(filtered ?? []).reduce((s, e) => s + (e?.amount ?? 0), 0).toLocaleString()}
@@ -651,6 +765,31 @@ const Expenses = () => {
             <Button variant="outline" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>Cancel</Button>
             <Button onClick={handleAdd} disabled={isSubmitting}>
               {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding...</> : "Add Expense"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rejection Reason Modal */}
+      <Dialog open={rejectionModal.show} onOpenChange={(val) => setRejectionModal(prev => ({ ...prev, show: val }))}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Reject Expense</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <Label>Reason for Rejection</Label>
+              <textarea 
+                className="w-full h-32 rounded-xl border border-slate-200 p-4 text-sm font-bold outline-none resize-none focus:ring-2 focus:ring-rose-500/20"
+                placeholder="Why is this expense being rejected?"
+                value={rejectionModal.reason}
+                onChange={e => setRejectionModal(prev => ({ ...prev, reason: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectionModal({ show: false, id: "", reason: "" })} disabled={isSubmitting}>Cancel</Button>
+            <Button onClick={handleReject} disabled={isSubmitting} className="bg-rose-500 hover:bg-rose-600 text-white">
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Confirm Reject
             </Button>
           </DialogFooter>
         </DialogContent>

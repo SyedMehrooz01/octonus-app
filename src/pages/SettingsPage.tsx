@@ -49,8 +49,10 @@ const ACTIONS: { id: UserAction; label: string }[] = [
 ];
 
 const SettingsPage = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, logAction } = useAuth();
   const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   
   // User Management State
   const [users, setUsers] = useState(INITIAL_USERS);
@@ -105,34 +107,75 @@ const SettingsPage = () => {
     dailySummary: true,
   });
 
-  const handleSave = (section: string) => {
-    toast({ title: `${section} saved`, description: "Your changes have been saved successfully." });
+  const handleSave = async (section: string) => {
+    setSaving(true);
+    try {
+      // Simulate save to Supabase
+      await new Promise(resolve => setTimeout(resolve, 800));
+      toast({ title: `${section} saved`, description: "Your changes have been saved successfully." });
+      logAction(`Updated ${section}`, "Settings");
+    } catch (err) {
+      toast({ title: "Error", description: `Failed to save ${section}`, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!newUser.name || !newUser.email || !newUser.password) {
       toast({ title: "Validation Error", description: "Please fill all required fields.", variant: "destructive" });
       return;
     }
-    const userToAdd = {
-      id: String(users.length + 1),
-      ...newUser,
-      status: "active",
-      lastLogin: "Never"
-    };
-    setUsers([...users, userToAdd]);
-    setShowAddUserModal(false);
-    toast({ title: "User Created", description: `${newUser.name} has been added to the system.` });
+    setSaving(true);
+    try {
+      // Simulate Supabase Auth/DB call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const userToAdd = {
+        id: String(users.length + 1),
+        ...newUser,
+        status: "active",
+        lastLogin: "Never"
+      };
+      setUsers([...users, userToAdd]);
+      setShowAddUserModal(false);
+      toast({ title: "User Created", description: `${newUser.name} has been added to the system.` });
+      logAction(`Created new user: ${newUser.name}`, "Settings");
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to create user", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleUpdateUserStatus = (id: string, status: string) => {
-    setUsers(users.map(u => u.id === id ? { ...u, status } : u));
-    toast({ title: "User Status Updated" });
+  const handleUpdateUserStatus = async (id: string, status: string) => {
+    setSaving(true);
+    try {
+      // Simulate Supabase update
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setUsers(users.map(u => u.id === id ? { ...u, status } : u));
+      toast({ title: "User Status Updated" });
+      logAction(`Updated user status for ID: ${id} to ${status}`, "Settings");
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to update user status", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeleteUser = (id: string) => {
-    setUsers(users.filter(u => u.id !== id));
-    toast({ title: "User Deleted", variant: "destructive" });
+  const handleDeleteUser = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this user? This cannot be undone.")) return;
+    setSaving(true);
+    try {
+      // Simulate Supabase delete
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setUsers(users.filter(u => u.id !== id));
+      toast({ title: "User Deleted", variant: "destructive" });
+      logAction(`Deleted user ID: ${id}`, "Settings");
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to delete user", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const togglePagePermission = (pageId: string) => {
@@ -261,8 +304,10 @@ const SettingsPage = () => {
                     </div>
                   </div>
                   <DialogFooter className="gap-3">
-                    <Button variant="outline" className="h-12 rounded-xl font-black px-6" onClick={() => setShowAddUserModal(false)}>CANCEL</Button>
-                    <Button className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-8" onClick={handleAddUser}>CREATE ACCOUNT</Button>
+                    <Button variant="outline" className="h-12 rounded-xl font-black px-6" onClick={() => setShowAddUserModal(false)} disabled={saving}>CANCEL</Button>
+                    <Button className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-8" onClick={handleAddUser} disabled={saving}>
+                      {saving ? "CREATING..." : "CREATE ACCOUNT"}
+                    </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -408,8 +453,8 @@ const SettingsPage = () => {
               </div>
             </div>
             <div className="mt-6 flex justify-end">
-              <Button onClick={() => handleSave("Company settings")} className="gap-2">
-                <Save className="h-4 w-4" /> Save Changes
+              <Button onClick={() => handleSave("Company settings")} className="gap-2" disabled={saving}>
+                {saving ? "SAVING..." : <><Save className="h-4 w-4" /> Save Changes</>}
               </Button>
             </div>
           </div>
@@ -438,8 +483,8 @@ const SettingsPage = () => {
               </div>
             </div>
             <div className="mt-6 flex justify-end">
-              <Button onClick={() => handleSave("Profile")} className="gap-2">
-                <Save className="h-4 w-4" /> Save Profile
+              <Button onClick={() => handleSave("Profile")} className="gap-2" disabled={saving}>
+                {saving ? "SAVING..." : <><Save className="h-4 w-4" /> Save Profile</>}
               </Button>
             </div>
           </div>
@@ -462,8 +507,8 @@ const SettingsPage = () => {
               </div>
             </div>
             <div className="mt-6 flex justify-end">
-              <Button variant="outline" onClick={() => handleSave("Password")} className="gap-2">
-                <Shield className="h-4 w-4" /> Update Password
+              <Button variant="outline" onClick={() => handleSave("Password")} className="gap-2" disabled={saving}>
+                {saving ? "UPDATING..." : <><Shield className="h-4 w-4" /> Update Password</>}
               </Button>
             </div>
           </div>
@@ -494,8 +539,8 @@ const SettingsPage = () => {
               ))}
             </div>
             <div className="mt-6 flex justify-end">
-              <Button onClick={() => handleSave("Notifications")} className="gap-2">
-                <Save className="h-4 w-4" /> Save Preferences
+              <Button onClick={() => handleSave("Notifications")} className="gap-2" disabled={saving}>
+                {saving ? "SAVING..." : <><Save className="h-4 w-4" /> Save Preferences</>}
               </Button>
             </div>
           </div>
