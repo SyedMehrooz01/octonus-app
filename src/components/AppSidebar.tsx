@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, CalendarDays, Landmark, Package, Receipt, Settings, LogOut, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, Landmark, Package, Receipt, FileText, FolderOpen, Settings, LogOut, ChevronRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -10,6 +10,8 @@ export const navItems = [
   { id: "finance", to: "/finance", label: "Finance", icon: Landmark },
   { id: "inventory", to: "/inventory", label: "Inventory", icon: Package },
   { id: "expenses", to: "/expenses", label: "Expenses", icon: Receipt },
+  { id: "documents", to: "/documents", label: "Documents", icon: FileText },
+  { id: "files", to: "/files", label: "File Manager", icon: FolderOpen },
   { id: "settings", to: "/settings", label: "Settings", icon: Settings },
 ];
 

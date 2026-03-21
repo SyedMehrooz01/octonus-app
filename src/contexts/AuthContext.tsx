@@ -24,7 +24,7 @@ export interface AuthUser {
 
 export const ROLE_PERMISSIONS: Record<UserRole, UserPermissions> = {
   admin: {
-    pages: ["dashboard", "hr", "events", "finance", "inventory", "expenses", "documents", "settings"],
+    pages: ["dashboard", "hr", "events", "finance", "inventory", "expenses", "documents", "files", "settings"],
     actions: ["view", "add", "edit", "delete", "export"]
   },
   manager: {
