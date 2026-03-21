@@ -136,8 +136,8 @@ const SettingsPage = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
+        .from('system_users')
+        .select('id, full_name, email, role, status, page_access, action_permissions, last_login, created_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -163,8 +163,7 @@ const SettingsPage = () => {
     }
     setSaving(true);
     try {
-      // 1. Create user in Supabase Auth (Note: In a real app, this usually requires an Edge Function or admin-level access)
-      // For this demo/setup, we'll use the profiles table which handles metadata
+      // 1. signup in auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: newUser.email,
         password: newUser.password,
@@ -178,17 +177,18 @@ const SettingsPage = () => {
       if (authError) throw authError;
 
       if (authData.user) {
-        // 2. Insert into profiles table
-        const { error: profileError } = await supabase.from('profiles').insert([{
+        // 2. Insert into system_users table
+        const { error: dbError } = await supabase.from('system_users').insert([{
           id: authData.user.id,
           full_name: newUser.name,
           email: newUser.email,
           role: newUser.role,
-          permissions: newUser.permissions,
+          page_access: newUser.permissions.pages,
+          action_permissions: newUser.permissions.actions,
           status: 'active'
         }]);
 
-        if (profileError) throw profileError;
+        if (dbError) throw dbError;
       }
 
       toast({ title: "User Created", description: `${newUser.name} has been added to the system.` });
@@ -210,9 +210,12 @@ const SettingsPage = () => {
     setSelectedUser(user);
     setEditUser({
       id: user.id,
-      name: user.full_name || user.name,
+      name: user.full_name,
       role: user.role,
-      permissions: user.permissions || { pages: [], actions: [] }
+      permissions: {
+        pages: user.page_access || [],
+        actions: user.action_permissions || []
+      }
     });
     setShowEditUserModal(true);
   };
@@ -221,10 +224,11 @@ const SettingsPage = () => {
     setSaving(true);
     try {
       const { error } = await supabase
-        .from('profiles')
+        .from('system_users')
         .update({
           role: editUser.role,
-          permissions: editUser.permissions
+          page_access: editUser.permissions.pages,
+          action_permissions: editUser.permissions.actions
         })
         .eq('id', editUser.id);
 
@@ -250,8 +254,8 @@ const SettingsPage = () => {
       // In Supabase, resetting another user's password usually requires admin Edge Functions
       // For now we'll simulate the success as requested for the UI flow
       await new Promise(resolve => setTimeout(resolve, 1000));
-      toast({ title: "Password Reset", description: `Password for ${selectedUser.full_name || selectedUser.name} has been reset.` });
-      logAction(`Reset password for: ${selectedUser.full_name || selectedUser.name}`, "Settings");
+      toast({ title: "Password Reset", description: `Password for ${selectedUser.full_name} has been reset.` });
+      logAction(`Reset password for: ${selectedUser.full_name}`, "Settings");
       setShowResetPasswordModal(false);
       setNewPassword("");
     } catch (err: any) {
@@ -265,7 +269,7 @@ const SettingsPage = () => {
     setSaving(true);
     try {
       const { error } = await supabase
-        .from('profiles')
+        .from('system_users')
         .update({ status })
         .eq('id', id);
 
@@ -284,7 +288,7 @@ const SettingsPage = () => {
     if (!confirm("Are you sure you want to delete this user? This cannot be undone.")) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('profiles').delete().eq('id', id);
+      const { error } = await supabase.from('system_users').delete().eq('id', id);
       if (error) throw error;
       toast({ title: "User Deleted", variant: "destructive" });
       logAction(`Deleted user ID: ${id}`, "Settings");
