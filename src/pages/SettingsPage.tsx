@@ -520,19 +520,6 @@ const SettingsPage = () => {
                 </div>
               ))}
             </div>
-
-            <div className="mt-6 rounded-lg bg-destructive/5 border border-destructive/20 p-4">
-              <h4 className="mb-1 text-sm font-semibold text-destructive">Danger Zone</h4>
-              <p className="mb-3 text-xs text-muted-foreground">These actions are permanent and cannot be undone.</p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="border-destructive/30 text-destructive hover:bg-destructive/10">
-                  Clear All Data
-                </Button>
-                <Button variant="outline" size="sm" className="border-destructive/30 text-destructive hover:bg-destructive/10">
-                  Reset to Default
-                </Button>
-              </div>
-            </div>
           </div>
         </TabsContent>
       </Tabs>
