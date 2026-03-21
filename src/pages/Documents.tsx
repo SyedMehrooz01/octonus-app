@@ -47,11 +47,10 @@ interface DocItem {
 
 interface DocumentData {
   id?: string;
-  doc_no: string;
-  type: "Quotation" | "Invoice";
-  date: string;
+  doc_number: string;
+  doc_type: "Quotation" | "Invoice";
+  invoice_date: string;
   valid_until?: string;
-  invoice_date?: string;
   event_date?: string;
   client_company: string;
   contact_person: string;
@@ -62,6 +61,8 @@ interface DocumentData {
   srb_amount: number;
   sub_total: number;
   terms: string;
+  status?: string;
+  created_by?: string;
   created_at?: string;
 }
 
@@ -103,7 +104,7 @@ const Documents = () => {
     try {
       const { data, error } = await supabase
         .from("documents")
-        .select("*")
+        .select("id, doc_number, doc_type, client_company, contact_person, client_address, event_name, invoice_date, event_date, valid_until, items, total_amount, srb_amount, sub_total, terms, status, created_by, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -118,24 +119,28 @@ const Documents = () => {
   const generateDocNo = async () => {
     try {
       const prefix = activeTab === "Quotation" ? "QT" : "INV";
+      const currentYear = new Date().getFullYear();
+      
       const { data, error } = await supabase
         .from("documents")
-        .select("doc_no")
-        .eq("type", activeTab)
-        .order("doc_no", { ascending: false })
+        .select("doc_number")
+        .eq("doc_type", activeTab)
+        .like("doc_number", `${prefix}-${currentYear}-%`)
+        .order("doc_number", { ascending: false })
         .limit(1);
 
       if (error) throw error;
 
       let nextNum = 1;
       if (data && data.length > 0) {
-        const lastNo = data[0].doc_no;
-        const lastNum = parseInt(lastNo.split("-")[1]);
+        const lastNo = data[0].doc_number;
+        const parts = lastNo.split("-");
+        const lastNum = parseInt(parts[parts.length - 1]);
         if (!isNaN(lastNum)) {
           nextNum = lastNum + 1;
         }
       }
-      setDocNo(`${prefix}-${nextNum.toString().padStart(3, "0")}`);
+      setDocNo(`${prefix}-${currentYear}-${nextNum.toString().padStart(3, "0")}`);
     } catch (err: any) {
       toast.error("Failed to generate document number");
     }
@@ -185,9 +190,9 @@ const Documents = () => {
     setSaving(true);
     try {
       const docData: Partial<DocumentData> = {
-        doc_no: docNo,
-        type: activeTab,
-        date: date,
+        doc_number: docNo,
+        doc_type: activeTab,
+        invoice_date: date,
         client_company: clientCompany,
         contact_person: contactPerson,
         client_address: clientAddress,
@@ -197,13 +202,14 @@ const Documents = () => {
         srb_amount: srb,
         sub_total: subTotal,
         terms: terms,
+        status: "Active",
+        created_by: user?.name || user?.email || "System"
       };
 
       if (activeTab === "Quotation") {
         docData.valid_until = validUntil;
       } else {
         docData.event_date = eventDate;
-        docData.invoice_date = date;
       }
 
       const { error } = await supabase.from("documents").insert([docData]);
@@ -259,7 +265,7 @@ const Documents = () => {
     pdf.setTextColor(0, 0, 0);
     pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
-    const title = doc.type === "Quotation" ? "QUOTATION" : "SALES TAX INVOICE";
+    const title = doc.doc_type === "Quotation" ? "QUOTATION" : "SALES TAX INVOICE";
     const titleWidth = pdf.getTextWidth(title);
     pdf.text(title, (pageWidth - titleWidth) / 2, 35);
     
@@ -275,12 +281,12 @@ const Documents = () => {
     pdf.setFont("helvetica", "bold");
     pdf.text("DOCUMENT INFO:", 120, 50);
     pdf.setFont("helvetica", "normal");
-    pdf.text(`${doc.type} No: ${doc.doc_no}`, 120, 56);
-    pdf.text(`Date: ${format(new Date(doc.date), "PP")}`, 120, 61);
+    pdf.text(`${doc.doc_type} No: ${doc.doc_number}`, 120, 56);
+    pdf.text(`Date: ${format(new Date(doc.invoice_date), "PP")}`, 120, 61);
     pdf.text(`Event: ${doc.event_name}`, 120, 66, { maxWidth: 75 });
-    if (doc.type === "Quotation" && doc.valid_until) {
+    if (doc.doc_type === "Quotation" && doc.valid_until) {
       pdf.text(`Valid Until: ${format(new Date(doc.valid_until), "PP")}`, 120, 71);
-    } else if (doc.type === "Invoice" && doc.event_date) {
+    } else if (doc.doc_type === "Invoice" && doc.event_date) {
       pdf.text(`Event Date: ${format(new Date(doc.event_date), "PP")}`, 120, 71);
     }
 
@@ -345,7 +351,7 @@ const Documents = () => {
     const footerWidth = pdf.getTextWidth(footerText);
     pdf.text(footerText, (pageWidth - footerWidth) / 2, pdf.internal.pageSize.getHeight() - 10);
 
-    pdf.save(`${doc.doc_no}_${doc.client_company.replace(/\s+/g, '_')}.pdf`);
+    pdf.save(`${doc.doc_number}_${doc.client_company.replace(/\s+/g, '_')}.pdf`);
   };
 
   const generateExcel = (doc: DocumentData) => {
@@ -357,11 +363,11 @@ const Documents = () => {
       [COMPANY.address],
       [`Phone: ${COMPANY.phone} | Email: ${COMPANY.email}`],
       [],
-      [doc.type.toUpperCase()],
+      [doc.doc_type.toUpperCase()],
       [],
       ["Client Details:", "", "", "Document Info:"],
-      [`Company: ${doc.client_company}`, "", "", `${doc.type} No: ${doc.doc_no}`],
-      [`Contact: ${doc.contact_person}`, "", "", `Date: ${doc.date}`],
+      [`Company: ${doc.client_company}`, "", "", `${doc.doc_type} No: ${doc.doc_number}`],
+      [`Contact: ${doc.contact_person}`, "", "", `Date: ${doc.invoice_date}`],
       [`Address: ${doc.client_address}`, "", "", `Event: ${doc.event_name}`],
       [],
       ["S.NO", "DESCRIPTION", "QTY", "RATE (RS.)", "AMOUNT (RS.)"]
@@ -398,10 +404,10 @@ const Documents = () => {
       { wch: 20 }  // Amount
     ];
 
-    XLSX.utils.book_append_sheet(wb, ws, doc.type);
+    XLSX.utils.book_append_sheet(wb, ws, doc.doc_type);
     const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const data = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    saveAs(data, `${doc.doc_no}_${doc.client_company.replace(/\s+/g, '_')}.xlsx`);
+    saveAs(data, `${doc.doc_number}_${doc.client_company.replace(/\s+/g, '_')}.xlsx`);
   };
 
   const handleDelete = async (id: string) => {
@@ -420,7 +426,7 @@ const Documents = () => {
   const filteredDocs = (documents ?? []).filter(doc => 
     (doc?.client_company ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
     (doc?.event_name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (doc?.doc_no ?? "").toLowerCase().includes(searchQuery.toLowerCase())
+    (doc?.doc_number ?? "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -597,9 +603,9 @@ const Documents = () => {
                     <Button 
                       onClick={() => {
                         const tempDoc: DocumentData = {
-                          doc_no: docNo,
-                          type: activeTab,
-                          date: date,
+                          doc_number: docNo,
+                          doc_type: activeTab,
+                          invoice_date: date,
                           client_company: clientCompany,
                           contact_person: contactPerson,
                           client_address: clientAddress,
@@ -672,17 +678,17 @@ const Documents = () => {
                     ) : (
                       (filteredDocs ?? []).map((doc, idx) => (
                         <tr key={doc?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
-                          <td className="px-8 py-6 font-black text-blue-600 tracking-tight">{doc?.doc_no}</td>
+                          <td className="px-8 py-6 font-black text-blue-600 tracking-tight">{doc?.doc_number}</td>
                           <td className="px-8 py-6">
-                            <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${doc?.type === 'Quotation' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                              {doc?.type}
+                            <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${doc?.doc_type === 'Quotation' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                              {doc?.doc_type}
                             </Badge>
                           </td>
                           <td className="px-8 py-6">
                             <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{doc?.client_company}</p>
                             <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">{doc?.event_name}</p>
                           </td>
-                          <td className="px-8 py-6 text-sm font-black text-slate-500 tracking-tight">{doc?.date ? format(new Date(doc.date), 'MMM dd, yyyy') : "N/A"}</td>
+                          <td className="px-8 py-6 text-sm font-black text-slate-500 tracking-tight">{doc?.invoice_date ? format(new Date(doc.invoice_date), 'MMM dd, yyyy') : "N/A"}</td>
                           <td className="px-8 py-6 text-right font-black text-[#0f172a] tracking-tight">{formatCurrency(doc?.sub_total ?? 0)}</td>
                           <td className="px-8 py-6 text-right">
                             <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
