@@ -534,15 +534,17 @@ const Expenses = () => {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-slate-50/80 border-t border-slate-200">
+                <tfoot className="bg-slate-50/80 border-t-2 border-slate-100">
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Monthly Aggregate Log</td>
-                    <td className="px-6 py-8 text-right">
-                      <span className="px-6 py-3 rounded-2xl bg-rose-500 text-white font-black text-xl shadow-xl shadow-rose-500/20">
-                        ₨ {(filtered ?? []).reduce((s, e) => s + (e?.amount ?? 0), 0).toLocaleString()}
-                      </span>
+                    <td colSpan={5} className="px-6 py-10">
+                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Monthly Aggregate Total</p>
                     </td>
-                    <td className="px-6 py-8"></td>
+                    <td className="px-6 py-10 text-right">
+                      <div className="inline-flex items-center justify-center bg-rose-500 text-white font-black text-xl px-8 py-4 rounded-2xl shadow-lg shadow-rose-500/10">
+                        ₨ {(filtered ?? []).reduce((s, e) => s + (e?.amount ?? 0), 0).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-10"></td>
                   </tr>
                 </tfoot>
               </table>
