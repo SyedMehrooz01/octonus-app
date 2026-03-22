@@ -52,7 +52,7 @@ const Expenses = () => {
   // New States
   const [viewType, setPlViewType] = useState<"monthly" | "yearly">("monthly");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
+  const [selectedMonth, setSelectedMonth] = useState("");
   
   // Ledger Filters
   const [ledgerSearch, setLedgerSearch] = useState("");
@@ -75,38 +75,19 @@ const Expenses = () => {
   const fetchExpenses = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('expenses')
-        .select(`
-          id, 
-          voucher_no, 
-          date, 
-          description, 
-          category, 
-          payment_mode, 
-          amount, 
-          linked_event, 
-          status, 
-          approved_by, 
-          approved_at, 
-          created_by, 
-          created_by_name, 
-          created_by_id, 
-          created_by_role, 
-          created_at,
-          rejection_reason
-        `)
-        .order('date', { ascending: false });
-
-      if (error) {
-        console.error("Fetch expenses error:", error);
-        // We set to empty array on error for safer UI rendering
-        setExpenses([]);
-        return;
-      }
+      const { data, error } = await supabase 
+        .from('expenses') 
+        .select('*') 
+        .order('created_at', { ascending: false }); 
       
-      console.log("Supabase returned expenses:", data);
-      setExpenses(data || []);
+      if (error) { 
+        console.error('Expenses error:', error); 
+        toast.error('Failed to load expenses: ' + error.message); 
+        setExpenses([]);
+      } else { 
+        console.log('Fetched all expenses:', data);
+        setExpenses(data || []); 
+      } 
     } catch (error: any) {
       console.error("Fetch expenses unexpected error:", error);
       setExpenses([]);
@@ -252,13 +233,27 @@ const Expenses = () => {
 
   // Filtered expenses for entries tab
   const filtered = useMemo(() => {
-    const results = (expenses ?? []).filter(e => {
-      const matchSearch = (e?.description ?? "").toLowerCase().includes((search ?? "").toLowerCase());
-      const matchCategory = filterHead === "all" || e?.category === filterHead;
-      const matchMonth = (e?.date ?? "").startsWith(selectedMonth);
-      return matchSearch && matchCategory && matchMonth;
-    });
-    console.log("Filtered results for", selectedMonth, ":", results);
+    // Start with all expenses
+    let results = [...(expenses ?? [])];
+    
+    // Only filter if search is provided
+    if (search) {
+      results = results.filter(e => (e?.description ?? "").toLowerCase().includes(search.toLowerCase()));
+    }
+    
+    // Only filter if category is not "all"
+    if (filterHead !== "all") {
+      results = results.filter(e => e?.category === filterHead);
+    }
+    
+    // Only filter by month if selectedMonth is set (and maybe skip if we want to show all initially)
+    // To show ALL initially, we can make selectedMonth default to something that doesn't filter,
+    // or just check if it's set.
+    if (selectedMonth) {
+      results = results.filter(e => (e?.date ?? "").startsWith(selectedMonth));
+    }
+    
+    console.log("Filtered results:", results.length, "out of", expenses?.length);
     return results;
   }, [expenses, search, filterHead, selectedMonth]);
 
@@ -387,10 +382,12 @@ const Expenses = () => {
 
   return (
     <div className="space-y-8 pb-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="animate-in fade-in slide-in-from-left duration-500">
-          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Expense Tracking</h1>
-          <p className="text-slate-500 font-bold mt-1">Monitor all business spending and category-wise overheads.</p>
+          <h1 className="text-4xl font-black text-[#0f172a] tracking-tight uppercase">Expense Management</h1>
+          <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1">
+            Total: {expenses?.length || 0} expenses found
+          </p>
         </div>
         <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right duration-500">
           <div className="hidden sm:flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/60">
@@ -501,7 +498,7 @@ const Expenses = () => {
                       <td className="px-6 py-6 text-sm font-black text-slate-500 whitespace-nowrap tracking-tight">{e?.date ? format(new Date(e.date), 'MMM d, yyyy') : "N/A"}</td>
                       <td className="px-6 py-6">
                         <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-rose-600 transition-colors">{e?.description}</p>
-                        {e?.event_id && <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter mt-2 flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-blue-300" /> Event: {e?.event_id}</p>}
+                        {e?.linked_event && <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter mt-2 flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-blue-300" /> Event: {e?.linked_event}</p>}
                       </td>
                       <td className="px-6 py-6">
                         <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm">
