@@ -20,17 +20,22 @@ const PAYMENT_MODES = ["Cash", "Bank Transfer", "Cheque", "Online Transfer"];
 
 interface Expense {
   id: string;
+  voucher_no?: string | null;
   date: string;
   description: string;
-  head: string;
-  amount: number;
+  category: string;
   payment_mode: string;
-  event_id?: string | null;
+  amount: number;
+  linked_event?: string | null;
   status: 'pending' | 'approved' | 'rejected';
   approved_by?: string | null;
   approved_at?: string | null;
-  rejection_reason?: string | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  created_by_id?: string | null;
+  created_by_role?: string | null;
   created_at?: string;
+  rejection_reason?: string | null;
 }
 
 const Expenses = () => {
@@ -71,14 +76,38 @@ const Expenses = () => {
     try {
       const { data, error } = await supabase
         .from('expenses')
-        .select('id, voucher_no, date, description, category, payment_mode, amount, linked_event, status, approved_by, approved_at, created_by_name, created_by_id, created_by_role, created_at')
+        .select(`
+          id, 
+          voucher_no, 
+          date, 
+          description, 
+          category, 
+          payment_mode, 
+          amount, 
+          linked_event, 
+          status, 
+          approved_by, 
+          approved_at, 
+          created_by, 
+          created_by_name, 
+          created_by_id, 
+          created_by_role, 
+          created_at,
+          rejection_reason
+        `)
         .order('date', { ascending: false });
 
-      if (error) throw error;
-      setExpenses(data ?? []);
+      if (error) {
+        console.error("Fetch expenses error:", error);
+        // We set to empty array on error for safer UI rendering
+        setExpenses([]);
+        return;
+      }
+      
+      setExpenses(data || []);
     } catch (error: any) {
-      console.error("Fetch expenses error:", error);
-      toast.error("Failed to load expenses");
+      console.error("Fetch expenses unexpected error:", error);
+      setExpenses([]);
     } finally {
       setLoading(false);
     }
@@ -106,8 +135,10 @@ const Expenses = () => {
           payment_mode: newExpense.payment_mode,
           linked_event: newExpense.event_id,
           status: 'pending',
+          created_by: user?.email,
           created_by_name: user?.name || user?.email,
           created_by_id: user?.id,
+          created_by_role: user?.role || 'user',
           created_at: new Date().toISOString()
         }]);
 
@@ -199,7 +230,7 @@ const Expenses = () => {
     doc.text(expense.description, 60, 70);
     
     doc.text("Category:", 20, 80);
-    doc.text(expense.head, 60, 80);
+    doc.text(expense.category, 60, 80);
     
     doc.text("Amount:", 20, 90);
     doc.text(`Rs. ${expense.amount.toLocaleString()}`, 60, 90);
@@ -220,22 +251,22 @@ const Expenses = () => {
   // Filtered expenses for entries tab
   const filtered = (expenses ?? []).filter(e => {
     const matchSearch = (e?.description ?? "").toLowerCase().includes((search ?? "").toLowerCase());
-    const matchHead = filterHead === "all" || e?.head === filterHead;
+    const matchCategory = filterHead === "all" || e?.category === filterHead;
     const matchMonth = (e?.date ?? "").startsWith(selectedMonth);
-    return matchSearch && matchHead && matchMonth;
+    return matchSearch && matchCategory && matchMonth;
   });
 
   // Ledger filtering
   const ledgerFiltered = useMemo(() => {
     return (expenses ?? []).filter(e => {
       const matchSearch = (e?.description ?? "").toLowerCase().includes((ledgerSearch ?? "").toLowerCase());
-      const matchHead = ledgerHead === "all" || e?.head === ledgerHead;
+      const matchCategory = ledgerHead === "all" || e?.category === ledgerHead;
       const matchMode = ledgerMode === "all" || e?.payment_mode === ledgerMode;
       const matchDate = isWithinInterval(parseISO(e?.date ?? format(new Date(), "yyyy-MM-dd")), {
         start: parseISO(fromDate),
         end: parseISO(toDate)
       });
-      return matchSearch && matchHead && matchMode && matchDate;
+      return matchSearch && matchCategory && matchMode && matchDate;
     });
   }, [expenses, ledgerSearch, ledgerHead, ledgerMode, fromDate, toDate]);
 
@@ -270,14 +301,14 @@ const Expenses = () => {
 
   const yearlyByHead = EXPENSE_HEADS.map(head => ({
     head,
-    total: (yearlyExpenses ?? []).filter(e => e?.head === head).reduce((s, e) => s + (e?.amount ?? 0), 0)
+    total: (yearlyExpenses ?? []).filter(e => e?.category === head).reduce((s, e) => s + (e?.amount ?? 0), 0)
   })).filter(h => (h?.total ?? 0) > 0).sort((a, b) => (b?.total ?? 0) - (a?.total ?? 0));
 
   // Grouping logic for reports
   const groupByCategory = useMemo(() => {
     return EXPENSE_HEADS.map(head => ({
       name: head,
-      total: (expenses ?? []).filter(e => e?.head === head).reduce((s, e) => s + (e?.amount ?? 0), 0)
+      total: (expenses ?? []).filter(e => e?.category === head).reduce((s, e) => s + (e?.amount ?? 0), 0)
     })).filter(g => (g?.total ?? 0) > 0).sort((a, b) => (b?.total ?? 0) - (a?.total ?? 0));
   }, [expenses]);
 
@@ -321,7 +352,7 @@ const Expenses = () => {
     const data = (ledgerFiltered ?? []).map(e => ({
       Date: e?.date ?? "N/A",
       Description: e?.description ?? "N/A",
-      Category: e?.head ?? "N/A",
+      Category: e?.category ?? "N/A",
       Mode: e?.payment_mode ?? "N/A",
       Amount: e?.amount ?? 0
     }));
@@ -446,10 +477,10 @@ const Expenses = () => {
                 <tbody className="divide-y divide-slate-50">
                   {loading ? (
                     Array(5).fill(0).map((_, i) => (
-                      <tr key={i}><td colSpan={6} className="px-6 py-8"><div className="h-12 w-full animate-pulse rounded-2xl bg-slate-100" /></td></tr>
+                      <tr key={i}><td colSpan={7} className="px-6 py-8"><div className="h-12 w-full animate-pulse rounded-2xl bg-slate-100" /></td></tr>
                     ))
                   ) : (filtered ?? []).length === 0 ? (
-                    <tr><td colSpan={6} className="px-6 py-24 text-center">
+                    <tr><td colSpan={7} className="px-6 py-24 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center">
                           <Search className="h-8 w-8 text-slate-200" />
@@ -466,7 +497,7 @@ const Expenses = () => {
                       </td>
                       <td className="px-6 py-6">
                         <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm">
-                          {e?.head}
+                          {e?.category}
                         </Badge>
                       </td>
                       <td className="px-6 py-6">
@@ -506,6 +537,7 @@ const Expenses = () => {
                         ₨ {(filtered ?? []).reduce((s, e) => s + (e?.amount ?? 0), 0).toLocaleString()}
                       </span>
                     </td>
+                    <td className="px-6 py-8"></td>
                   </tr>
                 </tfoot>
               </table>
@@ -568,7 +600,7 @@ const Expenses = () => {
                     <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                       <td className="px-4 py-3 text-sm text-muted-foreground">{e?.date}</td>
                       <td className="px-4 py-3 text-sm font-medium">{e?.description}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{e?.head}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{e?.category}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{e?.payment_mode}</td>
                       <td className="px-4 py-3 text-sm font-bold text-destructive">₨ {(e?.amount ?? 0).toLocaleString()}</td>
                     </tr>
