@@ -105,6 +105,7 @@ const Expenses = () => {
         return;
       }
       
+      console.log("Supabase returned expenses:", data);
       setExpenses(data || []);
     } catch (error: any) {
       console.error("Fetch expenses unexpected error:", error);
@@ -250,16 +251,20 @@ const Expenses = () => {
   };
 
   // Filtered expenses for entries tab
-  const filtered = (expenses ?? []).filter(e => {
-    const matchSearch = (e?.description ?? "").toLowerCase().includes((search ?? "").toLowerCase());
-    const matchCategory = filterHead === "all" || e?.category === filterHead;
-    const matchMonth = (e?.date ?? "").startsWith(selectedMonth);
-    return matchSearch && matchCategory && matchMonth;
-  });
+  const filtered = useMemo(() => {
+    const results = (expenses ?? []).filter(e => {
+      const matchSearch = (e?.description ?? "").toLowerCase().includes((search ?? "").toLowerCase());
+      const matchCategory = filterHead === "all" || e?.category === filterHead;
+      const matchMonth = (e?.date ?? "").startsWith(selectedMonth);
+      return matchSearch && matchCategory && matchMonth;
+    });
+    console.log("Filtered results for", selectedMonth, ":", results);
+    return results;
+  }, [expenses, search, filterHead, selectedMonth]);
 
   // Ledger filtering
   const ledgerFiltered = useMemo(() => {
-    return (expenses ?? []).filter(e => {
+    const results = (expenses ?? []).filter(e => {
       const matchSearch = (e?.description ?? "").toLowerCase().includes((ledgerSearch ?? "").toLowerCase());
       const matchCategory = ledgerHead === "all" || e?.category === ledgerHead;
       const matchMode = ledgerMode === "all" || e?.payment_mode === ledgerMode;
@@ -269,6 +274,8 @@ const Expenses = () => {
       });
       return matchSearch && matchCategory && matchMode && matchDate;
     });
+    console.log("Ledger Filtered results from", fromDate, "to", toDate, ":", results);
+    return results;
   }, [expenses, ledgerSearch, ledgerHead, ledgerMode, fromDate, toDate]);
 
   const totalPages = Math.ceil((ledgerFiltered ?? []).length / itemsPerPage);
