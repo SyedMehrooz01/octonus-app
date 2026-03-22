@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export type UserRole = "admin" | "manager" | "staff" | "accountant";
 
@@ -167,6 +168,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return { success: false, error: "Access denied. Invalid role configuration." };
         }
 
+        // --- ACTIVITY LOG (Successful login) ---
+        try {
+          // Fetch IP if possible
+          let ip = "unknown";
+          try {
+            const ipRes = await fetch("https://api.ipify.org?format=json");
+            const ipData = await ipRes.json();
+            ip = ipData.ip;
+          } catch (e) {
+            // Silently fail IP fetch
+          }
+
+          const browserInfo = navigator.userAgent;
+          const loginTime = new Date().toISOString();
+
+          // Log in audit_logs
+          await supabase.from("audit_logs").insert([{
+            user_id: authUser.id,
+            user_name: authUser.name,
+            action: `Login from ${ip}`,
+            page: "Login",
+            timestamp: loginTime,
+            // We can add metadata if the table supports it, or just in action string
+            details: `Device: ${browserInfo}`
+          }]);
+        } catch (e) {
+          // Audit log failed
+        }
+
         setUser(authUser);
         localStorage.setItem("octonus_user", JSON.stringify(authUser));
         return { success: true };
@@ -183,6 +213,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     localStorage.removeItem("octonus_user");
   };
+
+  // --- SESSION TIMEOUT (30 mins inactivity) ---
+  useEffect(() => {
+    if (!user) return;
+
+    let timeoutId: NodeJS.Timeout;
+    const TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        console.log("Session timeout due to inactivity");
+        logout();
+        toast.error("Session expired due to inactivity. Please login again.");
+      }, TIMEOUT_MS);
+    };
+
+    // Events to track activity
+    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
+    events.forEach(name => document.addEventListener(name, resetTimer));
+
+    resetTimer(); // Initialize timer
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(name => document.removeEventListener(name, resetTimer));
+    };
+  }, [user]);
 
   const hasAccess = (page: string) => {
     if (!user) return false;

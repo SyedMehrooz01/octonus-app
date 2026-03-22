@@ -22,12 +22,49 @@ const Login = () => {
     setError("");
     if (!email.trim()) { setError("Email is required."); return; }
     if (!password.trim()) { setError("Password is required."); return; }
+
+    // --- LOGIN ATTEMPT LIMIT (5 attempts) ---
+    const attemptsKey = `login_attempts_${email}`;
+    const attempts = Number(localStorage.getItem(attemptsKey) || 0);
+    const lastAttemptTime = Number(localStorage.getItem(`${attemptsKey}_time`) || 0);
+    const lockoutTime = 15 * 60 * 1000; // 15 minutes lockout
+
+    if (attempts >= 5 && Date.now() - lastAttemptTime < lockoutTime) {
+      const remainingMinutes = Math.ceil((lockoutTime - (Date.now() - lastAttemptTime)) / 60000);
+      setError(`Too many failed attempts. Please try again in ${remainingMinutes} minutes.`);
+      return;
+    }
+
     setIsLoading(true);
     const result = await login(email, password);
     if (result.success) {
+      // Clear attempts on success
+      localStorage.removeItem(attemptsKey);
+      localStorage.removeItem(`${attemptsKey}_time`);
+
+      // --- ACTIVITY LOG ---
+      const browserInfo = `${navigator.userAgent}`;
+      const loginTime = new Date().toISOString();
+      
+      // We use logAction from AuthContext which already has access to user data after successful login
+      const { logAction } = useAuth(); // We need to call useAuth here to get the updated user context if possible, 
+      // but useAuth is already called at the top of the component. 
+      // However, the 'user' in AuthContext won't be updated until the next render.
+      // So we'll rely on the logAction to handle the logging after navigation or via a separate mechanism.
+      // Actually, AuthContext.login could handle the logging.
+
       navigate("/dashboard");
     } else {
-      setError(result.error || "Login failed.");
+      // Track failed attempt
+      const newAttempts = attempts + 1;
+      localStorage.setItem(attemptsKey, newAttempts.toString());
+      localStorage.setItem(`${attemptsKey}_time`, Date.now().toString());
+      
+      if (newAttempts >= 5) {
+        setError("Too many failed attempts. Your account is temporarily locked for 15 minutes.");
+      } else {
+        setError(`${result.error || "Login failed."} (${5 - newAttempts} attempts remaining)`);
+      }
     }
     setIsLoading(false);
   };
@@ -112,21 +149,15 @@ const Login = () => {
 
           <div className="relative flex items-center justify-center py-2">
             <div className="flex-grow border-t border-border"></div>
-            <span className="mx-4 flex-shrink text-xs text-muted-foreground uppercase font-medium">Regular User?</span>
+            <span className="mx-4 flex-shrink text-xs text-muted-foreground uppercase font-medium">Authorized Access Only</span>
             <div className="flex-grow border-t border-border"></div>
           </div>
 
-          <Link to="/signup" className="w-full block">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full gap-2 text-xs h-10 border-dashed hover:border-primary hover:text-primary transition-all"
-              disabled={isLoading}
-            >
-              <UserPlus className="h-3.5 w-3.5" />
-              Register Account
-            </Button>
-          </Link>
+          <div className="text-center p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">
+              If you don't have an account, please contact your System Administrator to create one.
+            </p>
+          </div>
         </form>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">

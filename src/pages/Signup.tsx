@@ -7,6 +7,7 @@ import { Lock, Mail, User, Eye, EyeOff, Loader2, AlertCircle, ArrowLeft } from "
 import { Logo } from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Signup = () => {
@@ -19,14 +20,33 @@ const Signup = () => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const { user } = useAuth(); // We need to check if an admin is logged in
+  
+  const validatePassword = (pwd: string) => {
+    if (pwd.length < 8) return "Password must be at least 8 characters.";
+    if (!/\d/.test(pwd)) return "Password must contain at least one number.";
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) return "Password must contain at least one special character.";
+    return null;
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    // --- ADMIN-ONLY USER CREATION ---
+    if (!user || user.role !== "admin") {
+      setError("Only administrators can create new user accounts.");
+      toast.error("Unauthorized");
+      return;
+    }
     
     if (!fullName.trim()) { setError("Full name is required."); return; }
     if (!email.trim()) { setError("Email is required."); return; }
     if (!password.trim()) { setError("Password is required."); return; }
-    if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+    
+    // --- PASSWORD REQUIREMENTS (8 chars, num, special) ---
+    const pwdError = validatePassword(password);
+    if (pwdError) { setError(pwdError); return; }
 
     setIsLoading(true);
 

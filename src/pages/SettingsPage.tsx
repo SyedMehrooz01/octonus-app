@@ -119,6 +119,19 @@ const SettingsPage = () => {
   ]);
 
   const handleSave = async (section: string) => {
+    // --- PASSWORD REQUIREMENTS for profile update ---
+    if (section === "Password") {
+      if (profile.newPassword !== profile.confirmPassword) {
+        toast({ title: "Validation Error", description: "Passwords do not match.", variant: "destructive" });
+        return;
+      }
+      const pwdError = validatePassword(profile.newPassword);
+      if (pwdError) {
+        toast({ title: "Weak Password", description: pwdError, variant: "destructive" });
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       // Simulate save to Supabase
@@ -156,11 +169,26 @@ const SettingsPage = () => {
     }
   }, [currentUser]);
 
+  const validatePassword = (pwd: string) => {
+    if (pwd.length < 8) return "Password must be at least 8 characters.";
+    if (!/\d/.test(pwd)) return "Password must contain at least one number.";
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) return "Password must contain at least one special character.";
+    return null;
+  };
+
   const handleAddUser = async () => {
     if (!newUser.name || !newUser.email || !newUser.password) {
       toast({ title: "Validation Error", description: "Please fill all required fields.", variant: "destructive" });
       return;
     }
+
+    // --- PASSWORD REQUIREMENTS (8 chars, num, special) ---
+    const pwdError = validatePassword(newUser.password);
+    if (pwdError) {
+      toast({ title: "Weak Password", description: pwdError, variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
     try {
       // 1. signup in auth
@@ -221,6 +249,12 @@ const SettingsPage = () => {
   };
 
   const handleUpdateUser = async () => {
+    // SECURITY: Users cannot change their own role
+    if (currentUser?.id === editUser.id && editUser.role !== currentUser?.role) {
+      toast({ title: "Security Alert", description: "You are not authorized to change your own role.", variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
     try {
       const { error } = await supabase
@@ -249,6 +283,14 @@ const SettingsPage = () => {
       toast({ title: "Error", description: "Please enter a new password", variant: "destructive" });
       return;
     }
+
+    // --- PASSWORD REQUIREMENTS (8 chars, num, special) ---
+    const pwdError = validatePassword(newPassword);
+    if (pwdError) {
+      toast({ title: "Weak Password", description: pwdError, variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
     try {
       // In Supabase, resetting another user's password usually requires admin Edge Functions
@@ -350,16 +392,24 @@ const SettingsPage = () => {
           <div className="grid grid-cols-2 gap-6 py-4">
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Access Role</Label>
-              <Select value={editUser.role} onValueChange={(v: UserRole) => {
-                setEditUser({...editUser, role: v, permissions: ROLE_PERMISSIONS[v]});
-              }}>
+              <Select 
+                disabled={currentUser?.id === editUser.id}
+                value={editUser.role} 
+                onValueChange={(v: UserRole) => {
+                  setEditUser({...editUser, role: v, permissions: ROLE_PERMISSIONS[v]});
+                }}
+              >
                 <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue /></SelectTrigger>
                 <SelectContent className="rounded-xl">
+                  <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="accountant">Accountant</SelectItem>
                   <SelectItem value="staff">Staff</SelectItem>
                 </SelectContent>
               </Select>
+              {currentUser?.id === editUser.id && (
+                <p className="text-[10px] font-bold text-rose-500 mt-1 italic">SECURITY: You cannot change your own role.</p>
+              )}
             </div>
 
             <div className="col-span-2 border-t border-slate-100 pt-6">
