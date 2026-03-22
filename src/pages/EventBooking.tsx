@@ -395,8 +395,8 @@ const EventBooking = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('event_bookings')
-        .select('*')
+        .from('bookings')
+        .select('id, client_name, client_phone, event_type, event_date, venue, pax, total_amount, advance_paid, balance_due, status, created_at')
         .order('event_date', { ascending: true });
 
       if (error) throw error;
@@ -404,25 +404,26 @@ const EventBooking = () => {
         setBookings(data.map(b => ({
           id: b.id,
           clientName: b.client_name,
-          phone: b.phone,
+          phone: b.client_phone,
           eventType: b.event_type,
           eventDate: b.event_date,
-          bookingDate: b.booking_date,
+          bookingDate: b.created_at, // Use created_at as fallback for bookingDate
           venue: b.venue,
-          guests: b.guests,
+          guests: b.pax,
           totalAmount: b.total_amount,
-          advance: b.advance,
-          balanceRemaining: b.balance_remaining,
+          advance: b.advance_paid,
+          balanceRemaining: b.balance_due,
           status: b.status,
-          paymentMethod: b.payment_method,
-          menu: b.menu,
-          notes: b.notes,
-          thirdParty: b.third_party,
-          supplierCost: b.supplier_cost,
-          sellingRate: b.selling_rate
+          paymentMethod: "N/A", // Not in requested columns
+          menu: "N/A", // Not in requested columns
+          notes: "", // Not in requested columns
+          thirdParty: false, // Not in requested columns
+          supplierCost: 0, // Not in requested columns
+          sellingRate: 0 // Not in requested columns
         })));
       }
     } catch (err: any) {
+      console.error("Fetch bookings error:", err);
       toast.error("Failed to fetch bookings");
     } finally {
       setLoading(false);
@@ -454,31 +455,24 @@ const EventBooking = () => {
       const adv = Number(nb?.advance || 0);
       const bookingData = {
         client_name: nb.clientName,
-        phone: nb.phone,
+        client_phone: nb.phone,
         event_type: nb.eventType,
         event_date: nb.eventDate,
-        booking_date: nb.bookingDate,
         venue: nb.venue,
-        guests: Number(nb.guests || 0),
+        pax: Number(nb.guests || 0),
         total_amount: total,
-        advance: adv,
-        balance_remaining: total - adv,
+        advance_paid: adv,
+        balance_due: total - adv,
         status: nb.status,
-        payment_method: nb.paymentMethod,
-        menu: nb.menu,
-        notes: nb.notes,
-        third_party: nb.thirdParty,
-        supplier_cost: Number(nb.supplierCost || 0),
-        selling_rate: Number(nb.sellingRate || 0),
-        created_by: user?.email
+        created_at: nb.bookingDate || new Date().toISOString()
       };
 
       if ((nb as any).id) {
-        const { error } = await supabase.from('event_bookings').update(bookingData).eq('id', (nb as any).id);
+        const { error } = await supabase.from('bookings').update(bookingData).eq('id', (nb as any).id);
         if (error) throw error;
         toast.success("Booking updated successfully");
       } else {
-        const { error } = await supabase.from('event_bookings').insert([bookingData]);
+        const { error } = await supabase.from('bookings').insert([bookingData]);
         if (error) throw error;
         toast.success("Booking created successfully");
       }
@@ -499,7 +493,7 @@ const EventBooking = () => {
     if (!confirm("Are you sure you want to permanently delete this booking?")) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('event_bookings').delete().eq('id', id);
+      const { error } = await supabase.from('bookings').delete().eq('id', id);
       if (error) throw error;
       await fetchBookingsData();
       toast.success("Booking deleted successfully");
@@ -513,7 +507,7 @@ const EventBooking = () => {
   const handleStatusChange = async (id: number, status: BookingStatus) => {
     setSaving(true);
     try {
-      const { error } = await supabase.from('event_bookings').update({ status }).eq('id', id);
+      const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
       if (error) throw error;
       await fetchBookingsData();
       toast.success(`Booking status updated to ${status}`);

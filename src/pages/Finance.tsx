@@ -107,7 +107,7 @@ const Finance = () => {
   const fetchFinanceData = async () => {
     try {
       const { data, error } = await supabase
-        .from('finance_ledger')
+        .from('ledger_entries')
         .select('*')
         .order('date', { ascending: true });
 
@@ -115,21 +115,23 @@ const Finance = () => {
       
       let runningBalance = 0;
       const ledgerData = (data ?? []).map((entry: any) => {
-        const amount = Number(entry.amount);
+        const amount = Number(entry?.amount || 0);
         runningBalance = entry.type === 'debit' ? runningBalance + amount : runningBalance - amount;
         return {
-          id: entry.id,
-          date: entry.date,
-          description: entry.description,
-          account: entry.account,
-          type: entry.type,
+          id: entry?.id ?? "",
+          date: entry?.date ?? format(new Date(), "yyyy-MM-dd"),
+          description: entry?.description ?? "No description",
+          account: entry?.account ?? "N/A",
+          type: entry?.type ?? "debit",
           amount: amount,
           balance: runningBalance
         };
       });
       setLedger(ledgerData);
     } catch (err: any) {
+      console.error("Finance ledger fetch error:", err);
       toast({ title: "Error", description: "Failed to fetch ledger entries", variant: "destructive" });
+      setLedger([]); // Set to empty on error for safety
     }
   };
 
@@ -197,7 +199,7 @@ const Finance = () => {
     }
     setSaving(true);
     try {
-      const { error } = await supabase.from('finance_ledger').insert([{
+      const { error } = await supabase.from('ledger_entries').insert([{
         date: newEntry.date,
         description: newEntry.description,
         account: newEntry.account,
@@ -224,7 +226,7 @@ const Finance = () => {
     if (!confirm("Are you sure you want to delete this entry?")) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('finance_ledger').delete().eq('id', id);
+      const { error } = await supabase.from('ledger_entries').delete().eq('id', id);
       if (error) throw error;
       await fetchFinanceData();
       toast({ title: "Success", description: "Entry deleted successfully" });

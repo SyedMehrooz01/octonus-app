@@ -188,7 +188,24 @@ const Dashboard = () => {
 
         setRecentActivity(activity.sort((a, b) => new Date(b?.time ?? 0).getTime() - new Date(a?.time ?? 0).getTime()).slice(0, 6));
 
+        const { data: ledgerData, error: ledgerError } = await supabase
+          .from('ledger_entries')
+          .select('amount, type');
+        
+        let currentBalance = 0;
+        if (!ledgerError && ledgerData && ledgerData.length > 0) {
+          ledgerData.forEach(entry => {
+            const amt = Number(entry?.amount || 0);
+            if (entry.type === 'debit') currentBalance += amt;
+            else currentBalance -= amt;
+          });
+        }
+        // Use currentBalance if needed in future stats, or for now just ensure safe fetch.
+        console.log("Current Ledger Balance:", currentBalance);
+
+        setLoading(false);
       } catch (error) {
+        console.error("Dashboard fetch error:", error);
         toast.error("Failed to fetch dashboard data");
       } finally {
         setLoading(false);

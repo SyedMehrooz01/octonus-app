@@ -71,12 +71,13 @@ const Expenses = () => {
     try {
       const { data, error } = await supabase
         .from('expenses')
-        .select('*')
+        .select('id, voucher_no, date, description, category, payment_mode, amount, linked_event, status, approved_by, approved_at, created_by_name, created_by_id, created_by_role, created_at')
         .order('date', { ascending: false });
 
       if (error) throw error;
       setExpenses(data ?? []);
     } catch (error: any) {
+      console.error("Fetch expenses error:", error);
       toast.error("Failed to load expenses");
     } finally {
       setLoading(false);
@@ -98,10 +99,16 @@ const Expenses = () => {
       const { error } = await supabase
         .from('expenses')
         .insert([{
-          ...newExpense,
+          date: newExpense.date,
+          description: newExpense.description,
+          category: newExpense.head,
           amount: Number(newExpense.amount),
+          payment_mode: newExpense.payment_mode,
+          linked_event: newExpense.event_id,
           status: 'pending',
-          created_by: user?.email
+          created_by_name: user?.name || user?.email,
+          created_by_id: user?.id,
+          created_at: new Date().toISOString()
         }]);
 
       if (error) throw error;

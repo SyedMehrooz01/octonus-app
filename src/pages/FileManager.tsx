@@ -119,6 +119,8 @@ const FileManager = () => {
           category: uploadCategory,
           description: uploadDescription,
           uploaded_by: user?.name || user?.email || "System",
+          user_id: user?.id,
+          created_at: new Date().toISOString()
         },
       ]);
 
