@@ -47,6 +47,8 @@ const Dashboard = () => {
   const [lowInventoryCount, setLowInventoryCount] = useState(0);
   const [activeStaffCount, setActiveStaffCount] = useState(0);
   const [thisMonthRevenue, setThisMonthRevenue] = useState(0);
+  const [thisMonthExpenses, setThisMonthExpenses] = useState(0);
+  const [revenueGrowth, setRevenueGrowth] = useState("0%");
 
   // Table state
   const [search, setSearch] = useState("");
@@ -58,34 +60,34 @@ const Dashboard = () => {
       setLoading(true);
       try {
         const today = startOfToday().toISOString();
-        const endOfTodayStr = endOfToday().toISOString();
         const todayStr = format(new Date(), 'yyyy-MM-dd');
         const monthStart = startOfMonth(new Date()).toISOString();
         const monthEnd = endOfMonth(new Date()).toISOString();
-        const nextWeek = addDays(new Date(), 7).toISOString();
+        const prevMonthStart = startOfMonth(subMonths(new Date(), 1)).toISOString();
+        const prevMonthEnd = endOfMonth(subMonths(new Date(), 1)).toISOString();
 
         // 1. Fetch Total Events
         const { count: totalEvents } = await supabase
-          .from('events')
+          .from('bookings')
           .select('*', { count: 'exact', head: true })
           .neq('status', 'cancelled');
         setTotalEventsCount(totalEvents || 0);
 
         // 2. Fetch Upcoming Events Count
         const { count: upcomingCount } = await supabase
-          .from('events')
+          .from('bookings')
           .select('*', { count: 'exact', head: true })
-          .gte('event_date', today)
+          .gte('event_date', todayStr)
           .neq('status', 'cancelled');
         setUpcomingEventsCount(upcomingCount || 0);
 
         // 3. Fetch Payments Due (Balance Remaining)
         const { data: balanceData } = await supabase
-          .from('events')
-          .select('balance_remaining')
+          .from('bookings')
+          .select('balance_due')
           .neq('status', 'cancelled')
-          .gt('balance_remaining', 0);
-        const totalDue = (balanceData ?? []).reduce((sum, e) => sum + (e?.balance_remaining ?? 0), 0);
+          .gt('balance_due', 0);
+        const totalDue = (balanceData ?? []).reduce((sum, e) => sum + (e?.balance_due ?? 0), 0);
         setPaymentsDue(totalDue);
 
         // 4. Fetch Low Inventory Alerts
@@ -109,20 +111,46 @@ const Dashboard = () => {
           .eq('date', todayStr);
         setAttendanceMissing(!attendanceCount || attendanceCount === 0);
 
-        // 7. Fetch Month Revenue
+        // 7. Fetch Month Revenue (from ledger_entries type='debit')
         const { data: monthlyPayments } = await supabase
-          .from('event_payments')
+          .from('ledger_entries')
           .select('amount')
+          .eq('type', 'debit')
           .gte('date', monthStart)
           .lte('date', monthEnd);
         const totalRevenue = (monthlyPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
         setThisMonthRevenue(totalRevenue);
 
+        // 7.1 Fetch Month Expenses (from expenses table)
+        const { data: monthlyExpensesData } = await supabase
+          .from('expenses')
+          .select('amount')
+          .eq('status', 'approved')
+          .gte('date', monthStart)
+          .lte('date', monthEnd);
+        const totalExpenses = (monthlyExpensesData ?? []).reduce((sum, e) => sum + (e?.amount ?? 0), 0);
+        setThisMonthExpenses(totalExpenses);
+
+        // 7.2 Calculate Revenue Growth
+        const { data: prevMonthPayments } = await supabase
+          .from('ledger_entries')
+          .select('amount')
+          .eq('type', 'debit')
+          .gte('date', prevMonthStart)
+          .lte('date', prevMonthEnd);
+        const prevRevenue = (prevMonthPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
+        if (prevRevenue > 0) {
+          const growth = ((totalRevenue - prevRevenue) / prevRevenue) * 100;
+          setRevenueGrowth(`${growth > 0 ? '+' : ''}${growth.toFixed(1)}%`);
+        } else {
+          setRevenueGrowth(totalRevenue > 0 ? "+100%" : "0%");
+        }
+
         // 8. Fetch Upcoming Events Table
         const { data: upcoming } = await supabase
-          .from('events')
-          .select(`id, client_name, event_date, total_amount, event_type, venue, status, guests, balance_remaining`)
-          .gte('event_date', today)
+          .from('bookings')
+          .select(`id, client_name, event_date, total_amount, event_type, venue, status, pax, balance_due`)
+          .gte('event_date', todayStr)
           .order('event_date', { ascending: true });
         setUpcomingEvents(upcoming || []);
 
@@ -133,8 +161,9 @@ const Dashboard = () => {
           const start = startOfMonth(date).toISOString();
           const end = endOfMonth(date).toISOString();
           const { data: payments } = await supabase
-            .from('event_payments')
+            .from('ledger_entries')
             .select('amount')
+            .eq('type', 'debit')
             .gte('date', start)
             .lte('date', end);
           const total = (payments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
@@ -148,7 +177,7 @@ const Dashboard = () => {
         // 10. Recent Activity
         const activity = [];
         const { data: recentBookings } = await supabase
-          .from('events')
+          .from('bookings')
           .select('client_name, created_at, event_type')
           .order('created_at', { ascending: false })
           .limit(3);
@@ -161,13 +190,14 @@ const Dashboard = () => {
         }));
 
         const { data: recentPayments } = await supabase
-          .from('event_payments')
-          .select('amount, date, events(client_name)')
+          .from('ledger_entries')
+          .select('amount, date, description')
+          .eq('type', 'debit')
           .order('date', { ascending: false })
           .limit(3);
         recentPayments?.forEach(p => activity.push({
           type: 'payment',
-          title: `Payment of ₨ ${(p?.amount ?? 0).toLocaleString()} received from ${(p as any).events?.client_name}`,
+          title: `Payment: ${p.description} (₨ ${p.amount.toLocaleString()})`,
           time: p?.date,
           icon: Wallet,
           color: 'text-emerald-500'
@@ -187,21 +217,6 @@ const Dashboard = () => {
         }));
 
         setRecentActivity(activity.sort((a, b) => new Date(b?.time ?? 0).getTime() - new Date(a?.time ?? 0).getTime()).slice(0, 6));
-
-        const { data: ledgerData, error: ledgerError } = await supabase
-          .from('ledger_entries')
-          .select('amount, type');
-        
-        let currentBalance = 0;
-        if (!ledgerError && ledgerData && ledgerData.length > 0) {
-          ledgerData.forEach(entry => {
-            const amt = Number(entry?.amount || 0);
-            if (entry.type === 'debit') currentBalance += amt;
-            else currentBalance -= amt;
-          });
-        }
-        // Use currentBalance if needed in future stats, or for now just ensure safe fetch.
-        console.log("Current Ledger Balance:", currentBalance);
 
         setLoading(false);
       } catch (error) {
@@ -235,7 +250,7 @@ const Dashboard = () => {
   const handleDeleteEvent = async (id: string) => {
     if (!confirm("Are you sure you want to delete this event?")) return;
     try {
-      const { error } = await supabase.from('events').delete().eq('id', id);
+      const { error } = await supabase.from('bookings').delete().eq('id', id);
       if (error) throw error;
       setUpcomingEvents(prev => prev.filter(e => e.id !== id));
       toast.success("Event deleted successfully");
@@ -279,6 +294,11 @@ const Dashboard = () => {
               <Clock className="h-4 w-4" /> Attendance Missing
             </Badge>
           )}
+          {lowInventoryCount > 0 && (
+            <Badge className="bg-orange-500 hover:bg-orange-600 text-white animate-pulse flex items-center gap-1.5 py-2.5 px-5 rounded-xl shadow-lg shadow-orange-500/20 border-none font-bold">
+              <AlertTriangle className="h-4 w-4" /> {lowInventoryCount} Low Stock Items
+            </Badge>
+          )}
           <div className="hidden lg:flex items-center gap-2 text-xs font-black text-slate-500 bg-white border border-slate-200/60 px-5 py-3 rounded-xl shadow-sm">
             <CalendarDays className="h-4 w-4 text-blue-600" />
             {format(new Date(), 'EEEE, MMMM do, yyyy').toUpperCase()}
@@ -288,15 +308,15 @@ const Dashboard = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Total Events */}
+        {/* Upcoming Events */}
         <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-500 to-blue-700 p-6 shadow-xl shadow-blue-500/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/30">
           <div className="relative z-10 flex flex-col gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
               <CalendarDays className="h-7 w-7 text-white" />
             </div>
             <div>
-              <p className="text-xs font-black text-blue-100/80 uppercase tracking-widest">Total Events</p>
-              <h3 className="text-4xl font-black text-white mt-1 tracking-tight">{(totalEventsCount ?? 0).toLocaleString()}</h3>
+              <p className="text-xs font-black text-blue-100/80 uppercase tracking-widest">Upcoming Events</p>
+              <h3 className="text-4xl font-black text-white mt-1 tracking-tight">{(upcomingEventsCount ?? 0).toLocaleString()}</h3>
             </div>
           </div>
           <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
@@ -304,51 +324,51 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Upcoming Events */}
-        <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-600 p-6 shadow-xl shadow-emerald-400/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-400/30">
-          <div className="relative z-10 flex flex-col gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
-              <Clock className="h-7 w-7 text-white" />
-            </div>
-            <div>
-              <p className="text-xs font-black text-emerald-50/80 uppercase tracking-widest">Upcoming Events</p>
-              <h3 className="text-4xl font-black text-white mt-1 tracking-tight">{(upcomingEventsCount ?? 0).toLocaleString()}</h3>
-            </div>
-          </div>
-          <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-6">
-            <Clock size={160} className="text-white" />
-          </div>
-        </div>
-
         {/* Payments Due */}
-        <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-400 to-teal-600 p-6 shadow-xl shadow-teal-400/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-teal-400/30">
+        <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-600 p-6 shadow-xl shadow-emerald-400/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-400/30">
           <div className="relative z-10 flex flex-col gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
               <span className="text-3xl font-black text-white italic">₨</span>
             </div>
             <div>
-              <p className="text-xs font-black text-teal-50/80 uppercase tracking-widest">Payments Due</p>
+              <p className="text-xs font-black text-emerald-50/80 uppercase tracking-widest">Payments Due</p>
               <h3 className="text-3xl font-black text-white mt-1 tracking-tight">₨ {(paymentsDue ?? 0).toLocaleString()}</h3>
             </div>
           </div>
-          <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+          <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-6">
             <Landmark size={160} className="text-white" />
           </div>
         </div>
 
-        {/* Low Inventory */}
-        <div className="group relative overflow-hidden rounded-3xl bg-white p-6 shadow-xl shadow-slate-200/50 border border-slate-100 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-slate-200/60">
+        {/* Month Expenses */}
+        <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-rose-500 to-rose-700 p-6 shadow-xl shadow-rose-500/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-rose-500/30">
           <div className="relative z-10 flex flex-col gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 shadow-inner">
-              <AlertTriangle className="h-7 w-7 text-rose-500" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+              <TrendingDown className="h-7 w-7 text-white" />
             </div>
             <div>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Low Inventory</p>
-              <h3 className="text-4xl font-black text-[#0f172a] mt-1 tracking-tight">{(lowInventoryCount ?? 0).toLocaleString()}</h3>
+              <p className="text-xs font-black text-rose-50/80 uppercase tracking-widest">Month Expenses</p>
+              <h3 className="text-3xl font-black text-white mt-1 tracking-tight">₨ {(thisMonthExpenses ?? 0).toLocaleString()}</h3>
+            </div>
+          </div>
+          <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+            <Receipt size={160} className="text-white" />
+          </div>
+        </div>
+
+        {/* Active Staff */}
+        <div className="group relative overflow-hidden rounded-3xl bg-white p-6 shadow-xl shadow-slate-200/50 border border-slate-100 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-slate-200/60">
+          <div className="relative z-10 flex flex-col gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 shadow-inner">
+              <Users className="h-7 w-7 text-indigo-500" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Active Staff</p>
+              <h3 className="text-4xl font-black text-[#0f172a] mt-1 tracking-tight">{(activeStaffCount ?? 0).toLocaleString()}</h3>
             </div>
           </div>
           <div className="absolute -right-6 -bottom-6 opacity-5 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3">
-            <Package size={160} className="text-slate-900" />
+            <Users size={160} className="text-slate-900" />
           </div>
         </div>
       </div>
@@ -425,7 +445,7 @@ const Dashboard = () => {
                         </td>
                         <td className="px-6 py-6">
                           <Badge variant="outline" className="rounded-lg border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black text-slate-600 shadow-sm">
-                            {event?.guests ?? 0} GUESTS
+                            {event?.pax ?? 0} GUESTS
                           </Badge>
                         </td>
                         <td className="px-6 py-6">
@@ -539,8 +559,8 @@ const Dashboard = () => {
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">MTD REVENUE</p>
                 <p className="text-xl font-black text-[#0f172a] mt-0.5">₨ {(thisMonthRevenue ?? 0).toLocaleString()}</p>
               </div>
-              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none px-3 py-1 font-black text-[10px]">
-                +12.5%
+              <Badge className={`px-3 py-1 font-black text-[10px] border-none ${revenueGrowth.startsWith('+') ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                {revenueGrowth}
               </Badge>
             </div>
           </div>
