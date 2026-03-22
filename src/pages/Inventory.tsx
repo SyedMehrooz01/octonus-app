@@ -262,8 +262,8 @@ const Inventory = () => {
   };
 
   return (
-    <div className="space-y-8 pb-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
           <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Inventory & Stock Control</h1>
           <p className="text-slate-500 font-bold mt-1">Real-time tracking of assets, consumables, and procurement.</p>
@@ -275,7 +275,7 @@ const Inventory = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Total Asset Types", value: (items ?? []).length, icon: Package, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20" },
           { label: "Low Stock Alerts", value: (lowStock ?? []).length, icon: AlertTriangle, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20" },

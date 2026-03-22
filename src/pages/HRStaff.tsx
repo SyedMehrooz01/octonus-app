@@ -1314,8 +1314,8 @@ const HRStaff = () => {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 sm:space-y-6 pb-10 max-w-full overflow-hidden">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-foreground">Workforce Management</h2>
           <p className="text-xs sm:text-sm text-muted-foreground text-balance">Comprehensive HR portal for staff, attendance, and payroll</p>
@@ -1345,8 +1345,32 @@ const HRStaff = () => {
         </div>
       )}
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        {[
+          { label: "Total Workforce", value: staff?.length, icon: Users, color: "from-blue-500 to-blue-700" },
+          { label: "Active Staff", value: (staff ?? []).filter(s => s?.status === 'active').length, icon: CheckCircle, color: "from-emerald-500 to-emerald-700" },
+          { label: "Leaves Today", value: (leaves ?? []).filter(l => l?.status === 'approved').length, icon: XCircle, color: "from-rose-500 to-rose-700" },
+          { label: "Monthly Payroll", value: `₨ ${(monthlyPayrollTotal ?? 0).toLocaleString()}`, icon: DollarSign, color: "from-violet-500 to-violet-700" },
+        ].map((card, i) => (
+          <div key={card.label} className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.color} p-5 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]`}>
+            <div className="relative z-10 flex flex-col gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+                <card.icon className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{card.label}</p>
+                <p className="text-2xl font-black truncate tracking-tight">{card.value}</p>
+              </div>
+            </div>
+            <div className="absolute -right-4 -bottom-4 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
+              <card.icon size={120} className="text-white" />
+            </div>
+          </div>
+        ))}
+      </div>
+
       <Tabs defaultValue="profiles" className="w-full">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-2">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-4">
           <div className="overflow-x-auto pb-1 w-full sm:w-auto">
             <TabsList className="w-full justify-start sm:w-auto inline-flex">
               <TabsTrigger value="profiles" className="text-xs sm:text-sm">Profiles</TabsTrigger>
@@ -1359,17 +1383,6 @@ const HRStaff = () => {
               <TabsTrigger value="performance" className="text-xs sm:text-sm">Performance</TabsTrigger>
               <TabsTrigger value="reports" className="text-xs sm:text-sm">Reports</TabsTrigger>
             </TabsList>
-          </div>
-          <div className="flex items-center gap-4 w-full sm:w-auto bg-card border border-border rounded-lg px-4 py-2">
-              <div className="flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground">Monthly Total Payroll</span>
-                <span className="text-sm font-bold text-success">₨ {(monthlyPayrollTotal || 0).toLocaleString()}</span>
-              </div>
-            <div className="h-8 w-[1px] bg-border mx-2" />
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground">Active Staff</span>
-              <span className="text-sm font-bold">{(staff ?? []).filter(s => s?.status === 'active').length}</span>
-            </div>
           </div>
         </div>
 

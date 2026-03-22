@@ -307,68 +307,68 @@ const Dashboard = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Upcoming Events */}
-        <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-500 to-blue-700 p-6 shadow-xl shadow-blue-500/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/30">
-          <div className="relative z-10 flex flex-col gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
-              <CalendarDays className="h-7 w-7 text-white" />
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 p-5 shadow-lg shadow-blue-500/20 transition-all duration-300 hover:scale-[1.02]">
+          <div className="relative z-10 flex flex-col gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+              <CalendarDays className="h-6 w-6 text-white" />
             </div>
             <div>
-              <p className="text-xs font-black text-blue-100/80 uppercase tracking-widest">Upcoming Events</p>
-              <h3 className="text-4xl font-black text-white mt-1 tracking-tight">{(upcomingEventsCount ?? 0).toLocaleString()}</h3>
+              <p className="text-[10px] font-black text-blue-100/80 uppercase tracking-widest">Upcoming Events</p>
+              <h3 className="text-3xl font-black text-white mt-0.5 tracking-tight">{(upcomingEventsCount ?? 0).toLocaleString()}</h3>
             </div>
           </div>
-          <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
-            <CalendarDays size={160} className="text-white" />
+          <div className="absolute -right-4 -bottom-4 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
+            <CalendarDays size={120} className="text-white" />
           </div>
         </div>
 
         {/* Payments Due */}
-        <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-600 p-6 shadow-xl shadow-emerald-400/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-400/30">
-          <div className="relative z-10 flex flex-col gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
-              <span className="text-3xl font-black text-white italic">₨</span>
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 p-5 shadow-lg shadow-emerald-400/20 transition-all duration-300 hover:scale-[1.02]">
+          <div className="relative z-10 flex flex-col gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+              <span className="text-2xl font-black text-white italic">₨</span>
             </div>
             <div>
-              <p className="text-xs font-black text-emerald-50/80 uppercase tracking-widest">Payments Due</p>
-              <h3 className="text-3xl font-black text-white mt-1 tracking-tight">₨ {(paymentsDue ?? 0).toLocaleString()}</h3>
+              <p className="text-[10px] font-black text-emerald-50/80 uppercase tracking-widest">Payments Due</p>
+              <h3 className="text-2xl font-black text-white mt-0.5 tracking-tight">₨ {(paymentsDue ?? 0).toLocaleString()}</h3>
             </div>
           </div>
-          <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-6">
-            <Landmark size={160} className="text-white" />
+          <div className="absolute -right-4 -bottom-4 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-6">
+            <Landmark size={120} className="text-white" />
           </div>
         </div>
 
         {/* Month Expenses */}
-        <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-rose-500 to-rose-700 p-6 shadow-xl shadow-rose-500/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-rose-500/30">
-          <div className="relative z-10 flex flex-col gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
-              <TrendingDown className="h-7 w-7 text-white" />
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500 to-rose-700 p-5 shadow-lg shadow-rose-500/20 transition-all duration-300 hover:scale-[1.02]">
+          <div className="relative z-10 flex flex-col gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+              <TrendingDown className="h-6 w-6 text-white" />
             </div>
             <div>
-              <p className="text-xs font-black text-rose-50/80 uppercase tracking-widest">Month Expenses</p>
-              <h3 className="text-3xl font-black text-white mt-1 tracking-tight">₨ {(thisMonthExpenses ?? 0).toLocaleString()}</h3>
+              <p className="text-[10px] font-black text-rose-50/80 uppercase tracking-widest">Month Expenses</p>
+              <h3 className="text-2xl font-black text-white mt-0.5 tracking-tight">₨ {(thisMonthExpenses ?? 0).toLocaleString()}</h3>
             </div>
           </div>
-          <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
-            <Receipt size={160} className="text-white" />
+          <div className="absolute -right-4 -bottom-4 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+            <Receipt size={120} className="text-white" />
           </div>
         </div>
 
         {/* Active Staff */}
-        <div className="group relative overflow-hidden rounded-3xl bg-white p-6 shadow-xl shadow-slate-200/50 border border-slate-100 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-slate-200/60">
-          <div className="relative z-10 flex flex-col gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 shadow-inner">
-              <Users className="h-7 w-7 text-indigo-500" />
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-lg shadow-slate-200/50 border border-slate-100 transition-all duration-300 hover:scale-[1.02]">
+          <div className="relative z-10 flex flex-col gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 shadow-inner">
+              <Users className="h-6 w-6 text-indigo-500" />
             </div>
             <div>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Active Staff</p>
-              <h3 className="text-4xl font-black text-[#0f172a] mt-1 tracking-tight">{(activeStaffCount ?? 0).toLocaleString()}</h3>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Staff</p>
+              <h3 className="text-3xl font-black text-[#0f172a] mt-0.5 tracking-tight">{(activeStaffCount ?? 0).toLocaleString()}</h3>
             </div>
           </div>
-          <div className="absolute -right-6 -bottom-6 opacity-5 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3">
-            <Users size={160} className="text-slate-900" />
+          <div className="absolute -right-4 -bottom-4 opacity-5 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3">
+            <Users size={120} className="text-slate-900" />
           </div>
         </div>
       </div>

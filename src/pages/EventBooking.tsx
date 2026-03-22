@@ -550,8 +550,8 @@ const EventBooking = () => {
   };
 
   return (
-    <div className="space-y-8 pb-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
           <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Event Booking & Scheduling</h1>
           <p className="text-slate-500 font-bold mt-1">Manage bookings, menus, and production from one central hub.</p>
@@ -561,7 +561,7 @@ const EventBooking = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
         {[
           {l:"Total Bookings",v:(bookings ?? []).length,c:"from-blue-500 to-blue-700",s:"shadow-blue-500/20",i:CalendarDays},
           {l:"Confirmed",v:(bookings ?? []).filter(b=>b?.status==="confirmed").length,c:"from-emerald-500 to-emerald-700",s:"shadow-emerald-500/20",i:CheckCircle2},

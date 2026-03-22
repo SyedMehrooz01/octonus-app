@@ -354,8 +354,8 @@ const Finance = () => {
   });
 
   return (
-    <div className="space-y-8 pb-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
           <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Finance & Accounts</h1>
           <p className="text-slate-500 font-bold mt-1">Manage general ledger, event finance, and profit reports.</p>
@@ -367,7 +367,7 @@ const Finance = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {l:"Total Revenue",v:`₨ ${(totalRevenue ?? 0).toLocaleString()}`,c:"from-emerald-500 to-emerald-700",shadow:"shadow-emerald-500/20",icon:TrendingUp},
           {l:"Total Expenses",v:`₨ ${(totalCredit ?? 0).toLocaleString()}`,c:"from-rose-500 to-rose-700",shadow:"shadow-rose-500/20",icon:TrendingDown},

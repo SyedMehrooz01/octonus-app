@@ -176,8 +176,8 @@ const FileManager = () => {
   });
 
   return (
-    <div className="space-y-8 pb-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
           <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">File Manager</h1>
           <p className="text-slate-500 font-bold mt-1">Manage all your company documents in one place.</p>

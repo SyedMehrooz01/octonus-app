@@ -548,8 +548,8 @@ const Expenses = () => {
   };
 
   return (
-    <div className="space-y-8 pb-10">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
           <h1 className="text-4xl font-black text-[#0f172a] tracking-tight uppercase">Expense Management</h1>
           <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1">
@@ -576,7 +576,7 @@ const Expenses = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[
           { label: "Today's Burn Rate", value: `₨ ${(todayExpenses ?? 0).toLocaleString()}`, icon: Calendar, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20", sub: format(new Date(), "PP") },
           { 

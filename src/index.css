@@ -66,7 +66,51 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground font-sans antialiased;
+    scroll-behavior: smooth;
+  }
+
+  /* Global Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #2D6A4F;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #1B4332;
+  }
+
+  /* Hide scrollbar when not hovering for containers with .hide-scrollbar-on-idle */
+  .hide-scrollbar-on-idle {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .hide-scrollbar-on-idle:hover {
+    scrollbar-color: #2D6A4F transparent;
+  }
+
+  .hide-scrollbar-on-idle::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+
+  .hide-scrollbar-on-idle:hover::-webkit-scrollbar-thumb {
+    background-color: #2D6A4F;
+  }
+
+  /* Table horizontal scroll container */
+  .table-container {
+    @apply w-full overflow-x-auto rounded-xl border border-border bg-card shadow-sm;
+    max-width: 100%;
   }
 }
 
