@@ -19,10 +19,12 @@ import {
   Trash2, 
   AlertTriangle, 
   Loader2, 
-  Package 
+  Package,
+  Calendar,
+  X
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, startOfToday, endOfToday, addDays, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfToday, endOfToday, addDays, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,19 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const Dashboard = () => {
   const { canDo, hasAccess, logAction } = useAuth();
@@ -39,6 +54,8 @@ const Dashboard = () => {
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [attendanceMissing, setAttendanceMissing] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [audits, setAudits] = useState<any[]>([]);
   
   // Stats state
   const [totalEventsCount, setTotalEventsCount] = useState(0);
@@ -55,11 +72,23 @@ const Dashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+
+  const fetchAudits = async () => {
+    const { data } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(50);
+    setAudits(data || []);
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true);
       try {
-        const today = startOfToday().toISOString();
         const todayStr = format(new Date(), 'yyyy-MM-dd');
         const monthStart = startOfMonth(new Date()).toISOString();
         const monthEnd = endOfMonth(new Date()).toISOString();
@@ -150,7 +179,6 @@ const Dashboard = () => {
         const { data: upcoming } = await supabase
           .from('bookings')
           .select(`id, client_name, event_date, total_amount, event_type, venue, status, pax, balance_due`)
-          .gte('event_date', todayStr)
           .order('event_date', { ascending: true });
         setUpcomingEvents(upcoming || []);
 
@@ -178,15 +206,17 @@ const Dashboard = () => {
         const activity = [];
         const { data: recentBookings } = await supabase
           .from('bookings')
-          .select('client_name, created_at, event_type')
+          .select('id, client_name, created_at, event_type')
           .order('created_at', { ascending: false })
           .limit(3);
         recentBookings?.forEach(b => activity.push({
           type: 'booking',
+          id: b.id,
           title: `New booking: ${b.client_name}`,
           time: b.created_at,
           icon: CalendarDays,
-          color: 'text-blue-500'
+          color: 'text-blue-500',
+          path: '/events'
         }));
 
         const { data: recentPayments } = await supabase
@@ -200,7 +230,8 @@ const Dashboard = () => {
           title: `Payment: ${p.description} (₨ ${p.amount.toLocaleString()})`,
           time: p?.date,
           icon: Wallet,
-          color: 'text-emerald-500'
+          color: 'text-emerald-500',
+          path: '/finance'
         }));
 
         const { data: recentAttendance } = await supabase
@@ -213,7 +244,8 @@ const Dashboard = () => {
           title: `Attendance marked for ${(a as any).staff?.name}: ${a?.status}`,
           time: a?.date,
           icon: CheckCircle,
-          color: 'text-violet-500'
+          color: 'text-violet-500',
+          path: '/hr'
         }));
 
         setRecentActivity(activity.sort((a, b) => new Date(b?.time ?? 0).getTime() - new Date(a?.time ?? 0).getTime()).slice(0, 6));
@@ -239,10 +271,10 @@ const Dashboard = () => {
         navigate("/expenses");
         break;
       case "Mark Attendance":
-        navigate("/hr?tab=attendance");
+        navigate("/hr");
         break;
       case "Generate Payroll":
-        navigate("/hr?tab=payroll");
+        navigate("/hr");
         break;
     }
   };
@@ -261,12 +293,17 @@ const Dashboard = () => {
   };
 
   const filteredEvents = useMemo(() => {
-    return (upcomingEvents ?? []).filter(e => 
-      e?.client_name?.toLowerCase().includes((search ?? "").toLowerCase()) ||
-      e?.event_type?.toLowerCase().includes((search ?? "").toLowerCase()) ||
-      e?.venue?.toLowerCase().includes((search ?? "").toLowerCase())
-    );
-  }, [upcomingEvents, search]);
+    return (upcomingEvents ?? []).filter(e => {
+      const matchSearch = e?.client_name?.toLowerCase().includes((search ?? "").toLowerCase()) ||
+                         e?.event_type?.toLowerCase().includes((search ?? "").toLowerCase()) ||
+                         e?.venue?.toLowerCase().includes((search ?? "").toLowerCase());
+      
+      const matchStatus = statusFilter === "all" || e?.status?.toLowerCase() === statusFilter.toLowerCase();
+      const matchType = typeFilter === "all" || e?.event_type?.toLowerCase() === typeFilter.toLowerCase();
+      
+      return matchSearch && matchStatus && matchType;
+    });
+  }, [upcomingEvents, search, statusFilter, typeFilter]);
 
   const totalPages = Math.ceil((filteredEvents ?? []).length / itemsPerPage);
   const paginatedEvents = (filteredEvents ?? []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -280,6 +317,8 @@ const Dashboard = () => {
     return <Badge variant="outline" className="px-3 py-1 rounded-lg font-bold">{status}</Badge>;
   };
 
+  const eventTypes = ["Wedding", "Corporate", "Birthday", "Seminar", "Concert", "Other"];
+
   return (
     <div className="space-y-8 pb-10">
       {/* Header */}
@@ -290,12 +329,12 @@ const Dashboard = () => {
         </div>
         <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right duration-500">
           {attendanceMissing && (
-            <Badge className="bg-rose-500 hover:bg-rose-600 text-white animate-pulse flex items-center gap-1.5 py-2.5 px-5 rounded-xl shadow-lg shadow-rose-500/20 border-none font-bold">
+            <Badge onClick={() => navigate('/hr')} className="bg-rose-500 hover:bg-rose-600 text-white animate-pulse flex items-center gap-1.5 py-2.5 px-5 rounded-xl shadow-lg shadow-rose-500/20 border-none font-bold cursor-pointer">
               <Clock className="h-4 w-4" /> Attendance Missing
             </Badge>
           )}
           {lowInventoryCount > 0 && (
-            <Badge className="bg-orange-500 hover:bg-orange-600 text-white animate-pulse flex items-center gap-1.5 py-2.5 px-5 rounded-xl shadow-lg shadow-orange-500/20 border-none font-bold">
+            <Badge onClick={() => navigate('/inventory')} className="bg-orange-500 hover:bg-orange-600 text-white animate-pulse flex items-center gap-1.5 py-2.5 px-5 rounded-xl shadow-lg shadow-orange-500/20 border-none font-bold cursor-pointer">
               <AlertTriangle className="h-4 w-4" /> {lowInventoryCount} Low Stock Items
             </Badge>
           )}
@@ -309,7 +348,7 @@ const Dashboard = () => {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Upcoming Events */}
-        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 p-5 shadow-lg shadow-blue-500/20 transition-all duration-300 hover:scale-[1.02]">
+        <div onClick={() => navigate('/events')} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 p-5 shadow-lg shadow-blue-500/20 transition-all duration-300 hover:scale-[1.02] cursor-pointer">
           <div className="relative z-10 flex flex-col gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
               <CalendarDays className="h-6 w-6 text-white" />
@@ -325,7 +364,7 @@ const Dashboard = () => {
         </div>
 
         {/* Payments Due */}
-        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 p-5 shadow-lg shadow-emerald-400/20 transition-all duration-300 hover:scale-[1.02]">
+        <div onClick={() => navigate('/finance')} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 p-5 shadow-lg shadow-emerald-400/20 transition-all duration-300 hover:scale-[1.02] cursor-pointer">
           <div className="relative z-10 flex flex-col gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
               <span className="text-2xl font-black text-white italic">₨</span>
@@ -341,7 +380,7 @@ const Dashboard = () => {
         </div>
 
         {/* Month Expenses */}
-        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500 to-rose-700 p-5 shadow-lg shadow-rose-500/20 transition-all duration-300 hover:scale-[1.02]">
+        <div onClick={() => navigate('/expenses')} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500 to-rose-700 p-5 shadow-lg shadow-rose-500/20 transition-all duration-300 hover:scale-[1.02] cursor-pointer">
           <div className="relative z-10 flex flex-col gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
               <TrendingDown className="h-6 w-6 text-white" />
@@ -357,7 +396,7 @@ const Dashboard = () => {
         </div>
 
         {/* Active Staff */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-lg shadow-slate-200/50 border border-slate-100 transition-all duration-300 hover:scale-[1.02]">
+        <div onClick={() => navigate('/hr')} className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-lg shadow-slate-200/50 border border-slate-100 transition-all duration-300 hover:scale-[1.02] cursor-pointer">
           <div className="relative z-10 flex flex-col gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 shadow-inner">
               <Users className="h-6 w-6 text-indigo-500" />
@@ -387,9 +426,29 @@ const Dashboard = () => {
               />
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" className="h-12 rounded-xl border-slate-200 font-black px-6 gap-2 hover:bg-slate-50 transition-all shadow-sm">
-                <Filter className="h-4 w-4 text-slate-500" /> FILTER
-              </Button>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-12 w-[140px] rounded-xl font-bold border-slate-200">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="tentative">Tentative</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="h-12 w-[140px] rounded-xl font-bold border-slate-200">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="all">All Types</SelectItem>
+                  {eventTypes.map(t => <SelectItem key={t} value={t.toLowerCase()}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+
               {canDo('add') && (
                 <Button onClick={() => navigate("/events")} className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-6 gap-2 shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5">
                   <Plus className="h-5 w-5" /> ADD BOOKING
@@ -573,7 +632,7 @@ const Dashboard = () => {
             </div>
             <div className="space-y-7">
               {(recentActivity ?? []).map((activity, i) => (
-                <div key={i} className="flex gap-4 group cursor-default">
+                <div key={i} className="flex gap-4 group cursor-pointer" onClick={() => activity.path && navigate(activity.path)}>
                   <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-50 transition-all duration-300 group-hover:bg-white group-hover:shadow-lg group-hover:scale-110 border border-transparent group-hover:border-slate-100`}>
                     <activity.icon className={`h-5 w-5 ${activity.color ?? ""}`} />
                   </div>
@@ -587,12 +646,62 @@ const Dashboard = () => {
                 </div>
               ))}
             </div>
-            <Button variant="ghost" className="w-full mt-8 rounded-xl font-black text-[11px] text-blue-600 uppercase tracking-widest hover:bg-blue-50 gap-2 h-11">
+            <Button 
+              variant="ghost" 
+              className="w-full mt-8 rounded-xl font-black text-[11px] text-blue-600 uppercase tracking-widest hover:bg-blue-50 gap-2 h-11"
+              onClick={() => {
+                fetchAudits();
+                setShowAuditModal(true);
+              }}
+            >
               VIEW ALL AUDITS <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Audit Log Modal */}
+      <Dialog open={showAuditModal} onOpenChange={setShowAuditModal}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black flex items-center gap-2">
+              <Activity className="h-5 w-5 text-blue-600" /> SYSTEM AUDIT LOG
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {audits.length > 0 ? audits.map((log) => (
+              <div key={log.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center shrink-0 shadow-sm">
+                    <User className="h-4 w-4 text-slate-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-[#0f172a]">{log.action}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                      {log.user_name} • {log.page}
+                    </p>
+                    {log.details && (
+                      <p className="text-[10px] text-slate-500 mt-2 font-medium italic">{log.details}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-[10px] font-black text-slate-400 uppercase">
+                    {format(new Date(log.timestamp), 'MMM dd, yyyy')}
+                  </p>
+                  <p className="text-[10px] font-black text-blue-600 uppercase mt-1">
+                    {format(new Date(log.timestamp), 'HH:mm:ss')}
+                  </p>
+                </div>
+              </div>
+            )) : (
+              <div className="text-center py-12">
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No audit logs found</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
