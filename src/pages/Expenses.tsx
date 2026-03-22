@@ -19,6 +19,24 @@ import autoTable from "jspdf-autotable";
 const EXPENSE_HEADS = ["Utilities", "Staff", "Kitchen Supplies", "Decoration", "Marketing", "Maintenance", "Transport", "Miscellaneous"];
 const PAYMENT_MODES = ["Cash", "Bank Transfer", "Cheque", "Online Transfer"];
 
+const numberToWords = (num: number): string => {
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  
+  if (num === 0) return "Zero";
+  
+  const convert = (n: number): string => {
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? " " + ones[n % 10] : "");
+    if (n < 1000) return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 !== 0 ? " and " + convert(n % 100) : "");
+    if (n < 100000) return convert(Math.floor(n / 1000)) + " Thousand" + (n % 1000 !== 0 ? " " + convert(n % 1000) : "");
+    if (n < 10000000) return convert(Math.floor(n / 100000)) + " Lakh" + (n % 100000 !== 0 ? " " + convert(n % 100000) : "");
+    return n.toString();
+  };
+  
+  return convert(Math.floor(num)) + " Rupees Only";
+};
+
 interface Expense {
   id: string;
   voucher_no?: string | null;
@@ -199,36 +217,185 @@ const Expenses = () => {
       toast.error("Only approved expenses can have vouchers");
       return;
     }
+    
     const doc = new jsPDF();
-    doc.setFontSize(22);
-    doc.text("EXPENSE VOUCHER", 105, 20, { align: "center" });
+    const companyGreen = "#2D6A4F";
+    const darkNavy = "#0f172a";
     
+    // --- HEADER: Green diagonal bar at top left ---
+    doc.setFillColor(companyGreen);
+    doc.triangle(0, 0, 60, 0, 0, 25, 'F');
+    
+    // Header Info
+    doc.setTextColor(darkNavy);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.text("Octonus Solutions", 15, 20);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("A Spectacular Turn of Events", 15, 26);
+    
+    doc.setFontSize(8);
+    doc.text("Office No. 2, Crown Centre, Gulshan-e-Iqbal, Karachi", 15, 32);
+    doc.text("Phone: +92-331-3195292 | Email: octonussolutions@gmail.com", 15, 36);
+    
+    // Logo placeholder circle top right
+    doc.setDrawColor(companyGreen);
+    doc.setLineWidth(0.5);
+    doc.circle(180, 20, 12, 'S');
+    doc.setFontSize(6);
+    doc.text("OCTONUS", 174, 20);
+    doc.text("LOGO", 176, 23);
+    
+    // Thin green line separator
+    doc.setDrawColor(companyGreen);
+    doc.setLineWidth(0.2);
+    doc.line(15, 42, 195, 42);
+    
+    // --- VOUCHER TITLE SECTION ---
+    doc.setFillColor(darkNavy);
+    doc.rect(15, 48, 180, 10, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("EXPENSE VOUCHER", 105, 55, { align: "center" });
+    
+    doc.setTextColor(darkNavy);
+    doc.setFontSize(10);
+    doc.text(`Voucher No: EXP-2026-${expense.id.slice(0, 4).toUpperCase()}`, 195, 65, { align: "right" });
+    
+    doc.line(15, 68, 195, 68);
+    
+    // --- TWO COLUMN DETAILS SECTION ---
+    const startY = 75;
+    doc.setFont("helvetica", "bold");
+    doc.text("Date:", 15, startY);
+    doc.text("Category:", 15, startY + 7);
+    doc.text("Payment Mode:", 15, startY + 14);
+    doc.text("Linked Event:", 15, startY + 21);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(expense.date ? format(new Date(expense.date), "do MMMM yyyy") : "N/A", 50, startY);
+    doc.text(expense.category, 50, startY + 7);
+    doc.text(expense.payment_mode, 50, startY + 14);
+    doc.text(expense.linked_event || "N/A", 50, startY + 21);
+    
+    // Right column
+    doc.setFont("helvetica", "bold");
+    doc.text("Created By:", 110, startY);
+    doc.text("Designation:", 110, startY + 7);
+    doc.text("Created At:", 110, startY + 14);
+    doc.text("Status:", 110, startY + 21);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(expense.created_by_name || expense.created_by || "System", 145, startY);
+    doc.text(expense.created_by_role || "User", 145, startY + 7);
+    doc.text(expense.created_at ? format(new Date(expense.created_at), "PPp") : "N/A", 145, startY + 14);
+    
+    // Status Badge
+    doc.setFillColor(45, 106, 79); // company green
+    doc.roundedRect(145, startY + 17, 30, 6, 1, 1, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.text("APPROVED", 160, startY + 21.5, { align: "center" });
+    
+    // --- DESCRIPTION BOX ---
+    const descY = 105;
+    doc.setTextColor(darkNavy);
+    doc.setDrawColor(200);
+    doc.rect(15, descY, 180, 25);
+    doc.setFillColor(245, 245, 245);
+    doc.rect(15, descY, 180, 7, 'F');
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("DESCRIPTION", 20, descY + 5);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const splitDesc = doc.splitTextToSize(expense.description, 170);
+    doc.text(splitDesc, 20, descY + 13);
+    
+    // --- AMOUNT SECTION ---
+    const amountY = 140;
+    doc.setDrawColor(companyGreen);
+    doc.rect(110, amountY, 85, 20);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(darkNavy);
+    doc.text("Amount:", 115, amountY + 8);
+    doc.setTextColor(220, 38, 38); // Bold red
+    doc.setFontSize(14);
+    doc.text(`Rs. ${expense.amount.toLocaleString()}/-`, 140, amountY + 8);
+    
+    doc.setFontSize(9);
+    doc.setTextColor(darkNavy);
+    doc.text("In Words:", 115, amountY + 15);
+    doc.setFont("helvetica", "italic");
+    const words = numberToWords(expense.amount);
+    const splitWords = doc.splitTextToSize(words, 60);
+    doc.text(splitWords, 135, amountY + 15);
+    
+    // --- APPROVAL SECTION ---
+    const appY = 170;
+    doc.setDrawColor(companyGreen);
+    doc.setLineWidth(0.5);
+    doc.rect(15, appY, 180, 20);
+    doc.setTextColor(companyGreen);
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text(`Voucher ID: ${expense.id.slice(0, 8)}`, 20, 40);
-    doc.text(`Date: ${expense.date}`, 20, 50);
+    doc.text("APPROVED", 25, appY + 12);
     
-    doc.line(20, 55, 190, 55);
+    doc.setFontSize(9);
+    doc.setTextColor(darkNavy);
+    doc.text(`Approved By: ${expense.approved_by || "Administrator"}`, 70, appY + 8);
+    doc.text(`Approval Date: ${expense.approved_at ? format(new Date(expense.approved_at), "do MMM yyyy") : "N/A"}`, 70, appY + 14);
+    doc.text(`Approval Time: ${expense.approved_at ? format(new Date(expense.approved_at), "hh:mm a") : "N/A"}`, 140, appY + 14);
     
-    doc.text("Description:", 20, 70);
-    doc.text(expense.description, 60, 70);
+    // --- SIGNATURE SECTION ---
+    const sigY = 205;
+    // Prepared By
+    doc.setDrawColor(200);
+    doc.setLineWidth(0.2);
+    doc.rect(15, sigY, 85, 45);
+    doc.line(20, sigY + 10, 95, sigY + 10);
+    doc.setFont("helvetica", "bold");
+    doc.text("PREPARED BY", 57.5, sigY + 15, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.text(`Name: ${expense.created_by_name || "________________"}`, 20, sigY + 25);
+    doc.text(`Designation: ${expense.created_by_role || "________________"}`, 20, sigY + 30);
+    doc.text("Sign: ________________", 20, sigY + 35);
+    doc.text(`Date: ${expense.date ? format(new Date(expense.date), "dd/MM/yyyy") : "________________"}`, 20, sigY + 40);
     
-    doc.text("Category:", 20, 80);
-    doc.text(expense.category, 60, 80);
+    // Authorized By
+    doc.rect(110, sigY, 85, 45);
+    doc.line(115, sigY + 10, 190, sigY + 10);
+    doc.setFont("helvetica", "bold");
+    doc.text("AUTHORIZED BY", 152.5, sigY + 15, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.text(`Name: ${expense.approved_by || "________________"}`, 115, sigY + 25);
+    doc.text("Designation: Administrator", 115, sigY + 30);
+    doc.text("Sign: ________________", 115, sigY + 35);
+    doc.text(`Date: ${expense.approved_at ? format(new Date(expense.approved_at), "dd/MM/yyyy") : "________________"}`, 115, sigY + 40);
     
-    doc.text("Amount:", 20, 90);
-    doc.text(`Rs. ${expense.amount.toLocaleString()}`, 60, 90);
+    // --- FOOTER ---
+    doc.setFillColor(companyGreen);
+    doc.rect(0, 275, 210, 22, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
     
-    doc.text("Payment Mode:", 20, 100);
-    doc.text(expense.payment_mode, 60, 100);
+    // Column 1: Address
+    doc.text("Office No. 2, Crown Centre,", 15, 282);
+    doc.text("Gulshan-e-Iqbal, Karachi", 15, 286);
     
-    doc.line(20, 110, 190, 110);
+    // Column 2: Email/Web
+    doc.text("octonussolutions@gmail.com", 105, 282, { align: "center" });
+    doc.text("www.octonussolutions.com.pk", 105, 286, { align: "center" });
     
-    doc.text("Approved By:", 20, 130);
-    doc.text(expense.approved_by || "Admin", 60, 130);
-    doc.text("Signature:", 140, 130);
-    doc.line(140, 135, 180, 135);
+    // Column 3: Phone
+    doc.text("+92 331 3195292", 195, 282, { align: "right" });
+    doc.text("021 34 977 797", 195, 286, { align: "right" });
     
-    doc.save(`Voucher_${expense.id.slice(0, 8)}.pdf`);
+    doc.save(`Voucher_EXP_${expense.id.slice(0, 4).toUpperCase()}.pdf`);
   };
 
   // Filtered expenses for entries tab
