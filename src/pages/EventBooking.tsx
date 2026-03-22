@@ -397,7 +397,8 @@ const EventBooking = () => {
       const { data, error } = await supabase
         .from('bookings')
         .select('id, client_name, client_phone, event_type, event_date, venue, pax, total_amount, advance_paid, balance_due, status, created_at')
-        .order('event_date', { ascending: true });
+        .order('event_date', { ascending: true })
+        .limit(50);
 
       if (error) throw error;
       if (data) {
@@ -407,23 +408,22 @@ const EventBooking = () => {
           phone: b.client_phone,
           eventType: b.event_type,
           eventDate: b.event_date,
-          bookingDate: b.created_at, // Use created_at as fallback for bookingDate
+          bookingDate: b.created_at, 
           venue: b.venue,
           guests: b.pax,
           totalAmount: b.total_amount,
           advance: b.advance_paid,
           balanceRemaining: b.balance_due,
           status: b.status,
-          paymentMethod: "N/A", // Not in requested columns
-          menu: "N/A", // Not in requested columns
-          notes: "", // Not in requested columns
-          thirdParty: false, // Not in requested columns
-          supplierCost: 0, // Not in requested columns
-          sellingRate: 0 // Not in requested columns
+          paymentMethod: "N/A", 
+          menu: "N/A", 
+          notes: "", 
+          thirdParty: false, 
+          supplierCost: 0, 
+          sellingRate: 0 
         })));
       }
     } catch (err: any) {
-      console.error("Fetch bookings error:", err);
       toast.error("Failed to fetch bookings");
     } finally {
       setLoading(false);
@@ -529,10 +529,13 @@ const EventBooking = () => {
     window.print();
   };
 
+  const [dateFilter, setDateFilter] = useState("");
+
   const filtered = (bookings ?? []).filter(b => {
     const ms = (b?.clientName ?? "").toLowerCase().includes((search ?? "").toLowerCase()) || (b?.eventType ?? "").toLowerCase().includes((search ?? "").toLowerCase());
-    const mf = statusFilter==="all" || b?.status===statusFilter;
-    return ms && mf;
+    const mf = statusFilter === "all" || b?.status === statusFilter;
+    const md = !dateFilter || (b?.eventDate && b.eventDate === dateFilter);
+    return ms && mf && md;
   });
 
   const totalPages = Math.ceil((filtered ?? []).length / itemsPerPage);
@@ -612,8 +615,14 @@ const EventBooking = () => {
               />
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto">
+              <Input 
+                type="date" 
+                className="w-full sm:w-44 h-12 rounded-xl border-slate-200 bg-white font-bold shadow-sm" 
+                value={dateFilter}
+                onChange={e => { setDateFilter(e.target.value); setCurrentPage(1); }}
+              />
               <Select value={statusFilter} onValueChange={s => { setStatusFilter(s); setCurrentPage(1); }}>
-                <SelectTrigger className="w-full sm:w-56 h-12 rounded-xl border-slate-200 bg-white font-black text-[11px] uppercase tracking-widest shadow-sm">
+                <SelectTrigger className="w-full sm:w-44 h-12 rounded-xl border-slate-200 bg-white font-black text-[11px] uppercase tracking-widest shadow-sm">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-slate-100 shadow-2xl p-2">
@@ -624,9 +633,15 @@ const EventBooking = () => {
                   <SelectItem value="cancelled" className="rounded-lg font-bold text-rose-600">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" className="h-12 rounded-xl border-slate-200 font-black px-6 gap-2 hover:bg-slate-50 transition-all shadow-sm">
-                <Filter className="h-4 w-4 text-slate-500" /> FILTER
-              </Button>
+              {(search || statusFilter !== "all" || dateFilter) && (
+                <Button 
+                  variant="ghost" 
+                  onClick={() => { setSearch(""); setStatusFilter("all"); setDateFilter(""); setCurrentPage(1); }}
+                  className="h-12 rounded-xl text-rose-500 font-black px-4 hover:bg-rose-50 transition-all"
+                >
+                  RESET
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1290,7 +1305,7 @@ const EventBooking = () => {
         </DialogContent>
       </Dialog>
 
-      {/* SUPPLIER PAYMENT MODAL */}
+      {/* DISBURSE PAYMENT MODAL */}
       <Dialog open={showSupplierPaymentModal} onOpenChange={setShowSupplierPaymentModal}>
         <DialogContent className="max-w-md rounded-3xl border-none shadow-2xl">
           <DialogHeader><DialogTitle className="text-2xl font-black tracking-tight">Vendor Settlement</DialogTitle><DialogDescription className="font-medium">Record a financial disbursement to {selectedSupplier?.name}.</DialogDescription></DialogHeader>
@@ -1301,6 +1316,79 @@ const EventBooking = () => {
             <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest ml-1">Internal Reference / Notes</Label><Input className="h-12 rounded-xl font-bold" placeholder="Reference invoice or check number..." value={supplierPaymentForm.notes} onChange={e => setSupplierPaymentForm({ ...supplierPaymentForm, notes: e.target.value })} /></div>
           </div>
           <DialogFooter className="gap-3"><Button variant="ghost" className="rounded-xl font-black uppercase tracking-widest text-[11px]" onClick={() => setShowSupplierPaymentModal(false)}>Cancel</Button><Button className="h-12 px-8 rounded-xl bg-primary text-white font-black shadow-xl shadow-primary/20 uppercase tracking-widest text-[11px]" onClick={handleSupplierPayment} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Finalize Disbursal</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ONBOARD NEW VENDOR MODAL */}
+      <Dialog open={showAddSupplierModal} onOpenChange={setShowAddSupplierModal}>
+        <DialogContent className="max-w-md rounded-3xl border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black tracking-tight">Onboard New Vendor</DialogTitle>
+            <DialogDescription className="font-medium">Add a new supplier to the system.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Vendor Name *</Label>
+              <Input 
+                className="h-12 rounded-xl font-bold" 
+                placeholder="e.g. Al-Madina Catering" 
+                value={supplierForm.name} 
+                onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Contact Number</Label>
+              <Input 
+                className="h-12 rounded-xl font-bold" 
+                placeholder="0300-1234567" 
+                value={supplierForm.contact} 
+                onChange={e => setSupplierForm({ ...supplierForm, contact: e.target.value })} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Email Address</Label>
+              <Input 
+                type="email"
+                className="h-12 rounded-xl font-bold" 
+                placeholder="vendor@example.com" 
+                value={supplierForm.email} 
+                onChange={e => setSupplierForm({ ...supplierForm, email: e.target.value })} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Service Category</Label>
+              <Select value={supplierForm.category} onValueChange={v => setSupplierForm({ ...supplierForm, category: v })}>
+                <SelectTrigger className="h-12 rounded-xl font-bold">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {["Food", "Decor", "Photography", "Lighting", "Sound", "Printing", "Other"].map(c => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Opening Balance (₨)</Label>
+              <Input 
+                type="number" 
+                className="h-12 rounded-xl font-bold" 
+                value={supplierForm.opening_balance} 
+                onChange={e => setSupplierForm({ ...supplierForm, opening_balance: Number(e.target.value) })} 
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-3">
+            <Button variant="ghost" className="rounded-xl font-black uppercase tracking-widest text-[11px]" onClick={() => setShowAddSupplierModal(false)}>Cancel</Button>
+            <Button 
+              className="h-12 px-8 rounded-xl bg-primary text-white font-black shadow-xl shadow-primary/20 uppercase tracking-widest text-[11px]" 
+              onClick={handleAddSupplier} 
+              disabled={isSaving}
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} 
+              Onboard Vendor
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -104,12 +104,27 @@ const Finance = () => {
   const [showPayVendor, setShowPayVendor] = useState(false);
   const [vendorPayForm, setVendorPayForm] = useState({ amount: "", method: "Cash", date: format(new Date(), "yyyy-MM-dd"), notes: "" });
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefreshVendors = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchVendors();
+      toast({ title: "Success", description: "Vendor ledger updated" });
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to refresh vendors", variant: "destructive" });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const fetchFinanceData = async () => {
     try {
       const { data, error } = await supabase
         .from('ledger_entries')
-        .select('*')
-        .order('date', { ascending: true });
+        .select('id, date, description, account, type, amount')
+        .order('date', { ascending: true })
+        .limit(100);
 
       if (error) throw error;
       
@@ -129,15 +144,17 @@ const Finance = () => {
       });
       setLedger(ledgerData);
     } catch (err: any) {
-      console.error("Finance ledger fetch error:", err);
       toast({ title: "Error", description: "Failed to fetch ledger entries", variant: "destructive" });
-      setLedger([]); // Set to empty on error for safety
+      setLedger([]); 
     }
   };
 
   const fetchVendors = async () => {
     try {
-      const { data: vData } = await supabase.from('suppliers').select('*');
+      const { data: vData } = await supabase
+        .from('suppliers')
+        .select('id, name, contact_number, service_type, opening_balance, current_balance')
+        .limit(50);
       if (vData) {
         setVendors((vData ?? []).map((v: any) => ({
           id: v?.id ?? "",
@@ -150,7 +167,11 @@ const Finance = () => {
         })));
       }
       
-      const { data: pData } = await supabase.from('supplier_payments').select('*').order('date', { ascending: false });
+      const { data: pData } = await supabase
+        .from('supplier_payments')
+        .select('id, supplier_id, date, amount, method, notes')
+        .order('date', { ascending: false })
+        .limit(100);
       if (pData) {
         setVendorPayments((pData ?? []).map((p: any) => ({
           id: p?.id ?? "",
@@ -594,7 +615,15 @@ const Finance = () => {
                 <h3 className="text-sm font-semibold text-card-foreground">Vendor Ledger</h3>
                 <p className="text-xs text-muted-foreground mt-1">Full transaction history and payment tracking</p>
               </div>
-              <Button size="sm" variant="outline" onClick={fetchVendors}><History className="h-4 w-4 mr-1"/> Refresh</Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={handleRefreshVendors}
+                disabled={isRefreshing}
+              >
+                {isRefreshing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <History className="h-4 w-4 mr-1"/>}
+                Refresh
+              </Button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[800px]">

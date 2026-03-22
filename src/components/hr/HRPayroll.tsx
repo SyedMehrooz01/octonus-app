@@ -1,5 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Download, FileText } from "lucide-react";
 import { format } from "date-fns";
 import React, { memo } from "react";
@@ -9,7 +12,11 @@ interface HRPayrollProps {
   handleExportPayroll: () => void;
   staff: any[];
   prefillPayrollForm: (staff: any) => void;
+  showPayrollModal: boolean;
   setShowPayrollModal: (show: boolean) => void;
+  payrollForm: any;
+  setPayrollForm: (form: any) => void;
+  handleMarkAsPaid: () => void;
   handleGeneratePayslip: (staff: any, payroll: any) => void;
   statusColor: (status: string) => string;
 }
@@ -19,7 +26,11 @@ const HRPayroll = memo(({
   handleExportPayroll,
   staff,
   prefillPayrollForm,
+  showPayrollModal,
   setShowPayrollModal,
+  payrollForm,
+  setPayrollForm,
+  handleMarkAsPaid,
   handleGeneratePayslip,
   statusColor
 }: HRPayrollProps) => {
@@ -115,6 +126,81 @@ const HRPayroll = memo(({
           </table>
         </div>
       </div>
+      {/* Payroll Modal */}
+      <Dialog open={showPayrollModal} onOpenChange={setShowPayrollModal}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Process Payroll - {payrollForm.month}</DialogTitle></DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Earnings & Allowances</p>
+                <div className="space-y-2">
+                  <Label className="text-xs">Basic Salary: ₨ {(payrollForm.basicSalary || 0).toLocaleString()}</Label>
+                  <div className="space-y-1.5">
+                    <Label>House Rent Allowance</Label>
+                    <Input type="number" value={payrollForm.allowances.houseRent} onChange={e => setPayrollForm({ ...payrollForm, allowances: { ...payrollForm.allowances, houseRent: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Medical Allowance</Label>
+                    <Input type="number" value={payrollForm.allowances.medical} onChange={e => setPayrollForm({ ...payrollForm, allowances: { ...payrollForm.allowances, medical: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Conveyance Allowance</Label>
+                    <Input type="number" value={payrollForm.allowances.conveyance} onChange={e => setPayrollForm({ ...payrollForm, allowances: { ...payrollForm.allowances, conveyance: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Special Allowance</Label>
+                    <Input type="number" value={payrollForm.allowances.special} onChange={e => setPayrollForm({ ...payrollForm, allowances: { ...payrollForm.allowances, special: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Overtime Pay</Label>
+                    <Input type="number" value={payrollForm.overtime.pay} onChange={e => setPayrollForm({ ...payrollForm, overtime: { ...payrollForm.overtime, pay: Number(e.target.value) } })} />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <p className="text-xs font-bold uppercase tracking-widest text-destructive">Deductions</p>
+                <div className="space-y-2">
+                  <div className="space-y-1.5">
+                    <Label>Income Tax</Label>
+                    <Input type="number" value={payrollForm.deductions.tax} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, tax: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>EOBI (1%)</Label>
+                    <Input type="number" value={payrollForm.deductions.eobi} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, eobi: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>PESSI/SESSI</Label>
+                    <Input type="number" value={payrollForm.deductions.pessi} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, pessi: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Loan/Advance</Label>
+                    <Input type="number" value={payrollForm.deductions.loans} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, loans: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Late Arrival Deduction</Label>
+                    <Input type="number" value={payrollForm.deductions.late} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, late: Number(e.target.value) } })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Absence Deduction</Label>
+                    <Input type="number" value={payrollForm.deductions.absences} onChange={e => setPayrollForm({ ...payrollForm, deductions: { ...payrollForm.deductions, absences: Number(e.target.value) } })} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-muted rounded-lg flex justify-between items-center">
+              <span className="font-bold">Net Payable:</span>
+              <span className="text-xl font-bold text-success">
+                ₨ {((payrollForm.basicSalary || 0) + (payrollForm.allowances.houseRent || 0) + (payrollForm.allowances.medical || 0) + (payrollForm.allowances.conveyance || 0) + (payrollForm.allowances.special || 0) + (payrollForm.overtime.pay || 0) - (payrollForm.deductions.tax || 0) - (payrollForm.deductions.eobi || 0) - (payrollForm.deductions.pessi || 0) - (payrollForm.deductions.loans || 0) - (payrollForm.deductions.late || 0) - (payrollForm.deductions.absences || 0)).toLocaleString()}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPayrollModal(false)}>Cancel</Button>
+            <Button className="bg-success hover:bg-success/90" onClick={handleMarkAsPaid}>Mark as Paid</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });

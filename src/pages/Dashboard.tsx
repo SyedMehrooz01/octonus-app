@@ -46,6 +46,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import SkeletonLoading from "@/components/SkeletonLoading";
+
 const Dashboard = () => {
   const { canDo, hasAccess, logAction } = useAuth();
   const navigate = useNavigate();
@@ -95,70 +97,34 @@ const Dashboard = () => {
         const prevMonthStart = startOfMonth(subMonths(new Date(), 1)).toISOString();
         const prevMonthEnd = endOfMonth(subMonths(new Date(), 1)).toISOString();
 
-        // 1. Fetch Total Events
-        const { count: totalEvents } = await supabase
-          .from('bookings')
-          .select('*', { count: 'exact', head: true })
-          .neq('status', 'cancelled');
+        const [
+          { count: totalEvents },
+          { count: upcomingCount },
+          { data: balanceData },
+          { data: inventoryData },
+          { count: staffCount },
+          { count: attendanceCount },
+          { data: monthlyPayments },
+          { data: monthlyExpensesData }
+        ] = await Promise.all([
+          supabase.from('bookings').select('id', { count: 'exact', head: true }).neq('status', 'cancelled'),
+          supabase.from('bookings').select('id', { count: 'exact', head: true }).gte('event_date', todayStr).neq('status', 'cancelled'),
+          supabase.from('bookings').select('balance_due').neq('status', 'cancelled').gt('balance_due', 0),
+          supabase.from('inventory_items').select('id, stock, min_stock'),
+          supabase.from('staff').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', todayStr),
+          supabase.from('ledger_entries').select('amount').eq('type', 'debit').gte('date', monthStart).lte('date', monthEnd),
+          supabase.from('expenses').select('amount').eq('status', 'approved').gte('date', monthStart).lte('date', monthEnd)
+        ]);
+
         setTotalEventsCount(totalEvents || 0);
-
-        // 2. Fetch Upcoming Events Count
-        const { count: upcomingCount } = await supabase
-          .from('bookings')
-          .select('*', { count: 'exact', head: true })
-          .gte('event_date', todayStr)
-          .neq('status', 'cancelled');
         setUpcomingEventsCount(upcomingCount || 0);
-
-        // 3. Fetch Payments Due (Balance Remaining)
-        const { data: balanceData } = await supabase
-          .from('bookings')
-          .select('balance_due')
-          .neq('status', 'cancelled')
-          .gt('balance_due', 0);
-        const totalDue = (balanceData ?? []).reduce((sum, e) => sum + (e?.balance_due ?? 0), 0);
-        setPaymentsDue(totalDue);
-
-        // 4. Fetch Low Inventory Alerts
-        const { data: inventoryData } = await supabase
-          .from('inventory_items')
-          .select('id, stock, min_stock');
-        const lowStock = (inventoryData ?? []).filter(i => (i?.stock ?? 0) <= (i?.min_stock ?? 0)).length;
-        setLowInventoryCount(lowStock);
-
-        // 5. Fetch Active Staff Count
-        const { count: staffCount } = await supabase
-          .from('staff')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'active');
+        setPaymentsDue((balanceData ?? []).reduce((sum, e) => sum + (e?.balance_due ?? 0), 0));
+        setLowInventoryCount((inventoryData ?? []).filter(i => (i?.stock ?? 0) <= (i?.min_stock ?? 0)).length);
         setActiveStaffCount(staffCount ?? 0);
-
-        // 6. Check if attendance marked for today
-        const { count: attendanceCount } = await supabase
-          .from('attendance')
-          .select('*', { count: 'exact', head: true })
-          .eq('date', todayStr);
         setAttendanceMissing(!attendanceCount || attendanceCount === 0);
-
-        // 7. Fetch Month Revenue (from ledger_entries type='debit')
-        const { data: monthlyPayments } = await supabase
-          .from('ledger_entries')
-          .select('amount')
-          .eq('type', 'debit')
-          .gte('date', monthStart)
-          .lte('date', monthEnd);
-        const totalRevenue = (monthlyPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
-        setThisMonthRevenue(totalRevenue);
-
-        // 7.1 Fetch Month Expenses (from expenses table)
-        const { data: monthlyExpensesData } = await supabase
-          .from('expenses')
-          .select('amount')
-          .eq('status', 'approved')
-          .gte('date', monthStart)
-          .lte('date', monthEnd);
-        const totalExpenses = (monthlyExpensesData ?? []).reduce((sum, e) => sum + (e?.amount ?? 0), 0);
-        setThisMonthExpenses(totalExpenses);
+        setThisMonthRevenue((monthlyPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0));
+        setThisMonthExpenses((monthlyExpensesData ?? []).reduce((sum, e) => sum + (e?.amount ?? 0), 0));
 
         // 7.2 Calculate Revenue Growth
         const { data: prevMonthPayments } = await supabase
@@ -318,6 +284,19 @@ const Dashboard = () => {
   };
 
   const eventTypes = ["Wedding", "Corporate", "Birthday", "Seminar", "Concert", "Other"];
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-20 w-full bg-white rounded-3xl animate-pulse" />
+        <SkeletonLoading type="stats" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-[400px] bg-white rounded-3xl animate-pulse" />
+          <div className="h-[400px] bg-white rounded-3xl animate-pulse" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-10">

@@ -20,6 +20,8 @@ const FileManager = lazy(() => import("@/pages/FileManager"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
+import ErrorBoundary from "./components/ErrorBoundary";
+
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children, page }: { children: React.ReactNode; page: string }) => {
@@ -61,21 +63,21 @@ const AppRoutes = () => {
       </div>
     }>
       <Routes>
-        <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
-        <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <Signup />} />
+        <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <ErrorBoundary><Login /></ErrorBoundary>} />
+        <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <ErrorBoundary><Signup /></ErrorBoundary>} />
         <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
         <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<ProtectedRoute page="dashboard"><Dashboard /></ProtectedRoute>} />
-          <Route path="/hr" element={<ProtectedRoute page="hr"><HRStaff /></ProtectedRoute>} />
-          <Route path="/events" element={<ProtectedRoute page="events"><EventBooking /></ProtectedRoute>} />
-          <Route path="/finance" element={<ProtectedRoute page="finance"><Finance /></ProtectedRoute>} />
-          <Route path="/inventory" element={<ProtectedRoute page="inventory"><Inventory /></ProtectedRoute>} />
-          <Route path="/expenses" element={<ProtectedRoute page="expenses"><Expenses /></ProtectedRoute>} />
-          <Route path="/documents" element={<ProtectedRoute page="documents"><Documents /></ProtectedRoute>} />
-          <Route path="/files" element={<ProtectedRoute page="files"><FileManager /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute page="settings"><SettingsPage /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute page="dashboard"><ErrorBoundary><Dashboard /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/hr" element={<ProtectedRoute page="hr"><ErrorBoundary><HRStaff /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/events" element={<ProtectedRoute page="events"><ErrorBoundary><EventBooking /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/finance" element={<ProtectedRoute page="finance"><ErrorBoundary><Finance /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/inventory" element={<ProtectedRoute page="inventory"><ErrorBoundary><Inventory /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/expenses" element={<ProtectedRoute page="expenses"><ErrorBoundary><Expenses /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/documents" element={<ProtectedRoute page="documents"><ErrorBoundary><Documents /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/files" element={<ProtectedRoute page="files"><ErrorBoundary><FileManager /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute page="settings"><ErrorBoundary><SettingsPage /></ErrorBoundary></ProtectedRoute>} />
         </Route>
-        <Route path="*" element={<NotFound />} />
+        <Route path="*" element={<ErrorBoundary><NotFound /></ErrorBoundary>} />
       </Routes>
     </Suspense>
   );

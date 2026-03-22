@@ -224,7 +224,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const resetTimer = () => {
       if (timeoutId) clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        console.log("Session timeout due to inactivity");
         logout();
         toast.error("Session expired due to inactivity. Please login again.");
       }, TIMEOUT_MS);

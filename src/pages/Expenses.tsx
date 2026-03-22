@@ -95,19 +95,17 @@ const Expenses = () => {
     try {
       const { data, error } = await supabase 
         .from('expenses') 
-        .select('*') 
-        .order('created_at', { ascending: false }); 
+        .select('id, voucher_no, date, description, category, payment_mode, amount, linked_event, status, approved_by, approved_at, created_at, rejection_reason') 
+        .order('created_at', { ascending: false })
+        .limit(100); 
       
       if (error) { 
-        console.error('Expenses error:', error); 
         toast.error('Failed to load expenses: ' + error.message); 
         setExpenses([]);
       } else { 
-        console.log('Fetched all expenses:', data);
         setExpenses(data || []); 
       } 
     } catch (error: any) {
-      console.error("Fetch expenses unexpected error:", error);
       setExpenses([]);
     } finally {
       setLoading(false);
@@ -212,7 +210,25 @@ const Expenses = () => {
     }
   };
 
-  const downloadVoucher = (expense: Expense) => {
+  const loadLogo = async (pdf: jsPDF, x: number, y: number, size: number) => {
+    return new Promise<boolean>((resolve) => {
+      const img = new Image();
+      img.src = "/logo.png";
+      img.onload = () => {
+        try {
+          pdf.addImage(img, 'PNG', x, y, size, size);
+          resolve(true);
+        } catch (e) {
+          resolve(false);
+        }
+      };
+      img.onerror = () => {
+        resolve(false);
+      };
+    });
+  };
+
+  const downloadVoucher = async (expense: Expense) => {
     if (expense.status !== 'approved') {
       toast.error("Only approved expenses can have vouchers");
       return;
@@ -240,13 +256,18 @@ const Expenses = () => {
     doc.text("Office No. 2, Crown Centre, Gulshan-e-Iqbal, Karachi", 15, 32);
     doc.text("Phone: +92-331-3195292 | Email: octonussolutions@gmail.com", 15, 36);
     
-    // Logo placeholder circle top right
-    doc.setDrawColor(companyGreen);
-    doc.setLineWidth(0.5);
-    doc.circle(180, 20, 12, 'S');
-    doc.setFontSize(6);
-    doc.text("OCTONUS", 174, 20);
-    doc.text("LOGO", 176, 23);
+    // Logo Handling - Top right placement
+    const logoLoaded = await loadLogo(doc, 165, 10, 30);
+    if (!logoLoaded) {
+      // Logo placeholder circle top right
+      doc.setDrawColor(companyGreen);
+      doc.setLineWidth(0.5);
+      doc.circle(180, 25, 15, 'S');
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.text("OCTONUS", 180, 24, { align: "center" });
+      doc.text("SOLUTIONS", 180, 28, { align: "center" });
+    }
     
     // Thin green line separator
     doc.setDrawColor(companyGreen);
@@ -420,7 +441,6 @@ const Expenses = () => {
       results = results.filter(e => (e?.date ?? "").startsWith(selectedMonth));
     }
     
-    console.log("Filtered results:", results.length, "out of", expenses?.length);
     return results;
   }, [expenses, search, filterHead, selectedMonth]);
 
@@ -436,7 +456,6 @@ const Expenses = () => {
       });
       return matchSearch && matchCategory && matchMode && matchDate;
     });
-    console.log("Ledger Filtered results from", fromDate, "to", toDate, ":", results);
     return results;
   }, [expenses, ledgerSearch, ledgerHead, ledgerMode, fromDate, toDate]);
 
@@ -547,29 +566,42 @@ const Expenses = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div className="h-20 w-full bg-white rounded-3xl animate-pulse" />
+        <SkeletonLoading type="stats" />
+        <div className="h-12 w-64 bg-slate-100 rounded-xl animate-pulse mb-8" />
+        <div className="bg-white rounded-3xl border border-slate-100 p-6">
+          <SkeletonLoading type="table" count={8} />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+    <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-hidden">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
-          <h1 className="text-4xl font-black text-[#0f172a] tracking-tight uppercase">Expense Management</h1>
+          <h1 className="text-3xl sm:text-4xl font-black text-[#0f172a] tracking-tight uppercase">Expense Management</h1>
           <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1">
             Total: {expenses?.length || 0} expenses found
           </p>
         </div>
-        <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right duration-500">
-          <div className="hidden sm:flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/60">
+        <div className="flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-right duration-500">
+          <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/60">
             {(["monthly", "yearly"] as const).map(v => (
               <button 
                 key={v} 
                 onClick={() => setPlViewType(v)} 
-                className={`px-6 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-[0.2em] ${viewType === v ? "bg-white text-blue-600 shadow-lg" : "text-slate-400 hover:text-slate-600"}`}
+                className={`px-4 sm:px-6 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-[0.2em] ${viewType === v ? "bg-white text-blue-600 shadow-lg" : "text-slate-400 hover:text-slate-600"}`}
               >
                 {v}
               </button>
             ))}
           </div>
           {canDo("add") && (
-            <Button onClick={() => setShowAddModal(true)} className="bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl shadow-lg shadow-rose-500/20 h-12 px-8 gap-2 transition-all hover:-translate-y-0.5">
+            <Button onClick={() => setShowAddModal(true)} className="bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl shadow-lg shadow-rose-500/20 h-12 px-6 sm:px-8 gap-2 transition-all hover:-translate-y-0.5">
               <Plus className="h-5 w-5" /> ADD EXPENSE
             </Button>
           )}
@@ -634,16 +666,16 @@ const Expenses = () => {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
+              <table className="w-full min-w-[900px] table-fixed">
                 <thead>
                   <tr className="bg-slate-50/80 text-left border-b border-slate-100">
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Description</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Category</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Payment Mode</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Amount</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
+                    <th className="w-[12%] px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
+                    <th className="w-[28%] px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Description</th>
+                    <th className="w-[15%] px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Category</th>
+                    <th className="w-[15%] px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Mode</th>
+                    <th className="w-[12%] px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                    <th className="w-[13%] px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Amount</th>
+                    <th className="w-[5%] px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -663,37 +695,37 @@ const Expenses = () => {
                   ) : (filtered ?? []).map((e, idx) => (
                     <tr key={e?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-rose-50/40 transition-all duration-200 group`}>
                       <td className="px-6 py-6 text-sm font-black text-slate-500 whitespace-nowrap tracking-tight">{e?.date ? format(new Date(e.date), 'MMM d, yyyy') : "N/A"}</td>
-                      <td className="px-6 py-6">
-                        <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-rose-600 transition-colors">{e?.description}</p>
-                        {e?.linked_event && <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter mt-2 flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-blue-300" /> Event: {e?.linked_event}</p>}
+                      <td className="px-6 py-6 truncate">
+                        <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-rose-600 transition-colors truncate" title={e?.description}>{e?.description}</p>
+                        {e?.linked_event && <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter mt-2 flex items-center gap-1.5 truncate"><span className="h-1 w-1 rounded-full bg-blue-300 flex-shrink-0" /> Event: {e?.linked_event}</p>}
                       </td>
                       <td className="px-6 py-6">
-                        <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm">
+                        <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm truncate">
                           {e?.category}
                         </Badge>
                       </td>
                       <td className="px-6 py-6">
-                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${e?.payment_mode === "Cash" ? "bg-amber-500 text-white" : "bg-blue-500 text-white"}`}>
+                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm truncate ${e?.payment_mode === "Cash" ? "bg-amber-500 text-white" : "bg-blue-500 text-white"}`}>
                           {e?.payment_mode}
                         </Badge>
                       </td>
                       <td className="px-6 py-6">
-                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${e?.status === 'approved' ? 'bg-emerald-500 text-white' : e?.status === 'rejected' ? 'bg-rose-500 text-white' : 'bg-slate-400 text-white'}`}>
+                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm truncate ${e?.status === 'approved' ? 'bg-emerald-500 text-white' : e?.status === 'rejected' ? 'bg-rose-500 text-white' : 'bg-slate-400 text-white'}`}>
                           {e?.status}
                         </Badge>
                       </td>
-                      <td className="px-6 py-6 text-sm font-black text-right text-rose-600 tracking-tight">₨ {(e?.amount ?? 0).toLocaleString()}</td>
+                      <td className="px-6 py-6 text-sm font-black text-right text-rose-600 tracking-tight whitespace-nowrap">₨ {(e?.amount ?? 0).toLocaleString()}</td>
                       <td className="px-6 py-6 text-right">
                         <div className="flex justify-end gap-2">
                           {e?.status === 'pending' && canDo('edit') && (
                             <>
-                              <Button size="sm" onClick={() => handleApprove(e.id)} className="h-8 bg-emerald-500 hover:bg-emerald-600 text-white">Approve</Button>
-                              <Button size="sm" variant="outline" onClick={() => setRejectionModal({ show: true, id: e.id, reason: "" })} className="h-8 text-rose-500 border-rose-200 hover:bg-rose-50">Reject</Button>
+                              <Button size="sm" onClick={() => handleApprove(e.id)} className="h-8 bg-emerald-500 hover:bg-emerald-600 text-white px-2">Approve</Button>
+                              <Button size="sm" variant="outline" onClick={() => setRejectionModal({ show: true, id: e.id, reason: "" })} className="h-8 text-rose-500 border-rose-200 hover:bg-rose-50 px-2">Reject</Button>
                             </>
                           )}
                           {e?.status === 'approved' && (
-                            <Button size="sm" variant="ghost" onClick={() => downloadVoucher(e)} className="h-8 text-blue-600">
-                              <Download className="h-4 w-4 mr-1"/> Voucher
+                            <Button size="sm" variant="ghost" onClick={() => downloadVoucher(e)} className="h-8 w-8 p-0 text-blue-600" title="Download Voucher">
+                              <Download className="h-4 w-4"/>
                             </Button>
                           )}
                         </div>
@@ -707,7 +739,7 @@ const Expenses = () => {
                       <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Monthly Aggregate Total</p>
                     </td>
                     <td className="px-6 py-10 text-right">
-                      <div className="inline-flex items-center justify-center bg-rose-500 text-white font-black text-xl px-8 py-4 rounded-2xl shadow-lg shadow-rose-500/10">
+                      <div className="inline-flex items-center justify-center bg-rose-500 text-white font-black text-xl px-8 py-4 rounded-2xl shadow-lg shadow-rose-500/10 whitespace-nowrap">
                         ₨ {(filtered ?? []).reduce((s, e) => s + (e?.amount ?? 0), 0).toLocaleString()}
                       </div>
                     </td>

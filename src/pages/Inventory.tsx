@@ -71,7 +71,10 @@ const Inventory = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: itemsData, error: itemsError } = await supabase.from('inventory_items').select('*');
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('inventory_items')
+        .select('id, name, category, unit, stock, min_stock, purchase_price, supplier, type')
+        .limit(100);
       if (itemsError) throw itemsError;
       setItems((itemsData ?? []).map(i => ({
         id: i?.id ?? "",
@@ -85,7 +88,11 @@ const Inventory = () => {
         type: i?.type ?? "consumable"
       })));
 
-      const { data: historyData, error: historyError } = await supabase.from('stock_movements').select('*').order('date', { ascending: false });
+      const { data: historyData, error: historyError } = await supabase
+        .from('stock_movements')
+        .select('id, date, item_id, item_name, type, category, qty, note, issued_to, returned_by, return_date')
+        .order('date', { ascending: false })
+        .limit(100);
       if (historyError) throw historyError;
       setHistory(historyData ?? []);
     } catch (err: any) {

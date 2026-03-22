@@ -1,13 +1,26 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { CheckCircle, Users, Clock, Download, Edit } from "lucide-react";
 import { format } from "date-fns";
 import React, { memo } from "react";
 
 interface HRAttendanceProps {
   canDo: (action: string) => boolean;
+  showAttendanceModal: boolean;
   setShowAttendanceModal: (show: boolean) => void;
+  attendanceForm: any;
+  setAttendanceForm: (form: any) => void;
+  staff: any[];
+  handleMarkAttendance: () => void;
+  showBulkAttendanceModal: boolean;
+  setShowBulkAttendanceModal: (show: boolean) => void;
+  bulkStatus: string;
+  setBulkStatus: (status: string) => void;
+  handleBulkAttendance: () => void;
   handleMarkAllPresent: () => void;
   handleAutoAbsent: () => void;
   handleExportAttendance: () => void;
@@ -20,7 +33,17 @@ interface HRAttendanceProps {
 
 const HRAttendance = memo(({
   canDo,
+  showAttendanceModal,
   setShowAttendanceModal,
+  attendanceForm,
+  setAttendanceForm,
+  staff,
+  handleMarkAttendance,
+  showBulkAttendanceModal,
+  setShowBulkAttendanceModal,
+  bulkStatus,
+  setBulkStatus,
+  handleBulkAttendance,
   handleMarkAllPresent,
   handleAutoAbsent,
   handleExportAttendance,
@@ -127,6 +150,68 @@ const HRAttendance = memo(({
           </table>
         </div>
       </div>
+
+      {/* Attendance Modal */}
+      <Dialog open={showAttendanceModal} onOpenChange={setShowAttendanceModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Mark Staff Attendance</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Select Employee</Label>
+              <Select onValueChange={v => setAttendanceForm({ ...attendanceForm, empId: v })}>
+                <SelectTrigger><SelectValue placeholder="Select Staff Member" /></SelectTrigger>
+                <SelectContent>
+                  {(staff ?? []).map(s => <SelectItem key={s?.id ?? Math.random()} value={s?.id ?? ""}>{s?.name ?? "Unknown"}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <Select value={attendanceForm.status} onValueChange={v => setAttendanceForm({ ...attendanceForm, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="present">Present</SelectItem>
+                    <SelectItem value="absent">Absent</SelectItem>
+                    <SelectItem value="late">Late</SelectItem>
+                    <SelectItem value="half-day">Half Day</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Date</Label>
+                <Input type="date" value={attendanceForm.date} onChange={e => setAttendanceForm({ ...attendanceForm, date: e.target.value })} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter><Button onClick={handleMarkAttendance} className="w-full">Save Attendance</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Attendance Modal */}
+      <Dialog open={showBulkAttendanceModal} onOpenChange={setShowBulkAttendanceModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bulk Mark Attendance</DialogTitle>
+            <DialogDescription>Mark all staff members with a single status for today.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <Label>Select Status</Label>
+              <Select value={bulkStatus} onValueChange={setBulkStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="present">Present</SelectItem>
+                  <SelectItem value="absent">Absent</SelectItem>
+                  <SelectItem value="late">Late</SelectItem>
+                  <SelectItem value="half-day">Half Day</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full h-12 font-bold" onClick={handleBulkAttendance}>Mark All as {bulkStatus.charAt(0).toUpperCase() + bulkStatus.slice(1)}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });

@@ -72,13 +72,13 @@ const FileManager = () => {
     try {
       const { data, error } = await supabase
         .from("file_manager")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("id, file_name, file_url, file_type, file_size, category, description, uploaded_by, created_at")
+        .order("created_at", { ascending: false })
+        .limit(100);
 
       if (error) throw error;
       setFiles(data || []);
     } catch (err: any) {
-      console.error("Fetch files error:", err);
       toast.error("Failed to fetch files");
     } finally {
       setFileLoading(false);
