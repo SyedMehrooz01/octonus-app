@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from "react";
-import { Landmark, TrendingUp, TrendingDown, Plus, Search, FileText, Download, Calendar, Users, History, Wallet, Save, Loader2 } from "lucide-react";
+import { Landmark, TrendingUp, TrendingDown, Plus, Search, FileText, Download, Calendar, Users, History, Wallet, Save, Loader2, RefreshCcw, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import SkeletonLoading from "@/components/SkeletonLoading";
 
 interface LedgerEntry {
   id: string | number;
@@ -119,12 +120,13 @@ const Finance = () => {
   };
 
   const fetchFinanceData = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('ledger_entries')
         .select('id, date, description, account, type, amount')
         .order('date', { ascending: true })
-        .limit(100);
+        .limit(50);
 
       if (error) throw error;
       
@@ -144,8 +146,9 @@ const Finance = () => {
       });
       setLedger(ledgerData);
     } catch (err: any) {
-      toast({ title: "Error", description: "Failed to fetch ledger entries", variant: "destructive" });
       setLedger([]); 
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -171,7 +174,7 @@ const Finance = () => {
         .from('supplier_payments')
         .select('id, supplier_id, date, amount, method, notes')
         .order('date', { ascending: false })
-        .limit(100);
+        .limit(50);
       if (pData) {
         setVendorPayments((pData ?? []).map((p: any) => ({
           id: p?.id ?? "",
@@ -183,15 +186,13 @@ const Finance = () => {
         })));
       }
     } catch (err) {
-      toast({ title: "Error", description: "Failed to fetch vendors", variant: "destructive" });
+      // Silent error
     }
   };
 
   useEffect(() => {
     const init = async () => {
-      setLoading(true);
       await Promise.all([fetchFinanceData(), fetchVendors()]);
-      setLoading(false);
     };
     init();
   }, []);
@@ -373,6 +374,21 @@ const Finance = () => {
     start: startOfYear(parseISO(`${selectedYear}-01-01`)),
     end: endOfYear(parseISO(`${selectedYear}-01-01`))
   });
+
+  if (loading) {
+    return (
+      <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+          <div className="h-12 w-64 bg-slate-100 rounded-xl animate-pulse" />
+          <div className="h-12 w-40 bg-slate-100 rounded-xl animate-pulse" />
+        </div>
+        <SkeletonLoading type="stats" />
+        <div className="bg-white rounded-3xl border border-slate-100 p-6">
+          <SkeletonLoading type="table" count={8} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-10 max-w-full overflow-hidden">

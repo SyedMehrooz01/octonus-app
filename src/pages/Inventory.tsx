@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from "react";
-import { Package, Plus, Search, AlertTriangle, ArrowUp, ArrowDown, RotateCcw, FileText, Download, Loader2, Wallet, Landmark, Eye } from "lucide-react";
+import { Package, Plus, Search, AlertTriangle, ArrowUp, ArrowDown, RotateCcw, FileText, Download, Loader2, Wallet, Landmark, Eye, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/contexts/AuthContext";
+import SkeletonLoading from "@/components/SkeletonLoading";
 
 interface InventoryItem {
   id: string | number;
@@ -74,7 +75,7 @@ const Inventory = () => {
       const { data: itemsData, error: itemsError } = await supabase
         .from('inventory_items')
         .select('id, name, category, unit, stock, min_stock, purchase_price, supplier, type')
-        .limit(100);
+        .limit(50);
       if (itemsError) throw itemsError;
       setItems((itemsData ?? []).map(i => ({
         id: i?.id ?? "",
@@ -92,11 +93,11 @@ const Inventory = () => {
         .from('stock_movements')
         .select('id, date, item_id, item_name, type, category, qty, note, issued_to, returned_by, return_date')
         .order('date', { ascending: false })
-        .limit(100);
+        .limit(50);
       if (historyError) throw historyError;
       setHistory(historyData ?? []);
     } catch (err: any) {
-      toast.error("Failed to load inventory data");
+      // Silent error
     } finally {
       setLoading(false);
     }
@@ -268,18 +269,47 @@ const Inventory = () => {
     saveAs(blob, `Stock_Movement_History_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
   };
 
-  return (
-    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-        <div className="animate-in fade-in slide-in-from-left duration-500">
-          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Inventory & Stock Control</h1>
-          <p className="text-slate-500 font-bold mt-1">Real-time tracking of assets, consumables, and procurement.</p>
+  if (loading) {
+    return (
+      <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div className="h-20 w-full bg-white rounded-3xl animate-pulse mb-8" />
+        <SkeletonLoading type="stats" />
+        <div className="h-12 w-64 bg-slate-100 rounded-xl animate-pulse mb-8" />
+        <div className="bg-white rounded-3xl border border-slate-100 p-6">
+          <SkeletonLoading type="table" count={8} />
         </div>
-        {canDo("add") && (
-          <Button onClick={() => setShowAddModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-600/20 h-12 px-8 gap-2 transition-all hover:-translate-y-0.5 animate-in fade-in slide-in-from-right duration-500">
-            <Plus className="h-5 w-5" /> ADD NEW ASSET
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Header Section */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <div>
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight uppercase">Inventory Management</h1>
+          <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1 flex items-center gap-2">
+            <Clock className="h-3 w-3" /> Real-time Stock Tracking
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={fetchData}
+            className="h-12 w-12 rounded-xl border-slate-200 hover:bg-slate-50 text-slate-500"
+          >
+            <RotateCcw className="h-5 w-5" />
           </Button>
-        )}
+          {canDo("add") && (
+            <Button 
+              onClick={() => setShowAddModal(true)} 
+              className="bg-primary hover:bg-primary/90 text-white font-black rounded-xl shadow-lg shadow-primary/20 h-12 px-8 gap-2 transition-all hover:-translate-y-0.5"
+            >
+              <Plus className="h-5 w-5" /> NEW ITEM
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

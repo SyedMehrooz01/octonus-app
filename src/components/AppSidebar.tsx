@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Users, CalendarDays, Landmark, Package, Receipt, FileText, FolderOpen, Settings, LogOut, ChevronRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,7 +31,7 @@ const AppSidebar = ({ onLogout }: AppSidebarProps) => {
     if (onLogout) onLogout();
   };
 
-  const filteredNavItems = navItems.filter(item => hasAccess(item.id));
+  const filteredNavItems = useMemo(() => navItems.filter(item => hasAccess(item.id)), [hasAccess]);
 
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-[#0f172a] text-white z-30 shadow-2xl">
@@ -102,4 +103,4 @@ const AppSidebar = ({ onLogout }: AppSidebarProps) => {
   );
 };
 
-export default AppSidebar;
+export default memo(AppSidebar);

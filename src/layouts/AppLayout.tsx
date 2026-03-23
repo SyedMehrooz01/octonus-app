@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo, useCallback } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -42,12 +42,12 @@ const AppLayout = () => {
   const navigate = useNavigate();
   const { user, logout, hasAccess } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     navigate("/login", { replace: true });
-  };
+  }, [logout, navigate]);
 
-  const accessibleNav = navItems.filter(item => hasAccess(item.page));
+  const accessibleNav = useMemo(() => navItems.filter(item => hasAccess(item.page)), [hasAccess]);
   
   const filteredNav = useMemo(() => {
     if (!sidebarSearch.trim()) return accessibleNav;
@@ -56,7 +56,7 @@ const AppLayout = () => {
     );
   }, [accessibleNav, sidebarSearch]);
 
-  const SidebarContent = ({ onClose }: { onClose?: () => void }) => (
+  const SidebarContent = useCallback(({ onClose }: { onClose?: () => void }) => (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex flex-col items-center justify-center pt-6 pb-2 px-6 mb-2">
         <Logo size="sm" className="mb-1 scale-75" />
@@ -67,8 +67,7 @@ const AppLayout = () => {
       </div>
 
       {/* User info section */}
-      {user && (
-        <div className="mx-4 mb-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm shadow-inner">
+      {user && (        <div className="mx-4 mb-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm shadow-inner">
           <div className="flex items-center gap-2.5">
             <div className="relative">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 to-indigo-600 text-white font-black text-sm shadow-lg border border-white/20">
@@ -105,72 +104,73 @@ const AppLayout = () => {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-4 overflow-y-auto hide-scrollbar-on-idle pb-4">
-        {filteredNav.length > 0 ? (
-          filteredNav.map((item) => {
+      <nav className="flex-1 px-4 pb-4 overflow-y-auto custom-scrollbar">
+        <p className="px-2 mb-2 text-[10px] font-black text-blue-100/20 uppercase tracking-[0.2em]">Main Navigation</p>
+        <div className="space-y-1.5">
+          {filteredNav.map((item) => {
             const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 onClick={onClose}
-                className={`flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-[13px] font-bold transition-all duration-300 group ${
-                  isActive
-                    ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30 translate-x-1"
-                    : "text-blue-100/70 hover:bg-white/5 hover:text-white hover:translate-x-1"
-                }`}
+                className={({ isActive: linkActive }) => `
+                  group flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black transition-all duration-300
+                  ${isActive || linkActive 
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30" 
+                    : "text-blue-100/60 hover:bg-white/5 hover:text-white"}
+                `}
               >
-                <item.icon className={`h-4.5 w-4.5 flex-shrink-0 transition-all duration-300 ${isActive ? "scale-110 rotate-3" : "group-hover:scale-110 group-hover:rotate-3"}`} />
-                <span className="tracking-wide">{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <item.icon className={`h-4 w-4 transition-transform duration-300 ${isActive ? "scale-110" : "group-hover:scale-110"}`} />
+                  <span className="tracking-tight uppercase">{item.label}</span>
+                </div>
+                {isActive && <div className="h-1 w-1 rounded-full bg-white shadow-[0_0_8px_white]" />}
               </NavLink>
             );
-          })
-        ) : (
-          <div className="px-4 py-8 text-center">
-            <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/5 mb-3">
-              <Search className="h-5 w-5 text-blue-100/20" />
-            </div>
-            <p className="text-[11px] font-bold text-blue-100/40 uppercase tracking-widest">No results</p>
-          </div>
-        )}
+          })}
+        </div>
       </nav>
 
-      <div className="p-4 mt-auto border-t border-white/5 bg-[#0f172a]/50">
+      <div className="p-4 border-t border-white/5 mt-auto">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-xs font-bold text-rose-300/70 transition-all duration-300 hover:bg-rose-500/10 hover:text-rose-400 group"
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-xs font-black text-blue-100/30 transition-all hover:bg-rose-500/10 hover:text-rose-400 group"
         >
-          <LogOut className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-1" />
-          Logout System
+          <div className="p-2 rounded-lg bg-white/5 group-hover:bg-rose-500/20 transition-colors">
+            <LogOut className="h-4 w-4" />
+          </div>
+          <span className="uppercase tracking-widest text-[10px]">Logout Session</span>
         </button>
       </div>
     </div>
-  );
+  ), [user, sidebarSearch, filteredNav, location.pathname, handleLogout]);
 
-  return (
-    <div className="flex min-h-screen bg-[#f8fafc]">
+  return (    <div className="flex h-screen bg-[#f8fafc] overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex md:w-64 flex-col bg-[#0f172a] text-white fixed top-0 left-0 h-full z-40 border-r border-white/5">
+      <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:bg-[#0f172a] lg:text-white lg:shadow-2xl">
         <SidebarContent />
       </aside>
 
-      <div className="flex flex-1 flex-col md:ml-64 overflow-hidden">
-        <TopHeader onMenuClick={() => setMobileNavOpen(true)} user={user} onLogout={handleLogout} />
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
-          <div className="max-w-full mx-auto">
+      {/* Mobile Nav Sheet */}
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <SheetContent side="left" className="p-0 bg-[#0f172a] border-none text-white w-72">
+          <SidebarContent onClose={() => setMobileNavOpen(false)} />
+        </SheetContent>
+      </Sheet>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <TopHeader onOpenNav={() => setMobileNavOpen(true)} />
+        
+        <main className="flex-1 overflow-y-auto bg-slate-50/50 relative scroll-smooth p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto animate-in fade-in duration-700">
             <Outlet />
           </div>
         </main>
       </div>
-
-      {/* Mobile Sidebar */}
-      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-        <SheetContent side="left" className="w-72 bg-[#0f172a] p-0 text-white border-none flex flex-col">
-          <SidebarContent onClose={() => setMobileNavOpen(false)} />
-        </SheetContent>
-      </Sheet>
     </div>
   );
 };
 
-export default AppLayout;
+export default memo(AppLayout);

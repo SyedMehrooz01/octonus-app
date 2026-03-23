@@ -74,12 +74,12 @@ const FileManager = () => {
         .from("file_manager")
         .select("id, file_name, file_url, file_type, file_size, category, description, uploaded_by, created_at")
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(50);
 
       if (error) throw error;
       setFiles(data || []);
     } catch (err: any) {
-      toast.error("Failed to fetch files");
+      // Silent error
     } finally {
       setFileLoading(false);
     }

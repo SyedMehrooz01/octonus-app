@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { 
   Building2, User, Bell, Shield, Palette, Save, Users, Plus, 
   Trash2, Key, History, Search, CheckCircle2, XCircle, Edit2, 
-  Eye, Download, Lock
+  Eye, Download, Lock, Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { useAuth, ROLE_PERMISSIONS, UserRole, UserAction } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import SkeletonLoading from "@/components/SkeletonLoading";
 
 // Mock data for initial UI - in production this comes from Supabase
 const INITIAL_USERS = [
@@ -151,13 +152,13 @@ const SettingsPage = () => {
       const { data, error } = await supabase
         .from('system_users')
         .select('id, full_name, email, role, status, page_access, action_permissions, last_login, created_at')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
       setUsers(data || []);
     } catch (err: any) {
-      console.error("Fetch users error:", err);
-      toast({ title: "Error", description: "Failed to fetch users", variant: "destructive" });
+      // Silent error
     } finally {
       setLoading(false);
     }
@@ -375,11 +376,41 @@ const SettingsPage = () => {
     (u.email || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (loading) {
+    return (
+      <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div className="h-20 w-full bg-white rounded-3xl animate-pulse mb-8" />
+        <div className="h-16 w-full bg-slate-100/50 rounded-2xl animate-pulse mb-8" />
+        <div className="bg-white rounded-3xl border border-slate-100 p-8 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <div className="h-4 w-32 bg-slate-100 rounded animate-pulse" />
+              <div className="h-12 w-full bg-slate-50 rounded-xl animate-pulse" />
+            </div>
+            <div className="space-y-4">
+              <div className="h-4 w-32 bg-slate-100 rounded animate-pulse" />
+              <div className="h-12 w-full bg-slate-50 rounded-xl animate-pulse" />
+            </div>
+          </div>
+          <div className="h-40 w-full bg-slate-50 rounded-2xl animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8 pb-10">
-      <div className="animate-in fade-in slide-in-from-left duration-500">
-        <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">System Settings</h1>
-        <p className="text-slate-500 font-bold mt-1">Manage your system preferences and configurations.</p>
+    <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Header Section */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <div>
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight uppercase">System Settings</h1>
+          <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1 flex items-center gap-2">
+            <Clock className="h-3 w-3" /> Last sync: {format(new Date(), "hh:mm a")}
+          </p>
+        </div>
+        <Button onClick={fetchUsers} variant="outline" size="icon" className="h-12 w-12 rounded-xl border-slate-200 hover:bg-slate-50 text-slate-500">
+          <History className="h-5 w-5" />
+        </Button>
       </div>
 
       {/* Edit User Modal */}

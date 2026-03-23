@@ -112,12 +112,13 @@ const Documents = () => {
       const { data, error } = await supabase
         .from("documents")
         .select("id, doc_number, doc_type, client_company, contact_person, client_address, event_name, invoice_date, event_date, valid_until, items, total_amount, srb_amount, sub_total, terms, status, created_by, created_at")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (error) throw error;
       setDocuments(data || []);
     } catch (err: any) {
-      toast.error("Failed to fetch documents archive");
+      // Silent error
     } finally {
       setLoading(false);
     }
@@ -272,102 +273,106 @@ const Documents = () => {
   const generatePDF = async (doc: DocumentData) => {
     const pdf = new jsPDF();
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const companyGreen = "#166534";
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const companyGreen = "#2D6A4F";
     const darkNavy = "#0f172a";
 
-    // --- HEADER SECTION ---
-    // Top Green Bar
-    pdf.setFillColor(22, 101, 52); 
-    pdf.rect(0, 0, pageWidth, 45, "F");
+    // --- HEADER SECTION: Professional Letterhead ---
+    // Top Green Accent Bar
+    pdf.setFillColor(45, 106, 79); // #2D6A4F
+    pdf.rect(0, 0, pageWidth, 40, "F");
 
-    // Company Name & Tagline
+    // Company Name in Header
     pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(28);
+    pdf.setFontSize(24);
     pdf.setFont("helvetica", "bold");
-    pdf.text(COMPANY.name.toUpperCase(), 15, 25);
+    pdf.text(COMPANY.name.toUpperCase(), 15, 20);
     
-    pdf.setFontSize(10);
+    pdf.setFontSize(9);
     pdf.setFont("helvetica", "italic");
-    pdf.text(COMPANY.tagline, 15, 33);
+    pdf.text(COMPANY.tagline, 15, 27);
 
-    // Logo Handling - Positioned in the top right of the green bar
-    const logoLoaded = await loadLogo(pdf, 160, 5, 35);
+    // Logo Handling - Positioned in the top right
+    const logoLoaded = await loadLogo(pdf, 160, 5, 30);
     if (!logoLoaded) {
       pdf.setDrawColor(255, 255, 255);
       pdf.setLineWidth(0.5);
-      pdf.circle(177.5, 22.5, 15, 'S');
-      pdf.setFontSize(7);
+      pdf.circle(175, 20, 12, 'S');
+      pdf.setFontSize(6);
       pdf.setFont("helvetica", "bold");
-      pdf.text("OCTONUS", 177.5, 21, { align: "center" });
-      pdf.text("SOLUTIONS", 177.5, 25, { align: "center" });
+      pdf.text("OCTONUS", 175, 19, { align: "center" });
+      pdf.text("SOLUTIONS", 175, 22, { align: "center" });
     }
 
-    // --- DOCUMENT TITLE & INFO ---
+    // --- DOCUMENT TITLE ---
     pdf.setTextColor(darkNavy);
-    pdf.setFontSize(22);
+    pdf.setFontSize(20);
     pdf.setFont("helvetica", "bold");
     const title = doc.doc_type === "Quotation" ? "QUOTATION" : "SALES TAX INVOICE";
     const titleWidth = pdf.getTextWidth(title);
     pdf.text(title, (pageWidth - titleWidth) / 2, 55);
     
-    // Header line
+    // Decorative line under title
     pdf.setDrawColor(companyGreen);
-    pdf.setLineWidth(1);
-    pdf.line(pageWidth/2 - 20, 58, pageWidth/2 + 20, 58);
+    pdf.setLineWidth(0.8);
+    pdf.line(pageWidth/2 - 25, 58, pageWidth/2 + 25, 58);
 
-    // Client & Document Info Grid
-    const infoY = 75;
+    // --- CLIENT & DOCUMENT INFO ---
+    const infoY = 70;
     
-    // Left Side: Client
-    pdf.setFillColor(248, 250, 252); // slate-50
-    pdf.rect(15, infoY - 5, 85, 35, "F");
-    pdf.setDrawColor(226, 232, 240); // slate-200
-    pdf.rect(15, infoY - 5, 85, 35, "S");
+    // Bill To Section
+    pdf.setFillColor(248, 250, 252); 
+    pdf.rect(15, infoY, 85, 35, "F");
+    pdf.setDrawColor(226, 232, 240);
+    pdf.rect(15, infoY, 85, 35, "S");
     
-    pdf.setFontSize(9);
+    pdf.setFontSize(8);
     pdf.setTextColor(100);
     pdf.setFont("helvetica", "bold");
-    pdf.text("BILL TO:", 20, infoY + 2);
-    
-    pdf.setTextColor(darkNavy);
-    pdf.setFontSize(11);
-    pdf.text(doc.client_company, 20, infoY + 10);
-    pdf.setFontSize(9);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`Attn: ${doc.contact_person}`, 20, infoY + 16);
-    const splitAddr = pdf.splitTextToSize(doc.client_address, 75);
-    pdf.text(splitAddr, 20, infoY + 22);
-
-    // Right Side: Doc Info
-    pdf.rect(110, infoY - 5, 85, 35, "F");
-    pdf.rect(110, infoY - 5, 85, 35, "S");
-    
-    pdf.setFontSize(9);
-    pdf.setTextColor(100);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("DOCUMENT DETAILS:", 115, infoY + 2);
+    pdf.text("BILL TO:", 20, infoY + 7);
     
     pdf.setTextColor(darkNavy);
     pdf.setFontSize(10);
-    pdf.text(`${doc.doc_type} #:`, 115, infoY + 10);
-    pdf.text(doc.doc_number, 150, infoY + 10);
+    pdf.text(doc.client_company, 20, infoY + 14);
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Attn: ${doc.contact_person}`, 20, infoY + 20);
+    const splitAddr = pdf.splitTextToSize(doc.client_address, 75);
+    pdf.text(splitAddr, 20, infoY + 26);
+
+    // Document Details Section
+    pdf.setFillColor(248, 250, 252);
+    pdf.rect(110, infoY, 85, 35, "F");
+    pdf.rect(110, infoY, 85, 35, "S");
     
-    pdf.text("Date:", 115, infoY + 16);
-    pdf.text(format(new Date(doc.invoice_date), "PP"), 150, infoY + 16);
+    pdf.setFontSize(8);
+    pdf.setTextColor(100);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("DOCUMENT DETAILS:", 115, infoY + 7);
     
-    pdf.text("Event:", 115, infoY + 22);
-    const splitEvent = pdf.splitTextToSize(doc.event_name, 45);
-    pdf.text(splitEvent, 150, infoY + 22);
+    pdf.setTextColor(darkNavy);
+    pdf.setFontSize(9);
+    pdf.text(`${doc.doc_type} #:`, 115, infoY + 14);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(doc.doc_number, 150, infoY + 14);
+    
+    pdf.setFont("helvetica", "normal");
+    pdf.text("Date:", 115, infoY + 20);
+    pdf.text(format(new Date(doc.invoice_date), "PP"), 150, infoY + 20);
+    
+    pdf.text("Event:", 115, infoY + 26);
+    const splitEvent = pdf.splitTextToSize(doc.event_name, 40);
+    pdf.text(splitEvent, 150, infoY + 26);
     
     if (doc.doc_type === "Quotation" && doc.valid_until) {
-      pdf.text("Valid Until:", 115, infoY + 28);
-      pdf.text(format(new Date(doc.valid_until), "PP"), 150, infoY + 28);
+      pdf.text("Valid Until:", 115, infoY + 32);
+      pdf.text(format(new Date(doc.valid_until), "PP"), 150, infoY + 32);
     } else if (doc.doc_type === "Invoice" && doc.event_date) {
-      pdf.text("Event Date:", 115, infoY + 28);
-      pdf.text(format(new Date(doc.event_date), "PP"), 150, infoY + 28);
+      pdf.text("Event Date:", 115, infoY + 32);
+      pdf.text(format(new Date(doc.event_date), "PP"), 150, infoY + 32);
     }
 
-    // --- TABLE SECTION ---
+    // --- ITEMS TABLE ---
     const tableData = (doc?.items ?? []).map((item, index) => [
       (index + 1).toString().padStart(2, '0'),
       item?.description ?? "N/A",
@@ -377,33 +382,39 @@ const Documents = () => {
     ]);
 
     autoTable(pdf, {
-      startY: 120,
-      head: [["S.#", "DESCRIPTION", "QTY", "UNIT RATE (RS.)", "TOTAL (RS.)"]],
+      startY: 115,
+      head: [["S.#", "DESCRIPTION", "QTY", "RATE (RS.)", "AMOUNT (RS.)"]],
       body: tableData,
       theme: "grid",
       headStyles: { 
-        fillColor: [22, 101, 52], 
+        fillColor: [45, 106, 79], 
         textColor: 255, 
         fontStyle: "bold",
-        fontSize: 10,
+        fontSize: 9,
         halign: "center"
       },
       columnStyles: {
-        0: { cellWidth: 12, halign: "center" },
+        0: { cellWidth: 10, halign: "center" },
         1: { cellWidth: "auto" },
         2: { cellWidth: 15, halign: "center" },
-        3: { cellWidth: 35, halign: "right" },
+        3: { cellWidth: 30, halign: "right" },
         4: { cellWidth: 35, halign: "right" }
       },
-      styles: { fontSize: 9, cellPadding: 5 },
-      alternateRowStyles: { fillColor: [248, 250, 252] }
+      styles: { fontSize: 8.5, cellPadding: 4 },
+      alternateRowStyles: { fillColor: [250, 252, 251] }
     });
 
-    const finalY = (pdf as any).lastAutoTable.finalY + 10;
+    let finalY = (pdf as any).lastAutoTable.finalY + 10;
+
+    // Check if we need a new page for totals
+    if (finalY > pageHeight - 100) {
+      pdf.addPage();
+      finalY = 20;
+    }
 
     // --- TOTALS SECTION ---
-    const totalsX = 130;
-    pdf.setFontSize(10);
+    const totalsX = 135;
+    pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(100);
     pdf.text("Total Amount:", totalsX, finalY);
@@ -416,10 +427,10 @@ const Documents = () => {
     pdf.text(doc.srb_amount.toLocaleString(), 195, finalY + 7, { align: "right" });
     
     pdf.setDrawColor(companyGreen);
-    pdf.setLineWidth(0.5);
+    pdf.setLineWidth(0.4);
     pdf.line(totalsX, finalY + 10, 195, finalY + 10);
     
-    pdf.setFontSize(12);
+    pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(companyGreen);
     pdf.text("GRAND TOTAL:", totalsX, finalY + 17);
@@ -427,51 +438,46 @@ const Documents = () => {
 
     // --- TERMS & CONDITIONS ---
     pdf.setTextColor(darkNavy);
-    pdf.setFontSize(11);
+    pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.text("TERMS & CONDITIONS:", 15, finalY + 30);
     
-    pdf.setDrawColor(226, 232, 240);
-    pdf.line(15, finalY + 32, 70, finalY + 32);
+    pdf.setDrawColor(companyGreen);
+    pdf.setLineWidth(0.3);
+    pdf.line(15, finalY + 32, 60, finalY + 32);
 
     pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8.5);
-    pdf.setTextColor(100);
+    pdf.setFontSize(8);
+    pdf.setTextColor(80);
     const splitTerms = pdf.splitTextToSize(doc.terms, pageWidth - 30);
     pdf.text(splitTerms, 15, finalY + 38);
 
     // --- SIGNATURES ---
-    const sigY = pdf.internal.pageSize.getHeight() - 50;
+    const sigY = pageHeight - 55;
     pdf.setDrawColor(200);
     pdf.setLineWidth(0.2);
     
-    pdf.line(15, sigY, 75, sigY);
-    pdf.setFontSize(9);
+    pdf.line(20, sigY, 70, sigY);
+    pdf.setFontSize(8);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(darkNavy);
     pdf.text("PREPARED BY", 45, sigY + 5, { align: "center" });
     
-    pdf.line(135, sigY, 195, sigY);
+    pdf.line(140, sigY, 190, sigY);
     pdf.text("AUTHORIZED SIGNATORY", 165, sigY + 5, { align: "center" });
-    
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(7);
-    pdf.text("E.&O.E.", 15, sigY + 15);
 
     // --- FOOTER ---
-    pdf.setFillColor(22, 101, 52);
-    pdf.rect(0, pdf.internal.pageSize.getHeight() - 25, pageWidth, 25, "F");
+    pdf.setFillColor(45, 106, 79);
+    pdf.rect(0, pageHeight - 20, pageWidth, 20, "F");
     
     pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(8);
+    pdf.setFontSize(7.5);
     pdf.setFont("helvetica", "bold");
-    const contactInfo = `${COMPANY.address}  |  Email: ${COMPANY.email}`;
-    const contactWidth = pdf.getTextWidth(contactInfo);
-    pdf.text(contactInfo, (pageWidth - contactWidth) / 2, pdf.internal.pageSize.getHeight() - 14);
+    const footerText1 = `${COMPANY.address} | Phone: ${COMPANY.phone}`;
+    const footerText2 = `Email: ${COMPANY.email} | Web: ${COMPANY.website}`;
     
-    const webInfo = `Phone: ${COMPANY.phone}  |  Web: ${COMPANY.website}`;
-    const webWidth = pdf.getTextWidth(webInfo);
-    pdf.text(webInfo, (pageWidth - webWidth) / 2, pdf.internal.pageSize.getHeight() - 8);
+    pdf.text(footerText1, pageWidth / 2, pageHeight - 11, { align: "center" });
+    pdf.text(footerText2, pageWidth / 2, pageHeight - 6, { align: "center" });
 
     pdf.save(`${doc.doc_number}_${doc.client_company.replace(/\s+/g, '_')}.pdf`);
   };

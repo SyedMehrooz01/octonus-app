@@ -113,15 +113,15 @@ const HRStaff = () => {
         { data: assignData },
         { data: payData }
       ] = await Promise.all([
-        supabase.from('staff').select('id, name, email, role, department, salary, status, phone, address, emergency_contact, join_date, rights').order('name').limit(100),
-        supabase.from('attendance').select('id, employee_id, date, status, check_in, check_out').order('date', { ascending: false }).limit(100),
-        supabase.from('leave_requests').select('id, employee_id, type, start_date, end_date, reason, status').order('created_at', { ascending: false }).limit(100),
+        supabase.from('staff').select('id, name, email, role, department, salary, status, phone, address, emergency_contact, join_date, rights').order('name').limit(50),
+        supabase.from('attendance').select('id, employee_id, date, status, check_in, check_out').order('date', { ascending: false }).limit(50),
+        supabase.from('leave_requests').select('id, employee_id, type, start_date, end_date, reason, status').order('created_at', { ascending: false }).limit(50),
         supabase.from('announcements').select('id, title, message, created_at').order('created_at', { ascending: false }).limit(5),
-        supabase.from('overtime').select('id, employee_id, hours, date, status').order('date', { ascending: false }).limit(100),
-        supabase.from('advance_salary').select('id, employee_id, amount, reason, status').order('created_at', { ascending: false }).limit(100),
-        supabase.from('outside_workers').select('id, name, type, skill, phone, rate, rate_type').order('name').limit(100),
-        supabase.from('worker_assignments').select('id, worker_id, event_name, date, amount, status').order('date', { ascending: false }).limit(100),
-        supabase.from('worker_payments').select('id, worker_id, amount, date, method').order('date', { ascending: false }).limit(100)
+        supabase.from('overtime').select('id, employee_id, hours, date, status').order('date', { ascending: false }).limit(50),
+        supabase.from('advance_salary').select('id, employee_id, amount, reason, status').order('created_at', { ascending: false }).limit(50),
+        supabase.from('outside_workers').select('id, name, type, skill, phone, rate, rate_type').order('name').limit(50),
+        supabase.from('worker_assignments').select('id, worker_id, event_name, date, amount, status').order('date', { ascending: false }).limit(50),
+        supabase.from('worker_payments').select('id, worker_id, amount, date, method').order('date', { ascending: false }).limit(50)
       ]);
 
       const staffWithDetails = (staffData || []).map(s => ({

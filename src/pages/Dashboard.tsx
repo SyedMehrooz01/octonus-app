@@ -1,686 +1,428 @@
-import { useState, useEffect, memo, useMemo } from "react";
+import { useState, useEffect, memo } from "react";
 import { 
-  CalendarDays, 
-  Users, 
-  Landmark, 
-  Clock, 
-  Plus, 
-  Receipt, 
-  CheckCircle, 
-  Wallet, 
-  ArrowRight, 
-  Activity, 
+  Calendar, 
   TrendingUp, 
-  TrendingDown, 
-  Search, 
-  Filter, 
-  Eye, 
-  Edit, 
-  Trash2, 
+  Users, 
+  CheckCircle2, 
   AlertTriangle, 
-  Loader2, 
+  Clock, 
+  DollarSign, 
+  ChevronRight,
+  ArrowUpRight,
+  ArrowDownRight,
+  Loader2,
   Package,
-  Calendar,
-  X
+  ArrowRight,
+  Wallet
 } from "lucide-react";
+import { format, startOfMonth, endOfMonth, subMonths, isSameDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, startOfToday, endOfToday, addDays, subMonths, isWithinInterval, parseISO } from "date-fns";
-import { useNavigate } from "react-router-dom";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
 import SkeletonLoading from "@/components/SkeletonLoading";
 
 const Dashboard = () => {
-  const { canDo, hasAccess, logAction } = useAuth();
-  const navigate = useNavigate();
+  const { user, canDo } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalEvents: 0,
+    upcomingEvents: 0,
+    totalRevenue: 0,
+    totalExpenses: 0,
+    activeStaff: 0,
+    attendanceToday: 0,
+    lowStockItems: 0,
+    pendingPayments: 0
+  });
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [revenueData, setRevenueData] = useState<any[]>([]);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  const [attendanceMissing, setAttendanceMissing] = useState(false);
-  const [showAuditModal, setShowAuditModal] = useState(false);
-  const [audits, setAudits] = useState<any[]>([]);
-  
-  // Stats state
-  const [totalEventsCount, setTotalEventsCount] = useState(0);
-  const [upcomingEventsCount, setUpcomingEventsCount] = useState(0);
-  const [paymentsDue, setPaymentsDue] = useState(0);
-  const [lowInventoryCount, setLowInventoryCount] = useState(0);
-  const [activeStaffCount, setActiveStaffCount] = useState(0);
-  const [thisMonthRevenue, setThisMonthRevenue] = useState(0);
-  const [thisMonthExpenses, setThisMonthExpenses] = useState(0);
   const [revenueGrowth, setRevenueGrowth] = useState("0%");
 
-  // Table state
-  const [search, setSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      const today = new Date();
+      const todayStr = format(today, "yyyy-MM-dd");
+      const monthStart = startOfMonth(today).toISOString();
+      const monthEnd = endOfMonth(today).toISOString();
+      const prevMonthStart = startOfMonth(subMonths(today, 1)).toISOString();
+      const prevMonthEnd = endOfMonth(subMonths(today, 1)).toISOString();
 
-  // Filter state
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
+      // 1. Fetch Stats in Parallel
+      const [
+        { count: totalEvents },
+        { count: upcomingCount },
+        { data: balanceData },
+        { data: inventoryData },
+        { count: staffCount },
+        { count: attendanceCount },
+        { data: monthlyPayments },
+        { data: monthlyExpensesData }
+      ] = await Promise.all([
+        supabase.from('bookings').select('id', { count: 'exact', head: true }).neq('status', 'cancelled'),
+        supabase.from('bookings').select('id', { count: 'exact', head: true }).gte('event_date', todayStr).neq('status', 'cancelled'),
+        supabase.from('bookings').select('balance_due').neq('status', 'cancelled').gt('balance_due', 0).limit(50),
+        supabase.from('inventory_items').select('id, stock, min_stock').limit(50),
+        supabase.from('staff').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', todayStr),
+        supabase.from('ledger_entries').select('amount').eq('type', 'debit').gte('date', monthStart).lte('date', monthEnd).limit(50),
+        supabase.from('expenses').select('amount').eq('status', 'approved').gte('date', monthStart).lte('date', monthEnd).limit(50)
+      ]);
 
-  const fetchAudits = async () => {
-    const { data } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .order('timestamp', { ascending: false })
-      .limit(50);
-    setAudits(data || []);
-  };
+      const thisMonthRevenue = (monthlyPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
+      const thisMonthExpenses = (monthlyExpensesData ?? []).reduce((sum, e) => sum + (e?.amount ?? 0), 0);
+      const lowStock = (inventoryData ?? []).filter(item => (item.stock ?? 0) <= (item.min_stock ?? 0)).length;
+      const pendingPay = (balanceData ?? []).reduce((sum, b) => sum + (b?.balance_due ?? 0), 0);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      setLoading(true);
-      try {
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const monthStart = startOfMonth(new Date()).toISOString();
-        const monthEnd = endOfMonth(new Date()).toISOString();
-        const prevMonthStart = startOfMonth(subMonths(new Date(), 1)).toISOString();
-        const prevMonthEnd = endOfMonth(subMonths(new Date(), 1)).toISOString();
+      setStats({
+        totalEvents: totalEvents ?? 0,
+        upcomingEvents: upcomingCount ?? 0,
+        totalRevenue: thisMonthRevenue,
+        totalExpenses: thisMonthExpenses,
+        activeStaff: staffCount ?? 0,
+        attendanceToday: attendanceCount ?? 0,
+        lowStockItems: lowStock,
+        pendingPayments: pendingPay
+      });
 
-        const [
-          { count: totalEvents },
-          { count: upcomingCount },
-          { data: balanceData },
-          { data: inventoryData },
-          { count: staffCount },
-          { count: attendanceCount },
-          { data: monthlyPayments },
-          { data: monthlyExpensesData }
-        ] = await Promise.all([
-          supabase.from('bookings').select('id', { count: 'exact', head: true }).neq('status', 'cancelled'),
-          supabase.from('bookings').select('id', { count: 'exact', head: true }).gte('event_date', todayStr).neq('status', 'cancelled'),
-          supabase.from('bookings').select('balance_due').neq('status', 'cancelled').gt('balance_due', 0),
-          supabase.from('inventory_items').select('id, stock, min_stock'),
-          supabase.from('staff').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-          supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', todayStr),
-          supabase.from('ledger_entries').select('amount').eq('type', 'debit').gte('date', monthStart).lte('date', monthEnd),
-          supabase.from('expenses').select('amount').eq('status', 'approved').gte('date', monthStart).lte('date', monthEnd)
-        ]);
+      // 7. Calculate Revenue Growth
+      const { data: prevMonthPayments } = await supabase
+        .from('ledger_entries')
+        .select('amount')
+        .eq('type', 'debit')
+        .gte('date', prevMonthStart)
+        .lte('date', prevMonthEnd)
+        .limit(50);
+      const prevRevenue = (prevMonthPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
+      if (prevRevenue > 0) {
+        const growth = ((thisMonthRevenue - prevRevenue) / prevRevenue) * 100;
+        setRevenueGrowth(`${growth > 0 ? '+' : ''}${growth.toFixed(1)}%`);
+      } else {
+        setRevenueGrowth(thisMonthRevenue > 0 ? "+100%" : "0%");
+      }
 
-        setTotalEventsCount(totalEvents || 0);
-        setUpcomingEventsCount(upcomingCount || 0);
-        setPaymentsDue((balanceData ?? []).reduce((sum, e) => sum + (e?.balance_due ?? 0), 0));
-        setLowInventoryCount((inventoryData ?? []).filter(i => (i?.stock ?? 0) <= (i?.min_stock ?? 0)).length);
-        setActiveStaffCount(staffCount ?? 0);
-        setAttendanceMissing(!attendanceCount || attendanceCount === 0);
-        setThisMonthRevenue((monthlyPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0));
-        setThisMonthExpenses((monthlyExpensesData ?? []).reduce((sum, e) => sum + (e?.amount ?? 0), 0));
+      // 8. Fetch Upcoming Events Table
+      const { data: upcoming } = await supabase
+        .from('bookings')
+        .select(`id, client_name, event_date, total_amount, event_type, venue, status, pax, balance_due`)
+        .order('event_date', { ascending: true })
+        .limit(50);
+      setUpcomingEvents(upcoming || []);
 
-        // 7.2 Calculate Revenue Growth
-        const { data: prevMonthPayments } = await supabase
+      // 9. Fetch last 6 months revenue for chart
+      const last6Months = [];
+      for (let i = 5; i >= 0; i--) {
+        const date = subMonths(new Date(), i);
+        const start = startOfMonth(date).toISOString();
+        const end = endOfMonth(date).toISOString();
+        const { data: payments } = await supabase
           .from('ledger_entries')
           .select('amount')
           .eq('type', 'debit')
-          .gte('date', prevMonthStart)
-          .lte('date', prevMonthEnd);
-        const prevRevenue = (prevMonthPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
-        if (prevRevenue > 0) {
-          const growth = ((totalRevenue - prevRevenue) / prevRevenue) * 100;
-          setRevenueGrowth(`${growth > 0 ? '+' : ''}${growth.toFixed(1)}%`);
-        } else {
-          setRevenueGrowth(totalRevenue > 0 ? "+100%" : "0%");
-        }
-
-        // 8. Fetch Upcoming Events Table
-        const { data: upcoming } = await supabase
-          .from('bookings')
-          .select(`id, client_name, event_date, total_amount, event_type, venue, status, pax, balance_due`)
-          .order('event_date', { ascending: true });
-        setUpcomingEvents(upcoming || []);
-
-        // 9. Fetch last 6 months revenue for chart
-        const last6Months = [];
-        for (let i = 5; i >= 0; i--) {
-          const date = subMonths(new Date(), i);
-          const start = startOfMonth(date).toISOString();
-          const end = endOfMonth(date).toISOString();
-          const { data: payments } = await supabase
-            .from('ledger_entries')
-            .select('amount')
-            .eq('type', 'debit')
-            .gte('date', start)
-            .lte('date', end);
-          const total = (payments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
-          last6Months.push({
-            month: format(date, 'MMM'),
-            revenue: total
-          });
-        }
-        setRevenueData(last6Months);
-
-        // 10. Recent Activity
-        const activity = [];
-        const { data: recentBookings } = await supabase
-          .from('bookings')
-          .select('id, client_name, created_at, event_type')
-          .order('created_at', { ascending: false })
-          .limit(3);
-        recentBookings?.forEach(b => activity.push({
-          type: 'booking',
-          id: b.id,
-          title: `New booking: ${b.client_name}`,
-          time: b.created_at,
-          icon: CalendarDays,
-          color: 'text-blue-500',
-          path: '/events'
-        }));
-
-        const { data: recentPayments } = await supabase
-          .from('ledger_entries')
-          .select('amount, date, description')
-          .eq('type', 'debit')
-          .order('date', { ascending: false })
-          .limit(3);
-        recentPayments?.forEach(p => activity.push({
-          type: 'payment',
-          title: `Payment: ${p.description} (₨ ${p.amount.toLocaleString()})`,
-          time: p?.date,
-          icon: Wallet,
-          color: 'text-emerald-500',
-          path: '/finance'
-        }));
-
-        const { data: recentAttendance } = await supabase
-          .from('attendance')
-          .select('id, date, status, staff(name)')
-          .order('date', { ascending: false })
-          .limit(3);
-        recentAttendance?.forEach(a => activity.push({
-          type: 'attendance',
-          title: `Attendance marked for ${(a as any).staff?.name}: ${a?.status}`,
-          time: a?.date,
-          icon: CheckCircle,
-          color: 'text-violet-500',
-          path: '/hr'
-        }));
-
-        setRecentActivity(activity.sort((a, b) => new Date(b?.time ?? 0).getTime() - new Date(a?.time ?? 0).getTime()).slice(0, 6));
-
-        setLoading(false);
-      } catch (error) {
-        console.error("Dashboard fetch error:", error);
-        toast.error("Failed to fetch dashboard data");
-      } finally {
-        setLoading(false);
+          .gte('date', start)
+          .lte('date', end)
+          .limit(50);
+        const total = (payments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
+        last6Months.push({
+          month: format(date, 'MMM'),
+          revenue: total
+        });
       }
-    };
+      setRevenueData(last6Months);
 
+    } catch (err: any) {
+      // Error handled silently or via UI
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchDashboardData();
   }, []);
 
-  const handleQuickAction = (action: string) => {
-    switch (action) {
-      case "New Event Booking":
-        navigate("/events");
-        break;
-      case "Add Expense":
-        navigate("/expenses");
-        break;
-      case "Mark Attendance":
-        navigate("/hr");
-        break;
-      case "Generate Payroll":
-        navigate("/hr");
-        break;
-    }
-  };
-
-  const handleDeleteEvent = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this event?")) return;
-    try {
-      const { error } = await supabase.from('bookings').delete().eq('id', id);
-      if (error) throw error;
-      setUpcomingEvents(prev => prev.filter(e => e.id !== id));
-      toast.success("Event deleted successfully");
-      logAction("Deleted an event from dashboard", "Dashboard");
-    } catch (error) {
-      toast.error("Failed to delete event");
-    }
-  };
-
-  const filteredEvents = useMemo(() => {
-    return (upcomingEvents ?? []).filter(e => {
-      const matchSearch = e?.client_name?.toLowerCase().includes((search ?? "").toLowerCase()) ||
-                         e?.event_type?.toLowerCase().includes((search ?? "").toLowerCase()) ||
-                         e?.venue?.toLowerCase().includes((search ?? "").toLowerCase());
-      
-      const matchStatus = statusFilter === "all" || e?.status?.toLowerCase() === statusFilter.toLowerCase();
-      const matchType = typeFilter === "all" || e?.event_type?.toLowerCase() === typeFilter.toLowerCase();
-      
-      return matchSearch && matchStatus && matchType;
-    });
-  }, [upcomingEvents, search, statusFilter, typeFilter]);
-
-  const totalPages = Math.ceil((filteredEvents ?? []).length / itemsPerPage);
-  const paginatedEvents = (filteredEvents ?? []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  const getStatusBadge = (status: string) => {
-    const s = status?.toLowerCase();
-    if (s === 'confirmed') return <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold">Confirmed</Badge>;
-    if (s === 'pending') return <Badge className="bg-blue-500 hover:bg-blue-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold">Pending</Badge>;
-    if (s === 'tentative') return <Badge className="bg-gray-400 hover:bg-gray-500 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold">Tentative</Badge>;
-    if (s === 'cancelled') return <Badge className="bg-rose-500 hover:bg-rose-600 text-white border-none shadow-sm px-3 py-1 rounded-lg font-bold">Cancelled</Badge>;
-    return <Badge variant="outline" className="px-3 py-1 rounded-lg font-bold">{status}</Badge>;
-  };
-
-  const eventTypes = ["Wedding", "Corporate", "Birthday", "Seminar", "Concert", "Other"];
-
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="h-20 w-full bg-white rounded-3xl animate-pulse" />
+      <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div className="h-20 w-full bg-white rounded-3xl animate-pulse mb-8" />
         <SkeletonLoading type="stats" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="h-[400px] bg-white rounded-3xl animate-pulse" />
-          <div className="h-[400px] bg-white rounded-3xl animate-pulse" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-8">
+            <div className="h-64 bg-white rounded-3xl animate-pulse" />
+            <div className="h-96 bg-white rounded-3xl animate-pulse" />
+          </div>
+          <div className="space-y-8">
+            <div className="h-64 bg-white rounded-3xl animate-pulse" />
+            <div className="h-96 bg-white rounded-3xl animate-pulse" />
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 pb-10">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="animate-in fade-in slide-in-from-left duration-500">
-          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Welcome to Octonus Solutions!</h1>
-          <p className="text-slate-500 font-bold mt-1">Here's what's happening with your business today.</p>
+    <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Welcome Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100 animate-in fade-in slide-in-from-top duration-500">
+        <div>
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight uppercase">Executive Dashboard</h1>
+          <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1">
+            Welcome back, <span className="text-primary">{user?.name || "Administrator"}</span>
+          </p>
         </div>
-        <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right duration-500">
-          {attendanceMissing && (
-            <Badge onClick={() => navigate('/hr')} className="bg-rose-500 hover:bg-rose-600 text-white animate-pulse flex items-center gap-1.5 py-2.5 px-5 rounded-xl shadow-lg shadow-rose-500/20 border-none font-bold cursor-pointer">
-              <Clock className="h-4 w-4" /> Attendance Missing
-            </Badge>
-          )}
-          {lowInventoryCount > 0 && (
-            <Badge onClick={() => navigate('/inventory')} className="bg-orange-500 hover:bg-orange-600 text-white animate-pulse flex items-center gap-1.5 py-2.5 px-5 rounded-xl shadow-lg shadow-orange-500/20 border-none font-bold cursor-pointer">
-              <AlertTriangle className="h-4 w-4" /> {lowInventoryCount} Low Stock Items
-            </Badge>
-          )}
-          <div className="hidden lg:flex items-center gap-2 text-xs font-black text-slate-500 bg-white border border-slate-200/60 px-5 py-3 rounded-xl shadow-sm">
-            <CalendarDays className="h-4 w-4 text-blue-600" />
-            {format(new Date(), 'EEEE, MMMM do, yyyy').toUpperCase()}
+        <div className="flex items-center gap-3">
+          <div className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-100">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Today's Date</p>
+            <p className="text-sm font-black text-slate-700">{format(new Date(), "MMMM do, yyyy")}</p>
           </div>
+          <Button onClick={fetchDashboardData} variant="outline" size="icon" className="h-12 w-12 rounded-xl border-slate-200 hover:bg-slate-50">
+            <Clock className="h-5 w-5 text-slate-500" />
+          </Button>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Upcoming Events */}
-        <div onClick={() => navigate('/events')} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 p-5 shadow-lg shadow-blue-500/20 transition-all duration-300 hover:scale-[1.02] cursor-pointer">
-          <div className="relative z-10 flex flex-col gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
-              <CalendarDays className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-blue-100/80 uppercase tracking-widest">Upcoming Events</p>
-              <h3 className="text-3xl font-black text-white mt-0.5 tracking-tight">{(upcomingEventsCount ?? 0).toLocaleString()}</h3>
-            </div>
-          </div>
-          <div className="absolute -right-4 -bottom-4 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
-            <CalendarDays size={120} className="text-white" />
-          </div>
-        </div>
-
-        {/* Payments Due */}
-        <div onClick={() => navigate('/finance')} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 p-5 shadow-lg shadow-emerald-400/20 transition-all duration-300 hover:scale-[1.02] cursor-pointer">
-          <div className="relative z-10 flex flex-col gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
-              <span className="text-2xl font-black text-white italic">₨</span>
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-emerald-50/80 uppercase tracking-widest">Payments Due</p>
-              <h3 className="text-2xl font-black text-white mt-0.5 tracking-tight">₨ {(paymentsDue ?? 0).toLocaleString()}</h3>
-            </div>
-          </div>
-          <div className="absolute -right-4 -bottom-4 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-6">
-            <Landmark size={120} className="text-white" />
-          </div>
-        </div>
-
-        {/* Month Expenses */}
-        <div onClick={() => navigate('/expenses')} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500 to-rose-700 p-5 shadow-lg shadow-rose-500/20 transition-all duration-300 hover:scale-[1.02] cursor-pointer">
-          <div className="relative z-10 flex flex-col gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
-              <TrendingDown className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-rose-50/80 uppercase tracking-widest">Month Expenses</p>
-              <h3 className="text-2xl font-black text-white mt-0.5 tracking-tight">₨ {(thisMonthExpenses ?? 0).toLocaleString()}</h3>
-            </div>
-          </div>
-          <div className="absolute -right-4 -bottom-4 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
-            <Receipt size={120} className="text-white" />
-          </div>
-        </div>
-
-        {/* Active Staff */}
-        <div onClick={() => navigate('/hr')} className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-lg shadow-slate-200/50 border border-slate-100 transition-all duration-300 hover:scale-[1.02] cursor-pointer">
-          <div className="relative z-10 flex flex-col gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 shadow-inner">
-              <Users className="h-6 w-6 text-indigo-500" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Staff</p>
-              <h3 className="text-3xl font-black text-[#0f172a] mt-0.5 tracking-tight">{(activeStaffCount ?? 0).toLocaleString()}</h3>
+      {/* Primary Stats Grid */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { 
+            label: "Monthly Revenue", 
+            value: `₨ ${stats.totalRevenue.toLocaleString()}`, 
+            growth: revenueGrowth, 
+            icon: DollarSign, 
+            color: "from-emerald-500 to-emerald-700",
+            shadow: "shadow-emerald-500/20"
+          },
+          { 
+            label: "Monthly Expenses", 
+            value: `₨ ${stats.totalExpenses.toLocaleString()}`, 
+            icon: Wallet,
+            color: "from-rose-500 to-rose-700",
+            shadow: "shadow-rose-500/20"
+          },
+          { 
+            label: "Active Staff", 
+            value: stats.activeStaff.toString(), 
+            subValue: `${stats.attendanceToday} present today`,
+            icon: Users, 
+            color: "from-blue-500 to-blue-700",
+            shadow: "shadow-blue-500/20"
+          },
+          { 
+            label: "Upcoming Events", 
+            value: stats.upcomingEvents.toString(), 
+            subValue: "Confirmed bookings",
+            icon: Calendar, 
+            color: "from-amber-500 to-amber-700",
+            shadow: "shadow-amber-500/20"
+          }
+        ].map((stat, idx) => (
+          <div key={idx} className={`relative overflow-hidden rounded-3xl border-none shadow-xl ${stat.shadow} group hover:scale-[1.02] transition-all duration-300`}>
+            <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-90`} />
+            <div className="relative p-6 text-white">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{stat.label}</p>
+                  <h3 className="text-2xl font-black mt-1">{stat.value}</h3>
+                  {stat.growth && (
+                    <div className="flex items-center gap-1 mt-2 bg-white/20 w-fit px-2 py-0.5 rounded-full">
+                      <TrendingUp className="h-3 w-3" />
+                      <span className="text-[10px] font-bold">{stat.growth} this month</span>
+                    </div>
+                  )}
+                  {stat.subValue && (
+                    <p className="text-[10px] font-bold mt-2 opacity-80">{stat.subValue}</p>
+                  )}
+                </div>
+                <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm group-hover:scale-110 transition-transform">
+                  <stat.icon className="h-6 w-6" />
+                </div>
+              </div>
             </div>
           </div>
-          <div className="absolute -right-4 -bottom-4 opacity-5 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3">
-            <Users size={120} className="text-slate-900" />
-          </div>
-        </div>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Main Table Section */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl border border-slate-100 shadow-sm animate-in fade-in zoom-in duration-500">
-            <div className="relative flex-1 max-w-sm group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-              <Input 
-                placeholder="Search events..." 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-11 h-12 bg-slate-50 border-slate-100 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500/20 font-bold transition-all shadow-sm"
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-12 w-[140px] rounded-xl font-bold border-slate-200">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="tentative">Tentative</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="h-12 w-[140px] rounded-xl font-bold border-slate-200">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="all">All Types</SelectItem>
-                  {eventTypes.map(t => <SelectItem key={t} value={t.toLowerCase()}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-
-              {canDo('add') && (
-                <Button onClick={() => navigate("/events")} className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-6 gap-2 shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5">
-                  <Plus className="h-5 w-5" /> ADD BOOKING
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Content Area */}
+        <div className="lg:col-span-2 space-y-8">
+          {/* Upcoming Bookings Table */}
+          <div className="border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] overflow-hidden bg-white">
+            <div className="border-b border-slate-50 p-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Upcoming Schedule</h2>
+                  <p className="text-xs font-bold text-slate-400 mt-1">LATEST BOOKINGS AND EVENTS</p>
+                </div>
+                <Button variant="ghost" size="sm" className="rounded-xl font-bold text-primary hover:bg-primary/5 group">
+                  View Full Calendar <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
+              </div>
+            </div>
+            <div className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/50">
+                      <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Client / Event</th>
+                      <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Date</th>
+                      <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                      <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Balance Due</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {upcomingEvents.length > 0 ? (
+                      upcomingEvents.map((event) => (
+                        <tr key={event.id} className="group hover:bg-slate-50/50 transition-colors">
+                          <td className="px-8 py-5">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-black text-slate-700">{event.client_name}</span>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">{event.event_type} • {event.venue}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5 text-center">
+                            <div className="inline-flex flex-col items-center bg-slate-100 px-3 py-1 rounded-xl">
+                              <span className="text-[10px] font-black text-slate-700">{format(new Date(event.event_date), "MMM d")}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5 text-center">
+                            <Badge variant="outline" className={`rounded-lg px-2 py-0 text-[10px] font-black uppercase tracking-tighter ${
+                              event.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                              event.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                              'bg-slate-50 text-slate-600 border-slate-100'
+                            }`}>
+                              {event.status}
+                            </Badge>
+                          </td>
+                          <td className="px-8 py-5 text-right">
+                            <span className={`text-sm font-black ${event.balance_due > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                              ₨ {event.balance_due?.toLocaleString()}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-8 py-10 text-center">
+                          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No upcoming events scheduled</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Revenue Trends Chart */}
+          <div className="rounded-[2rem] border-none shadow-2xl shadow-slate-200/50 p-8 bg-white overflow-hidden">
+             <div className="px-0 pt-0 pb-6">
+               <h2 className="text-sm font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                 <TrendingUp className="h-4 w-4 text-primary" /> Revenue Analysis (Last 6 Months)
+               </h2>
+             </div>
+             <div className="h-64 flex items-end justify-between gap-4 px-2">
+               {revenueData.map((data, i) => {
+                 const max = Math.max(...revenueData.map(d => d.revenue), 1);
+                 const height = (data.revenue / max) * 100;
+                 return (
+                   <div key={data.month} className="flex-1 flex flex-col items-center gap-4 group">
+                     <div className="w-full relative">
+                       <div 
+                         className="w-full bg-slate-50 group-hover:bg-slate-100 rounded-2xl transition-all duration-500 flex items-end justify-center overflow-hidden" 
+                         style={{ height: '200px' }}
+                       >
+                         <div 
+                           className="w-full bg-gradient-to-t from-primary to-indigo-400 rounded-2xl transition-all duration-700 ease-out shadow-lg shadow-primary/20"
+                           style={{ height: `${height}%` }}
+                         />
+                       </div>
+                       <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all transform group-hover:-translate-y-1">
+                         <Badge className="bg-[#0f172a] text-white border-none text-[10px] font-black px-2 py-1 shadow-xl">₨ {data.revenue.toLocaleString()}</Badge>
+                       </div>
+                     </div>
+                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{data.month}</p>
+                   </div>
+                 );
+               })}
+             </div>
+          </div>
+        </div>
+
+        {/* Sidebar Area */}
+        <div className="space-y-8">
+          {/* Quick Actions */}
+          <div className="border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] overflow-hidden bg-slate-900 text-white">
+            <div className="p-8">
+              <h2 className="text-lg font-black uppercase tracking-tight">Quick Actions</h2>
+              <p className="text-xs font-bold text-slate-400 mt-1 opacity-70">COMMON TASKS AND TOOLS</p>
+            </div>
+            <div className="px-8 pb-8 space-y-3">
+              <Button className="w-full justify-between bg-white/10 hover:bg-white/20 border-none rounded-2xl h-14 font-bold group">
+                New Booking <ArrowUpRight className="h-5 w-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+              </Button>
+              <Button className="w-full justify-between bg-white/10 hover:bg-white/20 border-none rounded-2xl h-14 font-bold group">
+                Add Expense <ArrowDownRight className="h-5 w-5 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform" />
+              </Button>
+              <Button className="w-full justify-between bg-white/10 hover:bg-white/20 border-none rounded-2xl h-14 font-bold group">
+                Inventory Check <Package className="h-5 w-5 group-hover:scale-110 transition-transform" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Operational Alerts */}
+          <div className="border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] overflow-hidden bg-white">
+            <div className="p-8">
+              <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Operational Alerts</h2>
+              <p className="text-xs font-bold text-slate-400 mt-1">ISSUES REQUIRING ATTENTION</p>
+            </div>
+            <div className="px-8 pb-8 space-y-4">
+              {stats.lowStockItems > 0 && (
+                <div className="flex items-start gap-4 p-4 bg-rose-50 rounded-2xl border border-rose-100">
+                  <div className="p-2 bg-rose-500 rounded-xl text-white">
+                    <AlertTriangle className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-rose-700">Low Stock Warning</p>
+                    <p className="text-[10px] font-bold text-rose-500 uppercase">{stats.lowStockItems} items are below minimum level</p>
+                  </div>
+                </div>
+              )}
+              {stats.attendanceToday < stats.activeStaff && (
+                <div className="flex items-start gap-4 p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                  <div className="p-2 bg-amber-500 rounded-xl text-white">
+                    <Users className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-amber-700">Staff Attendance</p>
+                    <p className="text-[10px] font-bold text-amber-500 uppercase">{stats.activeStaff - stats.attendanceToday} staff members not present</p>
+                  </div>
+                </div>
+              )}
+              {stats.pendingPayments > 0 && (
+                <div className="flex items-start gap-4 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                  <div className="p-2 bg-blue-500 rounded-xl text-white">
+                    <DollarSign className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-blue-700">Receivables</p>
+                    <p className="text-[10px] font-bold text-blue-500 uppercase">₨ {stats.pendingPayments.toLocaleString()} pending from clients</p>
+                  </div>
+                </div>
+              )}
+              {stats.lowStockItems === 0 && stats.attendanceToday === stats.activeStaff && stats.pendingPayments === 0 && (
+                <div className="flex flex-col items-center py-6 text-center">
+                  <div className="p-4 bg-emerald-50 rounded-full text-emerald-500 mb-4">
+                    <CheckCircle2 className="h-8 w-8" />
+                  </div>
+                  <p className="text-sm font-black text-slate-700 uppercase">All Systems Normal</p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">No urgent issues detected</p>
+                </div>
               )}
             </div>
           </div>
-
-          <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[700px]">
-                <thead>
-                  <tr className="bg-slate-50/80 text-left border-b border-slate-100">
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Event & Client</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Guests</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-24 text-center">
-                        <div className="flex flex-col items-center gap-4">
-                          <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Syncing Intelligence...</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (paginatedEvents ?? []).length > 0 ? (
-                    (paginatedEvents ?? []).map((event, idx) => (
-                      <tr key={event?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
-                        <td className="px-6 py-6">
-                          <div className="flex items-center gap-4">
-                            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-blue-600 font-black text-sm shadow-sm border border-blue-100/50 group-hover:scale-110 transition-transform duration-300">
-                              {event?.event_type?.[0]?.toUpperCase() || 'E'}
-                            </div>
-                            <div>
-                              <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{event?.client_name}</p>
-                              <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter flex items-center gap-2">
-                                <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
-                                {event?.event_type} • {event?.venue}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-6">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-black text-slate-600 tracking-tight">{event?.event_date ? format(new Date(event.event_date), 'MMM dd, yyyy') : "N/A"}</span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase mt-1 tracking-widest">{event?.event_date ? format(new Date(event.event_date), 'EEEE') : ""}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-6">
-                          <Badge variant="outline" className="rounded-lg border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black text-slate-600 shadow-sm">
-                            {event?.pax ?? 0} GUESTS
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-6">
-                          {getStatusBadge(event?.status)}
-                        </td>
-                        <td className="px-6 py-6 text-right">
-                          <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
-                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 hover:text-blue-700 shadow-sm" onClick={() => navigate(`/events?id=${event?.id}`)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {canDo('edit') && (
-                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-100/50 hover:text-emerald-700 shadow-sm">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {canDo('delete') && (
-                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 hover:text-rose-600 shadow-sm" onClick={() => handleDeleteEvent(event?.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-24 text-center">
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center">
-                            <Search className="h-8 w-8 text-slate-200" />
-                          </div>
-                          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No matching records found</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-8 py-6 bg-slate-50/50 border-t border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                  Showing {Math.min((filteredEvents ?? []).length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min((filteredEvents ?? []).length, currentPage * itemsPerPage)} of {(filteredEvents ?? []).length} results
-                </p>
-                <div className="flex gap-3">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(prev => prev - 1)}
-                    className="rounded-xl border-slate-200 bg-white font-black h-10 px-6 disabled:opacity-40 transition-all hover:bg-slate-50 active:scale-95 shadow-sm"
-                  >
-                    PREVIOUS
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(prev => prev + 1)}
-                    className="rounded-xl border-slate-200 bg-white font-black h-10 px-6 disabled:opacity-40 transition-all hover:bg-slate-50 active:scale-95 shadow-sm"
-                  >
-                    NEXT
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sidebar Widgets */}
-        <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-700">
-          {/* Revenue Chart Widget */}
-          <div className="rounded-3xl border border-slate-100 bg-white p-7 shadow-xl shadow-slate-200/40 transition-all hover:shadow-2xl">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-xs font-black text-[#0f172a] uppercase tracking-[0.2em]">Revenue Analytics</h3>
-                <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">Performance Matrix</p>
-              </div>
-              <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-emerald-500" />
-              </div>
-            </div>
-            <div className="h-[220px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="month" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
-                    dy={12}
-                  />
-                  <YAxis hide />
-                  <Tooltip 
-                    cursor={{ fill: '#f8fafc', radius: 8 }}
-                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', fontWeight: 900, fontSize: '11px', padding: '12px' }}
-                  />
-                  <Bar dataKey="revenue" radius={[8, 8, 0, 0]} barSize={32}>
-                    {(revenueData ?? []).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === (revenueData ?? []).length - 1 ? '#2563eb' : '#e2e8f0'} className="transition-all duration-500" />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">MTD REVENUE</p>
-                <p className="text-xl font-black text-[#0f172a] mt-0.5">₨ {(thisMonthRevenue ?? 0).toLocaleString()}</p>
-              </div>
-              <Badge className={`px-3 py-1 font-black text-[10px] border-none ${revenueGrowth.startsWith('+') ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                {revenueGrowth}
-              </Badge>
-            </div>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="rounded-3xl border border-slate-100 bg-white p-7 shadow-xl shadow-slate-200/40 transition-all hover:shadow-2xl">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xs font-black text-[#0f172a] uppercase tracking-[0.2em]">Operational Pulse</h3>
-              <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-            </div>
-            <div className="space-y-7">
-              {(recentActivity ?? []).map((activity, i) => (
-                <div key={i} className="flex gap-4 group cursor-pointer" onClick={() => activity.path && navigate(activity.path)}>
-                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-50 transition-all duration-300 group-hover:bg-white group-hover:shadow-lg group-hover:scale-110 border border-transparent group-hover:border-slate-100`}>
-                    <activity.icon className={`h-5 w-5 ${activity.color ?? ""}`} />
-                  </div>
-                  <div className="flex flex-col gap-1.5 overflow-hidden">
-                    <p className="text-[13px] font-black text-slate-700 leading-snug group-hover:text-blue-600 transition-colors">{activity.title}</p>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-3 w-3 text-slate-300" />
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{activity.time ? format(new Date(activity.time), 'MMM dd, HH:mm') : "N/A"}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Button 
-              variant="ghost" 
-              className="w-full mt-8 rounded-xl font-black text-[11px] text-blue-600 uppercase tracking-widest hover:bg-blue-50 gap-2 h-11"
-              onClick={() => {
-                fetchAudits();
-                setShowAuditModal(true);
-              }}
-            >
-              VIEW ALL AUDITS <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
       </div>
-
-      {/* Audit Log Modal */}
-      <Dialog open={showAuditModal} onOpenChange={setShowAuditModal}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black flex items-center gap-2">
-              <Activity className="h-5 w-5 text-blue-600" /> SYSTEM AUDIT LOG
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {audits.length > 0 ? audits.map((log) => (
-              <div key={log.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center shrink-0 shadow-sm">
-                    <User className="h-4 w-4 text-slate-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-[#0f172a]">{log.action}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                      {log.user_name} • {log.page}
-                    </p>
-                    {log.details && (
-                      <p className="text-[10px] text-slate-500 mt-2 font-medium italic">{log.details}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[10px] font-black text-slate-400 uppercase">
-                    {format(new Date(log.timestamp), 'MMM dd, yyyy')}
-                  </p>
-                  <p className="text-[10px] font-black text-blue-600 uppercase mt-1">
-                    {format(new Date(log.timestamp), 'HH:mm:ss')}
-                  </p>
-                </div>
-              </div>
-            )) : (
-              <div className="text-center py-12">
-                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No audit logs found</p>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

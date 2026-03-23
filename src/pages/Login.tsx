@@ -42,17 +42,6 @@ const Login = () => {
       localStorage.removeItem(attemptsKey);
       localStorage.removeItem(`${attemptsKey}_time`);
 
-      // --- ACTIVITY LOG ---
-      const browserInfo = `${navigator.userAgent}`;
-      const loginTime = new Date().toISOString();
-      
-      // We use logAction from AuthContext which already has access to user data after successful login
-      const { logAction } = useAuth(); // We need to call useAuth here to get the updated user context if possible, 
-      // but useAuth is already called at the top of the component. 
-      // However, the 'user' in AuthContext won't be updated until the next render.
-      // So we'll rely on the logAction to handle the logging after navigation or via a separate mechanism.
-      // Actually, AuthContext.login could handle the logging.
-
       navigate("/dashboard");
     } else {
       // Track failed attempt
