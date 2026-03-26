@@ -20,11 +20,13 @@ interface InventoryItem {
   name: string;
   category: string;
   unit: string;
-  stock: number;
-  minStock: number;
-  purchasePrice: number;
+  current_stock: number;
+  min_stock_level: number;
+  purchase_price: number;
   supplier: string;
   type: "consumable" | "non-consumable";
+  status: string;
+  created_at: string;
 }
 
 interface StockMovement {
@@ -66,7 +68,7 @@ const Inventory = () => {
   const [selectedMovement, setSelectedMovement] = useState<StockMovement | null>(null);
   
   const [stockAction, setStockAction] = useState({ type: "purchase", qty: "", note: "", issued_to: "" });
-  const [newItem, setNewItem] = useState({ name: "", category: "Other", unit: "", stock: "", minStock: "", purchasePrice: "", supplier: "", type: "consumable" as const });
+  const [newItem, setNewItem] = useState({ name: "", category: "Other", unit: "", current_stock: "", min_stock_level: "", purchase_price: "", supplier: "", type: "consumable" as const });
   const [returnForm, setReturnForm] = useState({ qty: "", returned_by: "", note: "" });
 
   const fetchData = async () => {
@@ -74,7 +76,7 @@ const Inventory = () => {
     try {
       const { data: itemsData, error: itemsError } = await supabase
         .from('inventory_items')
-        .select('id, name, category, unit, stock, purchase_price, supplier, type')
+        .select('id, name, type, category, unit, current_stock, min_stock_level, purchase_price, supplier, status, created_at')
         .limit(50);
       
       if (itemsError) {
@@ -86,11 +88,13 @@ const Inventory = () => {
           name: i?.name ?? "Unknown",
           category: i?.category ?? "Other",
           unit: i?.unit ?? "Unit",
-          stock: i?.stock ?? 0,
-          minStock: i?.min_stock ?? 0,
-          purchasePrice: i?.purchase_price ?? 0,
+          current_stock: i?.current_stock ?? 0,
+          min_stock_level: i?.min_stock_level ?? 0,
+          purchase_price: i?.purchase_price ?? 0,
           supplier: i?.supplier ?? "N/A",
-          type: i?.type ?? "consumable"
+          type: i?.type ?? "consumable",
+          status: i?.status ?? "active",
+          created_at: i?.created_at ?? new Date().toISOString()
         })));
       }
 
@@ -146,31 +150,33 @@ const Inventory = () => {
     try {
       const { data, error } = await supabase.from('inventory_items').insert([{
         name: newItem.name,
+        type: newItem.type,
         category: newItem.category,
         unit: newItem.unit,
-        stock: Number(newItem.stock || 0),
-        purchase_price: Number(newItem.purchasePrice || 0),
+        current_stock: Number(newItem.current_stock || 0),
+        min_stock_level: Number(newItem.min_stock_level || 0),
+        purchase_price: Number(newItem.purchase_price || 0),
         supplier: newItem.supplier,
-        type: newItem.type
-      }]).select();
+        status: 'active'
+      }]).select('id, name, type, category, unit, current_stock, min_stock_level, purchase_price, supplier, status, created_at');
 
       if (error) throw error;
       
-      if (Number(newItem.stock) > 0) {
+      if (Number(newItem.current_stock) > 0 && data && data.length > 0) {
         await supabase.from('stock_movements').insert([{
           date: format(new Date(), "yyyy-MM-dd"),
           item_id: data[0].id,
           item_name: newItem.name,
           type: "purchase",
           category: newItem.type,
-          qty: Number(newItem.stock),
+          qty: Number(newItem.current_stock),
           note: "Initial Stock"
         }]);
       }
 
       toast.success("Item added successfully");
       setShowAddModal(false);
-      setNewItem({ name: "", category: "Other", unit: "", stock: "", minStock: "", purchasePrice: "", supplier: "", type: "consumable" });
+      setNewItem({ name: "", category: "Other", unit: "", current_stock: "", min_stock_level: "", purchase_price: "", supplier: "", type: "consumable" });
       fetchData();
     } catch (err: any) {
       toast.error(err.message || "Failed to add item");
@@ -184,11 +190,11 @@ const Inventory = () => {
     setIsSaving(true);
     try {
       const qty = Number(stockAction.qty);
-      const currentStock = selectedItem.stock ?? 0;
+      const currentStock = selectedItem.current_stock ?? 0;
       const newStock = stockAction.type === "purchase" ? currentStock + qty : Math.max(0, currentStock - qty);
       
       const { error: itemError } = await supabase.from('inventory_items').update({
-        stock: newStock
+        current_stock: newStock
       }).eq('id', selectedItem.id);
 
       if (itemError) throw itemError;
@@ -228,9 +234,9 @@ const Inventory = () => {
       }
 
       // Update item stock
-      const currentStock = selectedItem.stock ?? 0;
+      const currentStock = selectedItem.current_stock ?? 0;
       const { error: itemError } = await supabase.from('inventory_items').update({
-        stock: currentStock + qty
+        current_stock: currentStock + qty
       }).eq('id', selectedItem.id);
 
       if (itemError) throw itemError;
@@ -359,7 +365,7 @@ const Inventory = () => {
             {(lowStock ?? []).map(i => (
               <span key={i?.id} className="rounded-xl bg-white border border-rose-100 px-4 py-2.5 text-xs font-black text-rose-600 shadow-sm flex items-center gap-3 group hover:border-rose-300 transition-colors">
                 <div className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
-                {i?.name} <span className="text-rose-400 font-bold ml-1">— {i?.stock} {i?.unit} LEFT</span>
+                {i?.name} <span className="text-rose-400 font-bold ml-1">— {i?.current_stock} {i?.unit} LEFT</span>
               </span>
             ))}
           </div>
@@ -425,15 +431,15 @@ const Inventory = () => {
                       </td>
                       <td className="px-6 py-6">
                         <div className="flex flex-col items-center gap-2">
-                          <span className={`text-sm font-black tracking-tight ${(item?.stock ?? 0) <= (item?.minStock ?? 0) ? "text-rose-600" : "text-slate-700"}`}>
-                            {item?.stock} {item?.unit}
+                          <span className={`text-sm font-black tracking-tight ${(item?.current_stock ?? 0) <= (item?.min_stock_level ?? 0) ? "text-rose-600" : "text-slate-700"}`}>
+                            {item?.current_stock} {item?.unit}
                           </span>
                           <div className="h-1.5 w-20 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                            <div className={`h-full transition-all duration-500 ${(item?.stock ?? 0) <= (item?.minStock ?? 0) ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"}`} style={{ width: `${Math.min(100, ((item?.stock ?? 0) / (item?.minStock || 1)) * 50)}%` }} />
+                            <div className={`h-full transition-all duration-500 ${(item?.current_stock ?? 0) <= (item?.min_stock_level ?? 0) ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"}`} style={{ width: `${Math.min(100, ((item?.current_stock ?? 0) / (item?.min_stock_level || 1)) * 50)}%` }} />
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-6 text-sm font-black text-right text-slate-700 tracking-tight">₨ {((item?.stock ?? 0) * (item?.purchasePrice ?? 0)).toLocaleString()}</td>
+                      <td className="px-6 py-6 text-sm font-black text-right text-slate-700 tracking-tight">₨ {((item?.current_stock ?? 0) * (item?.purchase_price ?? 0)).toLocaleString()}</td>
                       <td className="px-6 py-6 text-right">
                         {canDo("edit") && (
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
@@ -570,15 +576,15 @@ const Inventory = () => {
             </div>
             <div className="space-y-1.5">
               <Label>Current Stock</Label>
-              <Input type="number" placeholder="0" value={newItem.stock} onChange={e => setNewItem({ ...newItem, stock: e.target.value })} />
+              <Input type="number" placeholder="0" value={newItem.current_stock} onChange={e => setNewItem({ ...newItem, current_stock: e.target.value })} />
             </div>
             <div className="space-y-1.5">
               <Label>Min Stock Level</Label>
-              <Input type="number" placeholder="0" value={newItem.minStock} onChange={e => setNewItem({ ...newItem, minStock: e.target.value })} />
+              <Input type="number" placeholder="0" value={newItem.min_stock_level} onChange={e => setNewItem({ ...newItem, min_stock_level: e.target.value })} />
             </div>
             <div className="space-y-1.5">
               <Label>Purchase Price (₨)</Label>
-              <Input type="number" placeholder="0" value={newItem.purchasePrice} onChange={e => setNewItem({ ...newItem, purchasePrice: e.target.value })} />
+              <Input type="number" placeholder="0" value={newItem.purchase_price} onChange={e => setNewItem({ ...newItem, purchase_price: e.target.value })} />
             </div>
             <div className="space-y-1.5">
               <Label>Supplier</Label>

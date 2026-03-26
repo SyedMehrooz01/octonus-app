@@ -105,7 +105,7 @@ const HRStaff = () => {
       const results = await Promise.all([
         supabase.from('staff').select('id, name, email, role, department, salary, status, phone, address, emergency_contact, join_date, rights').order('name').limit(50),
         supabase.from('attendance').select('id, employee_id, date, status, check_in, check_out').order('date', { ascending: false }).limit(50),
-        supabase.from('staff_leaves').select('id, employee_id, leave_type, start_date, end_date, reason, status').order('created_at', { ascending: false }).limit(50),
+        supabase.from('leaves').select('id, employee_id, leave_type, start_date, end_date, reason, status').order('created_at', { ascending: false }).limit(50),
         supabase.from('announcements').select('id, title, message, created_at').order('created_at', { ascending: false }).limit(5),
         supabase.from('overtime').select('id, employee_id, hours, date, status').order('date', { ascending: false }).limit(50),
         supabase.from('advance_salary').select('id, employee_id, amount, reason, status').order('created_at', { ascending: false }).limit(50),
@@ -417,7 +417,7 @@ const HRStaff = () => {
     if (!leaveForm.empId || !leaveForm.reason) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('staff_leaves').insert([{
+      const { error } = await supabase.from('leaves').insert([{
         employee_id: leaveForm.empId,
         leave_type: leaveForm.type,
         start_date: leaveForm.start,
@@ -440,7 +440,7 @@ const HRStaff = () => {
   const handleLeaveAction = async (id: number, status: string) => {
     setSaving(true);
     try {
-      const { error } = await supabase.from('staff_leaves').update({ status }).eq('id', id);
+      const { error } = await supabase.from('leaves').update({ status }).eq('id', id);
       if (error) throw error;
       await fetchHRData();
       toast.success(`Leave request ${status}`);

@@ -54,7 +54,7 @@ const Dashboard = () => {
         supabase.from('bookings').select('id', { count: 'exact', head: true }).neq('status', 'cancelled'),
         supabase.from('bookings').select('id', { count: 'exact', head: true }).gte('event_date', todayStr).neq('status', 'cancelled'),
         supabase.from('bookings').select('balance_due').neq('status', 'cancelled').gt('balance_due', 0).limit(50),
-        supabase.from('inventory_items').select('id, stock, min_stock').limit(50),
+        supabase.from('inventory_items').select('id, current_stock, min_stock_level').limit(50),
         supabase.from('staff').select('id', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', todayStr),
         supabase.from('ledger_entries').select('amount').eq('type', 'debit').gte('date', monthStart).lte('date', monthEnd).limit(50),
@@ -83,7 +83,7 @@ const Dashboard = () => {
 
       const thisMonthRevenue = (monthlyPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
       const thisMonthExpenses = (monthlyExpensesData ?? []).reduce((sum, e) => sum + (e?.amount ?? 0), 0);
-      const lowStock = (inventoryData ?? []).filter(item => (item?.stock ?? 0) <= (item?.min_stock ?? 0)).length;
+      const lowStock = (inventoryData ?? []).filter(item => (item?.current_stock ?? 0) <= (item?.min_stock_level ?? 0)).length;
       const pendingPay = (balanceData ?? []).reduce((sum, b) => sum + (b?.balance_due ?? 0), 0);
 
       setStats({
