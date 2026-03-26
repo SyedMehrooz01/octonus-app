@@ -75,9 +75,9 @@ const TopHeader = ({ onMenuClick, user, onLogout }: TopHeaderProps) => {
     // 3. Low Inventory Alerts
     const { data: lowInventory } = await supabase
       .from('inventory_items')
-      .select('id, name, stock, min_stock')
+      .select('id, name, current_stock, min_stock_level')
       .limit(3);
-    lowInventory?.filter(i => i.stock <= i.min_stock).forEach(i => alerts.push({
+    lowInventory?.filter(i => (i.current_stock ?? 0) <= (i.min_stock_level ?? 0)).forEach(i => alerts.push({
       id: `inv-${i.id}`,
       title: `Low stock: ${i.name}`,
       time: new Date().toISOString(),
@@ -88,13 +88,13 @@ const TopHeader = ({ onMenuClick, user, onLogout }: TopHeaderProps) => {
 
     // 4. Pending Leave Requests
     const { data: pendingLeaves } = await supabase
-      .from('staff_leaves')
-      .select('id, staff(name), type')
+      .from('leaves')
+      .select('id, employee_id, leave_type')
       .eq('status', 'pending')
       .limit(3);
     pendingLeaves?.forEach(l => alerts.push({
       id: `leave-${l.id}`,
-      title: `Leave request: ${(l as any).staff?.name}`,
+      title: `Leave request: ${(l as any).leave_type ?? 'Pending'}`,
       time: new Date().toISOString(),
       icon: CheckCircle,
       color: "text-violet-500",
