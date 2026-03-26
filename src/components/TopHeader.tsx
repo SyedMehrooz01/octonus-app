@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Menu, Bell, Search, ChevronDown, User, Settings as SettingsIcon, LogOut, CalendarDays, Receipt, Package, CheckCircle, X, Loader2 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { navItems } from "@/layouts/AppLayout";
+import { navItems } from "@/components/navigation";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
