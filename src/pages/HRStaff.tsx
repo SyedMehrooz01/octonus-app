@@ -110,8 +110,8 @@ const HRStaff = () => {
         supabase.from('overtime').select('id, employee_id, hours, date, status').order('date', { ascending: false }).limit(50),
         supabase.from('advance_salary').select('id, employee_id, amount, reason, status').order('created_at', { ascending: false }).limit(50),
         supabase.from('outside_workers').select('id, name, type, skill, phone, rate, rate_type').order('name').limit(50),
-        supabase.from('worker_assignments').select('id, worker_id, event_name, date, amount, status').order('date', { ascending: false }).limit(50),
-        supabase.from('worker_payments').select('id, worker_id, amount, date, method').order('date', { ascending: false }).limit(50)
+        supabase.from('worker_assignments').select('id, worker_id, event_name, date, amount, status').order('date', { ascending: false }).limit(50).then(r => r.error ? { data: [], error: null } : r),
+        supabase.from('worker_payments').select('id, worker_id, amount, date, method').order('date', { ascending: false }).limit(50).then(r => r.error ? { data: [], error: null } : r)
       ]);
 
       const [
