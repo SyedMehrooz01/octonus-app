@@ -155,10 +155,15 @@ const SettingsPage = () => {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
-      setUsers(data || []);
+      if (error) {
+        console.error("Users fetch error:", error);
+        setUsers([]);
+      } else {
+        setUsers(data ?? []);
+      }
     } catch (err: any) {
-      // Silent error
+      console.error("fetchUsers unexpected error:", err);
+      setUsers([]);
     } finally {
       setLoading(false);
     }

@@ -76,10 +76,15 @@ const FileManager = () => {
         .order("created_at", { ascending: false })
         .limit(50);
 
-      if (error) throw error;
-      setFiles(data || []);
+      if (error) {
+        console.error("Files fetch error:", error);
+        setFiles([]);
+      } else {
+        setFiles(data ?? []);
+      }
     } catch (err: any) {
-      // Silent error
+      console.error("fetchFiles unexpected error:", err);
+      setFiles([]);
     } finally {
       setFileLoading(false);
     }

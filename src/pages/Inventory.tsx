@@ -76,28 +76,40 @@ const Inventory = () => {
         .from('inventory_items')
         .select('id, name, category, unit, stock, min_stock, purchase_price, supplier, type')
         .limit(50);
-      if (itemsError) throw itemsError;
-      setItems((itemsData ?? []).map(i => ({
-        id: i?.id ?? "",
-        name: i?.name ?? "Unknown",
-        category: i?.category ?? "Other",
-        unit: i?.unit ?? "Unit",
-        stock: i?.stock ?? 0,
-        minStock: i?.min_stock ?? 0,
-        purchasePrice: i?.purchase_price ?? 0,
-        supplier: i?.supplier ?? "N/A",
-        type: i?.type ?? "consumable"
-      })));
+      
+      if (itemsError) {
+        console.error("Inventory items fetch error:", itemsError);
+        setItems([]);
+      } else {
+        setItems((itemsData ?? []).map(i => ({
+          id: i?.id ?? "",
+          name: i?.name ?? "Unknown",
+          category: i?.category ?? "Other",
+          unit: i?.unit ?? "Unit",
+          stock: i?.stock ?? 0,
+          minStock: i?.min_stock ?? 0,
+          purchasePrice: i?.purchase_price ?? 0,
+          supplier: i?.supplier ?? "N/A",
+          type: i?.type ?? "consumable"
+        })));
+      }
 
       const { data: historyData, error: historyError } = await supabase
         .from('stock_movements')
         .select('id, date, item_id, item_name, type, category, qty, note, issued_to, returned_by, return_date')
         .order('date', { ascending: false })
         .limit(50);
-      if (historyError) throw historyError;
-      setHistory(historyData ?? []);
+      
+      if (historyError) {
+        console.error("Stock movements fetch error:", historyError);
+        setHistory([]);
+      } else {
+        setHistory(historyData ?? []);
+      }
     } catch (err: any) {
-      // Silent error
+      console.error("Inventory fetchData unexpected error:", err);
+      setItems([]);
+      setHistory([]);
     } finally {
       setLoading(false);
     }

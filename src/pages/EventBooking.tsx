@@ -126,16 +126,20 @@ const EventBooking = () => {
         .order('id', { ascending: true })
         .limit(50);
 
-      if (menusError) throw menusError;
-
-      if (menusData && (menusData ?? []).length > 0) {
+      if (menusError) {
+        console.error("Menus fetch error:", menusError);
+        setMenus(INITIAL_MENUS);
+      } else if (menusData && (menusData ?? []).length > 0) {
         const { data: itemsData, error: itemsError } = await supabase
           .from('menu_items')
           .select('id, item, unit, rate, menu_id')
           .order('id', { ascending: true })
           .limit(100);
 
-        if (itemsError) throw itemsError;
+        if (itemsError) {
+          console.error("Menu items fetch error:", itemsError);
+          // Still use menusData but items might be empty
+        }
 
         const formattedMenus = (menusData ?? []).map(m => ({
           ...m,
@@ -146,6 +150,7 @@ const EventBooking = () => {
         setMenus(INITIAL_MENUS);
       }
     } catch (error: any) {
+      console.error("fetchMenus unexpected error:", error);
       setMenus(INITIAL_MENUS);
     } finally {
       setLoadingMenus(false);
@@ -154,13 +159,23 @@ const EventBooking = () => {
 
   const fetchSuppliers = useCallback(async () => {
     try {
-      const { data: sData } = await supabase.from('suppliers').select('id, name, contact_number, email, service_type, current_balance').limit(50);
-      if (sData) setSuppliers(sData ?? []);
+      const { data: sData, error: sErr } = await supabase.from('suppliers').select('id, name, contact_number, email, service_type, current_balance').limit(50);
+      if (sErr) {
+        console.error("Suppliers fetch error:", sErr);
+        setSuppliers([]);
+      } else {
+        setSuppliers(sData ?? []);
+      }
       
-      const { data: pData } = await supabase.from('supplier_payments').select('id, supplier_id, date, amount, method, notes').order('date', { ascending: false }).limit(50);
-      if (pData) setSupplierPayments(pData ?? []);
+      const { data: pData, error: pErr } = await supabase.from('supplier_payments').select('id, supplier_id, date, amount, method, notes').order('date', { ascending: false }).limit(50);
+      if (pErr) {
+        console.error("Supplier payments fetch error:", pErr);
+        setSupplierPayments([]);
+      } else {
+        setSupplierPayments(pData ?? []);
+      }
     } catch (err) {
-      // Silent error
+      console.error("fetchSuppliers unexpected error:", err);
     }
   }, []);
 
@@ -173,8 +188,10 @@ const EventBooking = () => {
         .order('event_date', { ascending: true })
         .limit(50);
 
-      if (error) throw error;
-      if (data) {
+      if (error) {
+        console.error("Bookings fetch error:", error);
+        setBookings([]);
+      } else if (data) {
         setBookings(data.map(b => ({
           id: b.id,
           clientName: b.client_name,
@@ -197,7 +214,8 @@ const EventBooking = () => {
         })));
       }
     } catch (err: any) {
-      // Silent error
+      console.error("fetchBookingsData unexpected error:", err);
+      setBookings([]);
     } finally {
       setLoading(false);
     }

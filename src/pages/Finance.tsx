@@ -154,11 +154,15 @@ const Finance = () => {
 
   const fetchVendors = async () => {
     try {
-      const { data: vData } = await supabase
+      const { data: vData, error: vErr } = await supabase
         .from('suppliers')
         .select('id, name, contact_number, service_type, opening_balance, current_balance')
         .limit(50);
-      if (vData) {
+      
+      if (vErr) {
+        console.error("Vendors fetch error:", vErr);
+        setVendors([]);
+      } else {
         setVendors((vData ?? []).map((v: any) => ({
           id: v?.id ?? "",
           name: v?.name ?? "Unknown",
@@ -170,12 +174,16 @@ const Finance = () => {
         })));
       }
       
-      const { data: pData } = await supabase
+      const { data: pData, error: pErr } = await supabase
         .from('supplier_payments')
         .select('id, supplier_id, date, amount, method, notes')
         .order('date', { ascending: false })
         .limit(50);
-      if (pData) {
+      
+      if (pErr) {
+        console.error("Vendor payments fetch error:", pErr);
+        setVendorPayments([]);
+      } else {
         setVendorPayments((pData ?? []).map((p: any) => ({
           id: p?.id ?? "",
           vendor_id: p?.supplier_id ?? "",
@@ -186,7 +194,9 @@ const Finance = () => {
         })));
       }
     } catch (err) {
-      // Silent error
+      console.error("fetchVendors unexpected error:", err);
+      setVendors([]);
+      setVendorPayments([]);
     }
   };
 

@@ -115,10 +115,15 @@ const Documents = () => {
         .order("created_at", { ascending: false })
         .limit(50);
 
-      if (error) throw error;
-      setDocuments(data || []);
+      if (error) {
+        console.error("Documents fetch error:", error);
+        setDocuments([]);
+      } else {
+        setDocuments(data ?? []);
+      }
     } catch (err: any) {
-      // Silent error
+      console.error("fetchDocuments unexpected error:", err);
+      setDocuments([]);
     } finally {
       setLoading(false);
     }

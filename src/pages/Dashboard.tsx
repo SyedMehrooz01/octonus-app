@@ -50,16 +50,7 @@ const Dashboard = () => {
       const prevMonthEnd = endOfMonth(subMonths(today, 1)).toISOString();
 
       // 1. Fetch Stats in Parallel
-      const [
-        { count: totalEvents },
-        { count: upcomingCount },
-        { data: balanceData },
-        { data: inventoryData },
-        { count: staffCount },
-        { count: attendanceCount },
-        { data: monthlyPayments },
-        { data: monthlyExpensesData }
-      ] = await Promise.all([
+      const results = await Promise.all([
         supabase.from('bookings').select('id', { count: 'exact', head: true }).neq('status', 'cancelled'),
         supabase.from('bookings').select('id', { count: 'exact', head: true }).gte('event_date', todayStr).neq('status', 'cancelled'),
         supabase.from('bookings').select('balance_due').neq('status', 'cancelled').gt('balance_due', 0).limit(50),
@@ -70,9 +61,29 @@ const Dashboard = () => {
         supabase.from('expenses').select('amount').eq('status', 'approved').gte('date', monthStart).lte('date', monthEnd).limit(50)
       ]);
 
+      const [
+        { count: totalEvents, error: err1 },
+        { count: upcomingCount, error: err2 },
+        { data: balanceData, error: err3 },
+        { data: inventoryData, error: err4 },
+        { count: staffCount, error: err5 },
+        { count: attendanceCount, error: err6 },
+        { data: monthlyPayments, error: err7 },
+        { data: monthlyExpensesData, error: err8 }
+      ] = results;
+
+      if (err1) console.error("Error fetching total events:", err1);
+      if (err2) console.error("Error fetching upcoming events count:", err2);
+      if (err3) console.error("Error fetching balance data:", err3);
+      if (err4) console.error("Error fetching inventory data:", err4);
+      if (err5) console.error("Error fetching staff count:", err5);
+      if (err6) console.error("Error fetching attendance count:", err6);
+      if (err7) console.error("Error fetching monthly payments:", err7);
+      if (err8) console.error("Error fetching monthly expenses:", err8);
+
       const thisMonthRevenue = (monthlyPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
       const thisMonthExpenses = (monthlyExpensesData ?? []).reduce((sum, e) => sum + (e?.amount ?? 0), 0);
-      const lowStock = (inventoryData ?? []).filter(item => (item.stock ?? 0) <= (item.min_stock ?? 0)).length;
+      const lowStock = (inventoryData ?? []).filter(item => (item?.stock ?? 0) <= (item?.min_stock ?? 0)).length;
       const pendingPay = (balanceData ?? []).reduce((sum, b) => sum + (b?.balance_due ?? 0), 0);
 
       setStats({
@@ -87,13 +98,17 @@ const Dashboard = () => {
       });
 
       // 7. Calculate Revenue Growth
-      const { data: prevMonthPayments } = await supabase
+      const { data: prevMonthPayments, error: prevRevErr } = await supabase
         .from('ledger_entries')
         .select('amount')
         .eq('type', 'debit')
         .gte('date', prevMonthStart)
         .lte('date', prevMonthEnd)
         .limit(50);
+      
+      if (prevRevErr) {
+        console.error("Error fetching prev month payments:", prevRevErr);
+      }
       const prevRevenue = (prevMonthPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
       if (prevRevenue > 0) {
         const growth = ((thisMonthRevenue - prevRevenue) / prevRevenue) * 100;
@@ -103,12 +118,18 @@ const Dashboard = () => {
       }
 
       // 8. Fetch Upcoming Events Table
-      const { data: upcoming } = await supabase
+      const { data: upcoming, error: upcomingErr } = await supabase
         .from('bookings')
         .select(`id, client_name, event_date, total_amount, event_type, venue, status, pax, balance_due`)
         .order('event_date', { ascending: true })
         .limit(50);
-      setUpcomingEvents(upcoming || []);
+      
+      if (upcomingErr) {
+        console.error("Error fetching upcoming events:", upcomingErr);
+        setUpcomingEvents([]);
+      } else {
+        setUpcomingEvents(upcoming ?? []);
+      }
 
       // 9. Fetch last 6 months revenue for chart
       const last6Months = [];
@@ -116,13 +137,15 @@ const Dashboard = () => {
         const date = subMonths(new Date(), i);
         const start = startOfMonth(date).toISOString();
         const end = endOfMonth(date).toISOString();
-        const { data: payments } = await supabase
+        const { data: payments, error: loopErr } = await supabase
           .from('ledger_entries')
           .select('amount')
           .eq('type', 'debit')
           .gte('date', start)
           .lte('date', end)
           .limit(50);
+        
+        if (loopErr) console.error(`Error fetching payments for month offset ${i}:`, loopErr);
         const total = (payments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
         last6Months.push({
           month: format(date, 'MMM'),
@@ -132,7 +155,7 @@ const Dashboard = () => {
       setRevenueData(last6Months);
 
     } catch (err: any) {
-      // Error handled silently or via UI
+      console.error("Dashboard fetchDashboardData unexpected error:", err);
     } finally {
       setLoading(false);
     }

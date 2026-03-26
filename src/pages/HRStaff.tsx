@@ -102,17 +102,7 @@ const HRStaff = () => {
   const fetchHRData = useCallback(async () => {
     setLoading(true);
     try {
-      const [
-        { data: staffData },
-        { data: attendData },
-        { data: leaveData },
-        { data: announceData },
-        { data: overtimeData },
-        { data: advanceData },
-        { data: outsideData },
-        { data: assignData },
-        { data: payData }
-      ] = await Promise.all([
+      const results = await Promise.all([
         supabase.from('staff').select('id, name, email, role, department, salary, status, phone, address, emergency_contact, join_date, rights').order('name').limit(50),
         supabase.from('attendance').select('id, employee_id, date, status, check_in, check_out').order('date', { ascending: false }).limit(50),
         supabase.from('leave_requests').select('id, employee_id, type, start_date, end_date, reason, status').order('created_at', { ascending: false }).limit(50),
@@ -124,7 +114,29 @@ const HRStaff = () => {
         supabase.from('worker_payments').select('id, worker_id, amount, date, method').order('date', { ascending: false }).limit(50)
       ]);
 
-      const staffWithDetails = (staffData || []).map(s => ({
+      const [
+        { data: staffData, error: err1 },
+        { data: attendData, error: err2 },
+        { data: leaveData, error: err3 },
+        { data: announceData, error: err4 },
+        { data: overtimeData, error: err5 },
+        { data: advanceData, error: err6 },
+        { data: outsideData, error: err7 },
+        { data: assignData, error: err8 },
+        { data: payData, error: err9 }
+      ] = results;
+
+      if (err1) console.error("Error fetching staff:", err1);
+      if (err2) console.error("Error fetching attendance:", err2);
+      if (err3) console.error("Error fetching leaves:", err3);
+      if (err4) console.error("Error fetching announcements:", err4);
+      if (err5) console.error("Error fetching overtime:", err5);
+      if (err6) console.error("Error fetching advances:", err6);
+      if (err7) console.error("Error fetching outside workers:", err7);
+      if (err8) console.error("Error fetching outside assignments:", err8);
+      if (err9) console.error("Error fetching outside payments:", err9);
+
+      const staffWithDetails = (staffData ?? []).map(s => ({
         ...s,
         attendance: 95, 
         performance: [4, 5, 4, 5, 5],
@@ -133,26 +145,27 @@ const HRStaff = () => {
       }));
 
       setStaff(staffWithDetails);
-      setAttendance((attendData || []).map(a => ({
+      setAttendance((attendData ?? []).map(a => ({
         ...a,
         name: staffData?.find(s => s.id === a.employee_id)?.name || "Unknown",
         checkIn: a.check_in,
         checkOut: a.check_out
       })));
-      setLeaves((leaveData || []).map(l => ({
+      setLeaves((leaveData ?? []).map(l => ({
         ...l,
         name: staffData?.find(s => s.id === l.employee_id)?.name || "Unknown",
         start: l.start_date,
         end: l.end_date
       })));
-      setAnnouncements(announceData || []);
-      setOvertime(overtimeData || []);
-      setAdvances(advanceData || []);
-      setOutsideWorkers(outsideData || []);
-      setOutsideAssignments(assignData || []);
-      setOutsidePayments(payData || []);
+      setAnnouncements(announceData ?? []);
+      setOvertime(overtimeData ?? []);
+      setAdvances(advanceData ?? []);
+      setOutsideWorkers(outsideData ?? []);
+      setOutsideAssignments(assignData ?? []);
+      setOutsidePayments(payData ?? []);
       setError(null);
     } catch (err: any) {
+      console.error("HRStaff fetchHRData unexpected error:", err);
       setError(err.message);
       toast.error("Failed to fetch HR data");
     } finally {
