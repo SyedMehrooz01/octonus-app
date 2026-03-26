@@ -74,7 +74,7 @@ const Inventory = () => {
     try {
       const { data: itemsData, error: itemsError } = await supabase
         .from('inventory_items')
-        .select('id, name, category, unit, stock, min_stock, purchase_price, supplier, type')
+        .select('id, name, category, unit, stock, purchase_price, supplier, type')
         .limit(50);
       
       if (itemsError) {
@@ -149,7 +149,6 @@ const Inventory = () => {
         category: newItem.category,
         unit: newItem.unit,
         stock: Number(newItem.stock || 0),
-        min_stock: Number(newItem.minStock || 0),
         purchase_price: Number(newItem.purchasePrice || 0),
         supplier: newItem.supplier,
         type: newItem.type
