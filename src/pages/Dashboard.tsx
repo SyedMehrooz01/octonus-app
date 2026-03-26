@@ -57,7 +57,7 @@ const Dashboard = () => {
         supabase.from('inventory_items').select('id, current_stock, min_stock_level').limit(50),
         supabase.from('staff').select('id', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', todayStr),
-        supabase.from('ledger_entries').select('amount').eq('type', 'debit').gte('date', monthStart).lte('date', monthEnd).limit(50),
+        supabase.from('ledger_entries').select('debit').gte('date', monthStart).lte('date', monthEnd).limit(50),
         supabase.from('expenses').select('amount').eq('status', 'approved').gte('date', monthStart).lte('date', monthEnd).limit(50)
       ]);
 
@@ -81,7 +81,7 @@ const Dashboard = () => {
       if (err7) console.error("Error fetching monthly payments:", err7);
       if (err8) console.error("Error fetching monthly expenses:", err8);
 
-      const thisMonthRevenue = (monthlyPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
+      const thisMonthRevenue = (monthlyPayments ?? []).reduce((sum, p) => sum + (p?.debit ?? 0), 0);
       const thisMonthExpenses = (monthlyExpensesData ?? []).reduce((sum, e) => sum + (e?.amount ?? 0), 0);
       const lowStock = (inventoryData ?? []).filter(item => (item?.current_stock ?? 0) <= (item?.min_stock_level ?? 0)).length;
       const pendingPay = (balanceData ?? []).reduce((sum, b) => sum + (b?.balance_due ?? 0), 0);
@@ -100,8 +100,7 @@ const Dashboard = () => {
       // 7. Calculate Revenue Growth
       const { data: prevMonthPayments, error: prevRevErr } = await supabase
         .from('ledger_entries')
-        .select('amount')
-        .eq('type', 'debit')
+        .select('debit')
         .gte('date', prevMonthStart)
         .lte('date', prevMonthEnd)
         .limit(50);
@@ -109,7 +108,7 @@ const Dashboard = () => {
       if (prevRevErr) {
         console.error("Error fetching prev month payments:", prevRevErr);
       }
-      const prevRevenue = (prevMonthPayments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
+      const prevRevenue = (prevMonthPayments ?? []).reduce((sum, p) => sum + (p?.debit ?? 0), 0);
       if (prevRevenue > 0) {
         const growth = ((thisMonthRevenue - prevRevenue) / prevRevenue) * 100;
         setRevenueGrowth(`${growth > 0 ? '+' : ''}${growth.toFixed(1)}%`);
@@ -139,14 +138,13 @@ const Dashboard = () => {
         const end = endOfMonth(date).toISOString();
         const { data: payments, error: loopErr } = await supabase
           .from('ledger_entries')
-          .select('amount')
-          .eq('type', 'debit')
+          .select('debit')
           .gte('date', start)
           .lte('date', end)
           .limit(50);
         
         if (loopErr) console.error(`Error fetching payments for month offset ${i}:`, loopErr);
-        const total = (payments ?? []).reduce((sum, p) => sum + (p?.amount ?? 0), 0);
+        const total = (payments ?? []).reduce((sum, p) => sum + (p?.debit ?? 0), 0);
         last6Months.push({
           month: format(date, 'MMM'),
           revenue: total

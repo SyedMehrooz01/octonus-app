@@ -141,8 +141,8 @@ const Inventory = () => {
     return matchesSearch && matchesCategory && matchesDate;
   });
 
-  const lowStock = (items ?? []).filter(i => (i?.stock ?? 0) <= (i?.minStock ?? 0));
-  const totalValue = (items ?? []).reduce((s, i) => s + ((i?.stock ?? 0) * (i?.purchasePrice ?? 0)), 0);
+  const lowStock = (items ?? []).filter(i => (i?.current_stock ?? 0) <= (i?.min_stock_level ?? 0));
+  const totalValue = (items ?? []).reduce((s, i) => s + ((i?.current_stock ?? 0) * (i?.purchase_price ?? 0)), 0);
 
   const handleAdd = async () => {
     if (!newItem?.name) return;
@@ -606,7 +606,7 @@ const Inventory = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-lg bg-muted/40 p-3 text-sm">
-              Current Stock: <span className="font-bold">{selectedItem?.stock} {selectedItem?.unit}</span>
+              Current Stock: <span className="font-bold">{selectedItem?.current_stock} {selectedItem?.unit}</span>
             </div>
             <div className="space-y-1.5">
               <Label>Quantity</Label>

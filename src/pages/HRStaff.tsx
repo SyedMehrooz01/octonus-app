@@ -147,14 +147,14 @@ const HRStaff = () => {
       setStaff(staffWithDetails);
       setAttendance((attendData ?? []).map(a => ({
         ...a,
-        name: staffData?.find(s => s.id === a.employee_id)?.name || "Unknown",
+        name: (staffData ?? []).find(s => s.id === a.employee_id)?.name || "Unknown",
         checkIn: a.check_in,
         checkOut: a.check_out
       })));
       setLeaves((leaveData ?? []).map(l => ({
         ...l,
         type: l.leave_type,
-        name: staffData?.find(s => s.id === l.employee_id)?.name || "Unknown",
+        name: (staffData ?? []).find(s => s.id === l.employee_id)?.name || "Unknown",
         start: l.start_date,
         end: l.end_date
       })));
@@ -169,6 +169,15 @@ const HRStaff = () => {
       console.error("HRStaff fetchHRData unexpected error:", err);
       setError(err.message);
       toast.error("Failed to fetch HR data");
+      setStaff([]);
+      setAttendance([]);
+      setLeaves([]);
+      setAnnouncements([]);
+      setOvertime([]);
+      setAdvances([]);
+      setOutsideWorkers([]);
+      setOutsideAssignments([]);
+      setOutsidePayments([]);
     } finally {
       setLoading(false);
     }

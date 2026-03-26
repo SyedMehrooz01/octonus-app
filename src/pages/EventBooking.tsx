@@ -132,7 +132,7 @@ const EventBooking = () => {
       } else if (menusData && (menusData ?? []).length > 0) {
         const { data: itemsData, error: itemsError } = await supabase
           .from('menu_items')
-          .select('id, item, unit, rate, menu_id')
+          .select('id, menu_id, name, quantity, unit, rate, created_at')
           .order('id', { ascending: true })
           .limit(100);
 
@@ -143,7 +143,10 @@ const EventBooking = () => {
 
         const formattedMenus = (menusData ?? []).map(m => ({
           ...m,
-          items: (itemsData ?? []).filter(i => i?.menu_id === m?.id) || []
+          items: (itemsData ?? []).filter(i => i?.menu_id === m?.id).map(i => ({
+            ...i,
+            item: i.name // Mapping 'name' from DB to 'item' used in UI
+          })) || []
         }));
         setMenus(formattedMenus);
       } else {
@@ -176,6 +179,8 @@ const EventBooking = () => {
       }
     } catch (err) {
       console.error("fetchSuppliers unexpected error:", err);
+      setSuppliers([]);
+      setSupplierPayments([]);
     }
   }, []);
 
@@ -192,7 +197,7 @@ const EventBooking = () => {
         console.error("Bookings fetch error:", error);
         setBookings([]);
       } else if (data) {
-        setBookings(data.map(b => ({
+        setBookings((data ?? []).map(b => ({
           id: b.id,
           clientName: b.client_name,
           phone: b.client_phone,
@@ -209,9 +214,11 @@ const EventBooking = () => {
           menu: b.menu || "N/A", 
           notes: b.notes || "", 
           thirdParty: b.third_party || false, 
-          supplierCost: b.supplier_cost || 0, 
-          sellingRate: b.selling_rate || 0 
+          supplier_cost: b.supplier_cost || 0, 
+          selling_rate: b.selling_rate || 0 
         })));
+      } else {
+        setBookings([]);
       }
     } catch (err: any) {
       console.error("fetchBookingsData unexpected error:", err);
@@ -332,7 +339,7 @@ const EventBooking = () => {
         const { error } = await supabase
           .from('menu_items')
           .update({
-            item: itemForm.item,
+            name: itemForm.item,
             unit: itemForm.unit,
             rate: itemForm.rate
           })
@@ -345,10 +352,11 @@ const EventBooking = () => {
         const { error } = await supabase
           .from('menu_items')
           .insert([{
-            item: itemForm.item,
+            name: itemForm.item,
             unit: itemForm.unit,
             rate: itemForm.rate,
-            menu_id: activeMenuId
+            menu_id: activeMenuId,
+            quantity: 1 // Default quantity if required
           }]);
 
         if (error) throw error;

@@ -124,28 +124,26 @@ const Finance = () => {
     try {
       const { data, error } = await supabase
         .from('ledger_entries')
-        .select('id, date, description, account, type, amount')
+        .select('id, date, description, debit, credit, balance, account_type, reference, created_at')
         .order('date', { ascending: true })
         .limit(50);
 
       if (error) throw error;
       
-      let runningBalance = 0;
       const ledgerData = (data ?? []).map((entry: any) => {
-        const amount = Number(entry?.amount || 0);
-        runningBalance = entry.type === 'debit' ? runningBalance + amount : runningBalance - amount;
         return {
           id: entry?.id ?? "",
           date: entry?.date ?? format(new Date(), "yyyy-MM-dd"),
           description: entry?.description ?? "No description",
-          account: entry?.account ?? "N/A",
-          type: entry?.type ?? "debit",
-          amount: amount,
-          balance: runningBalance
+          account: entry?.account_type ?? "N/A",
+          type: (entry?.debit ?? 0) > 0 ? 'debit' : 'credit',
+          amount: (entry?.debit ?? 0) > 0 ? entry.debit : entry.credit,
+          balance: entry?.balance ?? 0
         };
       });
       setLedger(ledgerData);
     } catch (err: any) {
+      console.error("fetchFinanceData error:", err);
       setLedger([]); 
     } finally {
       setLoading(false);
@@ -234,10 +232,11 @@ const Finance = () => {
       const { error } = await supabase.from('ledger_entries').insert([{
         date: newEntry.date,
         description: newEntry.description,
-        account: newEntry.account,
-        type: newEntry.type,
-        amount: Number(newEntry.amount),
-        created_by: user?.email
+        account_type: newEntry.account,
+        debit: newEntry.type === 'debit' ? Number(newEntry.amount) : 0,
+        credit: newEntry.type === 'credit' ? Number(newEntry.amount) : 0,
+        balance: netBalance + (newEntry.type === 'debit' ? Number(newEntry.amount) : -Number(newEntry.amount)),
+        reference: user?.email
       }]);
 
       if (error) throw error;

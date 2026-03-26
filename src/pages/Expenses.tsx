@@ -96,16 +96,18 @@ const Expenses = () => {
     try {
       const { data, error } = await supabase 
         .from('expenses') 
-        .select('id, voucher_no, date, description, category, payment_mode, amount, linked_event, status, approved_by, approved_at, created_at, rejection_reason') 
+        .select('id, voucher_no, date, description, category, payment_mode, amount, linked_event, status, approved_by, approved_at, created_by, created_by_name, created_by_id, created_by_role, created_at') 
         .order('created_at', { ascending: false })
         .limit(50); 
       
       if (error) { 
+        console.error("fetchExpenses error:", error);
         setExpenses([]);
       } else { 
-        setExpenses(data || []); 
+        setExpenses(data ?? []); 
       } 
     } catch (error: any) {
+      console.error("fetchExpenses unexpected error:", error);
       setExpenses([]);
     } finally {
       setLoading(false);
