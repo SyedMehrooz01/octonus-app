@@ -50,13 +50,14 @@ interface Expense {
   status: 'pending' | 'approved' | 'rejected';
   approved_by?: string | null;
   approved_at?: string | null;
+  rejection_reason?: string | null;
   created_by?: string | null;
   created_by_name?: string | null;
   created_by_id?: string | null;
   created_by_role?: string | null;
   created_at?: string;
-  rejection_reason?: string | null;
 }
+
 
 const Expenses = () => {
   const { user, canDo, logAction } = useAuth();
@@ -100,8 +101,7 @@ const Expenses = () => {
     try {
       const data = await financeService.getExpenses();
       if (!isMounted) return;
-      if (!data) throw new Error("Failed to fetch expenses.");
-      setExpenses(data); 
+      setExpenses(data ?? []); 
     } catch (error: any) {
       console.error("fetchExpenses unexpected error:", error);
       if (isMounted) {
@@ -112,6 +112,7 @@ const Expenses = () => {
       if (isMounted) setLoading(false);
     }
   }, []);
+
 
   useEffect(() => {
     let isMounted = true;
@@ -127,7 +128,13 @@ const Expenses = () => {
     
     setIsSubmitting(true);
     try {
+      // Voucher number generation
+      const currentYear = new Date().getFullYear();
+      const count = (expenses ?? []).length;
+      const voucherNo = `EXP-${currentYear}-${String(count + 1).padStart(3, '0')}`;
+
       await financeService.addExpense({
+        voucher_no: voucherNo,
         date: newExpense.date,
         description: newExpense.description,
         category: newExpense.head,
@@ -160,6 +167,7 @@ const Expenses = () => {
       setIsSubmitting(false);
     }
   };
+
 
   const handleApprove = async (id: string) => {
     setIsSubmitting(true);
@@ -270,7 +278,8 @@ const Expenses = () => {
     
     doc.setFontSize(9);
     doc.setTextColor(100);
-    doc.text(`Voucher No: EXP-2026-${expense.id.slice(0, 4).toUpperCase()}`, 195, 68, { align: "right" });
+    doc.text(`Voucher No: ${expense.voucher_no || `EXP-2026-${expense.id.slice(0, 4).toUpperCase()}`}`, 195, 68, { align: "right" });
+
     
     // --- TWO COLUMN DETAILS SECTION ---
     const infoY = 80;
@@ -441,7 +450,6 @@ const Expenses = () => {
     doc.save(`Expenses_Ledger_${format(new Date(), "yyyy-MM-dd")}.pdf`);
   };
 
-  // Filtered expenses for entries tab
   const filtered = useMemo(() => {
     // Start with all expenses
     let results = [...(expenses ?? [])];
@@ -456,15 +464,20 @@ const Expenses = () => {
       results = results.filter(e => e?.category === filterHead);
     }
     
-    // Only filter by month if selectedMonth is set (and maybe skip if we want to show all initially)
-    // To show ALL initially, we can make selectedMonth default to something that doesn't filter,
-    // or just check if it's set.
+    // Default to current month if no filter selected, but show all if filter cleared
     if (selectedMonth) {
       results = results.filter(e => (e?.date ?? "").startsWith(selectedMonth));
+    } else {
+      // If no search/head filter, default to current month as requested
+      if (!search && filterHead === "all") {
+        const currentMonth = format(new Date(), "yyyy-MM");
+        results = results.filter(e => (e?.date ?? "").startsWith(currentMonth));
+      }
     }
     
     return results;
   }, [expenses, search, filterHead, selectedMonth]);
+
 
   // Ledger filtering
   const ledgerFiltered = useMemo(() => {
@@ -641,15 +654,16 @@ const Expenses = () => {
         {[
           { label: "Today's Burn Rate", value: `₨ ${(todayExpenses ?? 0).toLocaleString()}`, icon: Calendar, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20", sub: format(new Date(), "PP") },
           { 
-            label: viewType === "monthly" ? "Current Month Burn" : "Annual Burn Rate", 
-            value: `₨ ${((viewType === "monthly" ? monthExpenses : totalYearly) ?? 0).toLocaleString()}`, 
+            label: "Current Month Burn", 
+            value: `₨ ${(monthExpenses ?? 0).toLocaleString()}`, 
             icon: TrendingDown, 
             color: "from-orange-500 to-orange-700",
             shadow: "shadow-orange-500/20",
-            sub: viewType === "monthly" ? format(new Date(), "MMMM yyyy") : selectedYear
+            sub: format(new Date(), "MMMM yyyy")
           },
           { label: "Aggregate Burn", value: `₨ ${(totalExpenses ?? 0).toLocaleString()}`, icon: Receipt, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20", sub: "All time records" },
         ].map((card, i) => (
+
           <div key={card.label} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.color} p-6 text-white shadow-xl ${card.shadow} transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
             <div className="relative z-10 flex flex-col gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
