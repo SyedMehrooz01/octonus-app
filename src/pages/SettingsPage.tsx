@@ -190,7 +190,6 @@ const SettingsPage = () => {
       return;
     }
 
-    // --- PASSWORD REQUIREMENTS (8 chars, num, special) ---
     const pwdError = validatePassword(newUser.password);
     if (pwdError) {
       toast({ title: "Weak Password", description: pwdError, variant: "destructive" });
@@ -213,7 +212,8 @@ const SettingsPage = () => {
           role: newUser.role,
           page_access: newUser.permissions.pages,
           action_permissions: newUser.permissions.actions,
-          status: 'active'
+          status: 'active',
+          created_by: currentUser?.name || currentUser?.email || 'System'
         });
       }
 
@@ -226,6 +226,7 @@ const SettingsPage = () => {
       });
       fetchUsers();
     } catch (err: any) {
+      console.error("Add user error:", err);
       toast({ title: "Error", description: err.message || "Failed to create user", variant: "destructive" });
     } finally {
       setSaving(false);
@@ -235,8 +236,8 @@ const SettingsPage = () => {
   const handleEditUser = (user: any) => {
     setSelectedUser(user);
     setEditUser({
-      id: user.id,
-      name: user.full_name,
+      id: String(user.id),
+      name: user.full_name || user.name || "",
       role: user.role,
       permissions: {
         pages: user.page_access || [],
@@ -263,10 +264,27 @@ const SettingsPage = () => {
 
       toast({ title: "User Updated", description: "Permissions and role updated successfully." });
       logAction(`Updated user permissions for: ${editUser.name}`, "Settings");
+      setShowEditUserModal(true); // Keeping modal open for confirmation or closing manually
       setShowEditUserModal(false);
       fetchUsers();
     } catch (err: any) {
+      console.error("Update user error:", err);
       toast({ title: "Error", description: err.message || "Failed to update user", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateUserStatus = async (id: string, status: string) => {
+    setSaving(true);
+    try {
+      await userService.updateUser(id, { status });
+      toast({ title: "User Status Updated", description: `User is now ${status}.` });
+      logAction(`Updated user status for ID: ${id} to ${status}`, "Settings");
+      fetchUsers();
+    } catch (err: any) {
+      console.error("Update status error:", err);
+      toast({ title: "Error", description: "Failed to update user status", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -278,7 +296,6 @@ const SettingsPage = () => {
       return;
     }
 
-    // --- PASSWORD REQUIREMENTS (8 chars, num, special) ---
     const pwdError = validatePassword(newPassword);
     if (pwdError) {
       toast({ title: "Weak Password", description: pwdError, variant: "destructive" });
@@ -290,8 +307,8 @@ const SettingsPage = () => {
       // In Supabase, resetting another user's password usually requires admin Edge Functions
       // For now we'll simulate the success as requested for the UI flow
       await new Promise(resolve => setTimeout(resolve, 1000));
-      toast({ title: "Password Reset", description: `Password for ${selectedUser.full_name} has been reset.` });
-      logAction(`Reset password for: ${selectedUser.full_name}`, "Settings");
+      toast({ title: "Password Reset", description: `Password for ${selectedUser.full_name || selectedUser.name} has been reset.` });
+      logAction(`Reset password for: ${selectedUser.full_name || selectedUser.name}`, "Settings");
       setShowResetPasswordModal(false);
       setNewPassword("");
     } catch (err: any) {
@@ -301,19 +318,7 @@ const SettingsPage = () => {
     }
   };
 
-  const handleUpdateUserStatus = async (id: string, status: string) => {
-    setSaving(true);
-    try {
-      await userService.updateUser(id, { status });
-      toast({ title: "User Status Updated" });
-      logAction(`Updated user status for ID: ${id} to ${status}`, "Settings");
-      fetchUsers();
-    } catch (err: any) {
-      toast({ title: "Error", description: "Failed to update user status", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
+
 
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Are you sure you want to delete this user? This cannot be undone.")) return;

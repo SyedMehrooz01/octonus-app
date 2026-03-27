@@ -101,15 +101,15 @@ const FileManager = () => {
     try {
       const fileName = uploadName || uploadFile.name;
       const fileExt = uploadFile.name.split(".").pop();
-      const filePath = `${Math.random()}.${fileExt}`;
+      const filePath = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
-      // 1. Upload to Supabase Storage
+      // 1. Upload to Supabase Storage in "documents" bucket
       await fileService.uploadFile("documents", filePath, uploadFile);
 
       // 2. Get Public URL
       const publicUrl = fileService.getPublicUrl("documents", filePath);
 
-      // 3. Save Metadata to DB
+      // 3. Save Metadata to "file_manager" table
       await fileService.addFileRecord({
         file_name: fileName,
         file_url: publicUrl,
@@ -118,7 +118,6 @@ const FileManager = () => {
         category: uploadCategory,
         description: uploadDescription,
         uploaded_by: user?.name || user?.email || "System",
-        user_id: user?.id,
         created_at: new Date().toISOString()
       });
 
@@ -129,6 +128,7 @@ const FileManager = () => {
       setUploadDescription("");
       fetchFiles();
     } catch (err: any) {
+      console.error("Upload error:", err);
       toast.error(err.message || "Failed to upload file");
     } finally {
       setSaving(false);
@@ -139,20 +139,26 @@ const FileManager = () => {
     if (!confirm("Are you sure you want to delete this file?")) return;
 
     try {
-      // Extract file path from URL
-      const filePath = fileUrl.split("/").pop();
+      // 1. Extract file path from URL to delete from Storage
+      // Public URL format: https://[project-id].supabase.co/storage/v1/object/public/documents/[path]
+      const urlParts = fileUrl.split("/");
+      const filePath = urlParts[urlParts.length - 1];
+      
       if (filePath) {
         await fileService.deleteFileStorage("documents", [filePath]);
       }
 
+      // 2. Delete record from database
       await fileService.deleteFileRecord(id);
 
       toast.success("File deleted successfully");
       fetchFiles();
     } catch (err: any) {
+      console.error("Delete error:", err);
       toast.error(err.message || "Failed to delete file");
     }
   };
+
 
   const getFileIcon = (type: string) => {
     if (type.includes("pdf")) return <FileText className="h-10 w-10 text-rose-500" />;
