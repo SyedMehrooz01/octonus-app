@@ -58,10 +58,12 @@ const HRPayroll = memo(({
             </thead>
             <tbody className="divide-y divide-border">
               {(staff ?? []).map((s, idx) => {
-                const latestPayroll = s?.payrollHistory?.[(s?.payrollHistory?.length ?? 0) - 1];
+                const payrollHistory = s?.payrollHistory ?? [];
+                const latestPayroll = payrollHistory.length > 0 ? payrollHistory[payrollHistory.length - 1] : null;
                 const netSalary = latestPayroll ? (latestPayroll?.netPay ?? 0) : (s?.salary ?? 0);
                 return (
-                  <tr key={s?.id ?? Math.random()} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-primary/5 transition-colors group`}>
+                  <tr key={s?.id || `payroll-${idx}`} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-primary/5 transition-colors group`}>
+
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-xs">

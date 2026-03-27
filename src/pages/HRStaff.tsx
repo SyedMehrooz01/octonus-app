@@ -84,9 +84,10 @@ const HRStaff = () => {
   const [ledgerStaff, setLedgerStaff] = useState<any>(null);
   const [rightsStaff, setRightsStaff] = useState<any>(null);
   const [selectedPayslip, setSelectedPayslip] = useState<any>(null);
-  const [editAttendanceId, setEditAttendanceId] = useState<number | null>(null);
+  const [editAttendanceId, setEditAttendanceId] = useState<string | null>(null);
 
   // Form states
+
   const [newStaff, setNewStaff] = useState({ name: "", email: "", role: "", department: "Operations", salary: "", phone: "", address: "", emergencyContact: "", joinDate: format(new Date(), 'yyyy-MM-dd') });
   const [attendanceForm, setAttendanceForm] = useState({ empId: "", date: format(new Date(), 'yyyy-MM-dd'), status: "present", checkIn: "09:00", checkOut: "18:00" });
   const [bulkStatus, setBulkStatus] = useState("present");
@@ -132,7 +133,7 @@ const HRStaff = () => {
 
       if (!staffDataRaw) throw new Error("Failed to fetch staff data.");
 
-      const staffData = staffDataRaw;
+      const staffData = staffDataRaw ?? [];
       const attendData = attendDataRaw ?? [];
       const leaveData = leaveDataRaw ?? [];
       const announceData = announceDataRaw ?? [];
@@ -142,7 +143,7 @@ const HRStaff = () => {
       const assignData = assignDataRaw ?? [];
       const payData = payDataRaw ?? [];
 
-      const staffWithDetails = staffData.map(s => ({
+      const staffWithDetails = (staffData ?? []).map(s => ({
         ...s,
         attendance: 95, 
         performance: [4, 5, 4, 5, 5],
@@ -151,19 +152,20 @@ const HRStaff = () => {
       }));
 
       setStaff(staffWithDetails);
-      setAttendance(attendData.map(a => ({
+      setAttendance((attendData ?? []).map(a => ({
         ...a,
-        name: staffData.find(s => s.id === a.employee_id)?.name || "Unknown",
+        name: (staffData ?? []).find(s => s.id === a.employee_id)?.name || "Unknown",
         checkIn: a.check_in,
         checkOut: a.check_out
       })));
-      setLeaves(leaveData.map(l => ({
+      setLeaves((leaveData ?? []).map(l => ({
         ...l,
         type: l.leave_type,
-        name: staffData.find(s => s.id === l.employee_id)?.name || "Unknown",
+        name: (staffData ?? []).find(s => s.id === l.employee_id)?.name || "Unknown",
         start: l.start_date,
         end: l.end_date
       })));
+
       setAnnouncements(announceData);
       setOvertime(overtimeData);
       setAdvances(advanceData);
@@ -328,7 +330,7 @@ const HRStaff = () => {
     setSaving(true);
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
-      const records = staff.map(s => ({
+      const records = (staff ?? []).map(s => ({
         employee_id: s.id,
         date: today,
         status: bulkStatus,
@@ -336,6 +338,7 @@ const HRStaff = () => {
         check_out: '18:00'
       }));
       await hrService.upsertAttendance(records);
+
       await fetchHRData(true);
       setShowBulkAttendanceModal(false);
       toast.success(`All staff marked as ${bulkStatus}`);
@@ -350,7 +353,7 @@ const HRStaff = () => {
     setSaving(true);
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
-      const records = staff.map(s => ({
+      const records = (staff ?? []).map(s => ({
         employee_id: s.id,
         date: today,
         status: 'present',
@@ -358,6 +361,7 @@ const HRStaff = () => {
         check_out: '18:00'
       }));
       await hrService.upsertAttendance(records);
+
       await fetchHRData(true);
       toast.success("All staff marked as present for today");
     } catch (err: any) {
@@ -367,7 +371,7 @@ const HRStaff = () => {
     }
   }, [staff, fetchHRData]);
 
-  const handleUpdateAttendance = useCallback(async (id: number, status: string) => {
+  const handleUpdateAttendance = useCallback(async (id: string, status: string) => {
     try {
       await hrService.updateAttendance(id, status);
       await fetchHRData(true);
@@ -382,13 +386,13 @@ const HRStaff = () => {
     setSaving(true);
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
-      const markedEmpIds = attendance.filter(a => a.date === today).map(a => a.employee_id);
-      const unmarkedStaff = staff.filter(s => !markedEmpIds.includes(s.id));
+      const markedEmpIds = (attendance ?? []).filter(a => a.date === today).map(a => a.employee_id);
+      const unmarkedStaff = (staff ?? []).filter(s => !markedEmpIds.includes(s.id));
       if (unmarkedStaff.length === 0) {
         toast.info("No unmarked staff found for today");
         return;
       }
-      const records = unmarkedStaff.map(s => ({
+      const records = (unmarkedStaff ?? []).map(s => ({
         employee_id: s.id,
         date: today,
         status: 'absent'
@@ -402,6 +406,7 @@ const HRStaff = () => {
       setSaving(false);
     }
   }, [attendance, staff, fetchHRData]);
+
 
   const handleMarkAsPaid = useCallback(async () => {
     setSaving(true);
@@ -446,7 +451,7 @@ const HRStaff = () => {
     }
   }, [leaveForm, fetchHRData]);
 
-  const handleLeaveAction = useCallback(async (id: number, status: string) => {
+  const handleLeaveAction = useCallback(async (id: string, status: string) => {
     setSaving(true);
     try {
       await hrService.updateLeaveStatus(id, status);
@@ -458,6 +463,7 @@ const HRStaff = () => {
       setSaving(false);
     }
   }, [fetchHRData]);
+
 
   const handleAddPerformance = useCallback(async () => {
     if (!performanceForm.empId) return;
@@ -681,7 +687,7 @@ const HRStaff = () => {
     toast.success(`Printing ID Card for ${worker.name}`);
   }, []);
 
-  const handleOvertimeAction = useCallback(async (id: number, status: string) => {
+  const handleOvertimeAction = useCallback(async (id: string, status: string) => {
     try {
       await hrService.updateOvertimeStatus(id, status);
       await fetchHRData(true);
@@ -691,7 +697,7 @@ const HRStaff = () => {
     }
   }, [fetchHRData]);
 
-  const handleAdvanceAction = useCallback(async (id: number, status: string) => {
+  const handleAdvanceAction = useCallback(async (id: string, status: string) => {
     try {
       await hrService.updateAdvanceSalaryStatus(id, status);
       await fetchHRData(true);
@@ -700,6 +706,7 @@ const HRStaff = () => {
       toast.error("Failed to update advance status");
     }
   }, [fetchHRData]);
+
 
   const filteredStaff = useMemo(() => (staff ?? []).filter(s =>
     (s?.name ?? "").toLowerCase().includes(search.toLowerCase()) ||

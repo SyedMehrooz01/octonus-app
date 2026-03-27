@@ -92,10 +92,11 @@ const HROutsideWorkers = memo(({
       {outsideViewMode === "cards" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {(outsideWorkers ?? []).filter(w => 
-            (w?.name ?? "").toLowerCase().includes(search.toLowerCase()) || 
-            (w?.skill ?? "").toLowerCase().includes(search.toLowerCase())
-          ).map(worker => (
-            <div key={worker?.id ?? Math.random()} className="relative group overflow-hidden rounded-2xl border border-border bg-white p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+            (w?.name ?? "").toLowerCase().includes((search ?? "").toLowerCase()) || 
+            (w?.skill ?? "").toLowerCase().includes((search ?? "").toLowerCase())
+          ).map((worker, idx) => (
+            <div key={worker?.id || `worker-${idx}`} className="relative group overflow-hidden rounded-2xl border border-border bg-white p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-5">
                   <div className="relative">
@@ -153,9 +154,10 @@ const HROutsideWorkers = memo(({
                   <CalendarDays className="h-3 w-3 text-primary" /> Recent Assignments
                 </p>
                 <div className="space-y-2">
-                  {(outsideAssignments ?? []).filter(a => a?.workerId === worker?.id).slice(0, 2).map(a => (
-                    <div key={a?.id ?? Math.random()} className="flex items-center justify-between text-[10px] bg-white/50 p-2 rounded-lg border border-border/30">
+                  {(outsideAssignments ?? []).filter(a => a?.workerId === worker?.id).slice(0, 2).map((a, idx) => (
+                    <div key={a?.id || `assignment-${idx}`} className="flex items-center justify-between text-[10px] bg-white/50 p-2 rounded-lg border border-border/30">
                       <span className="font-black text-foreground/80 truncate max-w-[110px]">{a?.eventName ?? "Event"}</span>
+
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground font-bold">{a?.date ? format(new Date(a.date), 'MMM d') : "N/A"}</span>
                         <Badge className={`h-4 text-[8px] px-1 border-none ${a?.status === 'paid' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
@@ -197,10 +199,10 @@ const HROutsideWorkers = memo(({
                 <tbody className="divide-y divide-border">
                   {(outsideAssignments ?? []).filter(a => {
                     const w = (outsideWorkers ?? []).find(x => x?.id === a?.workerId);
-                    return (w?.name ?? "").toLowerCase().includes(search.toLowerCase()) || 
-                           (a?.eventName ?? "").toLowerCase().includes(search.toLowerCase());
+                    return (w?.name ?? "").toLowerCase().includes((search ?? "").toLowerCase()) || 
+                           (a?.eventName ?? "").toLowerCase().includes((search ?? "").toLowerCase());
                   }).map((a, idx) => (
-                    <tr key={a?.id ?? Math.random()} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-primary/5 transition-colors group`}>
+                    <tr key={a?.id || `assignment-row-${idx}`} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-primary/5 transition-colors group`}>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs border border-indigo-100">
@@ -209,6 +211,7 @@ const HROutsideWorkers = memo(({
                           <span className="text-sm font-black text-foreground">{(outsideWorkers ?? []).find(w => w?.id === a?.workerId)?.name ?? "Unknown Worker"}</span>
                         </div>
                       </td>
+
                       <td className="px-6 py-5">
                         <span className="text-sm font-bold text-foreground/80">{a?.eventName ?? "Event Detail"}</span>
                       </td>
@@ -260,12 +263,13 @@ const HROutsideWorkers = memo(({
                 <tbody className="divide-y divide-border">
                   {(outsidePayments ?? []).filter(p => {
                     const w = (outsideWorkers ?? []).find(x => x?.id === p?.workerId);
-                    return (w?.name ?? "").toLowerCase().includes(search.toLowerCase()) || 
-                           (p?.method ?? "").toLowerCase().includes(search.toLowerCase());
+                    return (w?.name ?? "").toLowerCase().includes((search ?? "").toLowerCase()) || 
+                           (p?.method ?? "").toLowerCase().includes((search ?? "").toLowerCase());
                   }).map((p, idx) => (
-                    <tr key={p?.id ?? Math.random()} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-emerald-50 transition-colors group`}>
+                    <tr key={p?.id || `payment-row-${idx}`} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-emerald-50 transition-colors group`}>
                       <td className="px-6 py-5 text-sm font-bold text-muted-foreground uppercase tracking-tighter">{p?.date ? format(new Date(p.date), 'MMMM dd, yyyy') : "N/A"}</td>
                       <td className="px-6 py-5 font-black text-foreground">{(outsideWorkers ?? []).find(w => w?.id === p?.workerId)?.name ?? "Unknown"}</td>
+
                       <td className="px-6 py-5 text-center">
                         <span className={`inline-flex px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${p?.method === "cash" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}>
                           {p?.method ?? "cash"}

@@ -236,11 +236,11 @@ const HRProfiles = memo(({
                 </div>
                 <div className="space-y-1.5">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.1em]">Join Date</p>
-                  <p className="text-sm font-black text-foreground/80">{s?.joinDate ?? "N/A"}</p>
+                  <p className="text-sm font-black text-foreground/80">{s?.joining_date || s?.joinDate || "N/A"}</p>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between border-t border-border pt-6">
+              <div className="flex items-center justify-between border-t border-border pt-6 mb-6">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Attendance</span>
                   <div className="flex items-center gap-2 mt-1">

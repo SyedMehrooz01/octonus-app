@@ -7,9 +7,10 @@ interface HRAdvancesProps {
   canDo: (action: string) => boolean;
   setShowAdvanceModal: (show: boolean) => void;
   advances: any[];
-  handleAdvanceAction: (id: number, status: string) => void;
+  handleAdvanceAction: (id: string, status: string) => void;
   statusColor: (status: string) => string;
 }
+
 
 const HRAdvances = memo(({
   canDo,
@@ -41,9 +42,10 @@ const HRAdvances = memo(({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {(advances ?? []).map(a => (
-                <tr key={a?.id ?? Math.random()} className="text-sm hover:bg-muted/20">
+              {(advances ?? []).map((a, idx) => (
+                <tr key={a?.id || `advance-${idx}`} className="text-sm hover:bg-muted/20">
                   <td className="px-4 py-3 font-medium">{a?.name ?? "Unknown"}</td>
+
                   <td className="px-4 py-3 text-muted-foreground">{a?.date ?? "N/A"}</td>
                   <td className="px-4 py-3">₨ {(a?.amount ?? 0).toLocaleString()}</td>
                   <td className="px-4 py-3">{a?.reason ?? "No Reason"}</td>

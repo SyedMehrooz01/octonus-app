@@ -7,9 +7,10 @@ interface HROvertimeProps {
   canDo: (action: string) => boolean;
   setShowOvertimeModal: (show: boolean) => void;
   overtime: any[];
-  handleOvertimeAction: (id: number, status: string) => void;
+  handleOvertimeAction: (id: string, status: string) => void;
   statusColor: (status: string) => string;
 }
+
 
 const HROvertime = memo(({
   canDo,
@@ -40,9 +41,10 @@ const HROvertime = memo(({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {(overtime ?? []).map(o => (
-                <tr key={o?.id ?? Math.random()} className="text-sm hover:bg-muted/20">
+              {(overtime ?? []).map((o, idx) => (
+                <tr key={o?.id || `overtime-${idx}`} className="text-sm hover:bg-muted/20">
                   <td className="px-4 py-3 font-medium">{o?.name ?? "Unknown"}</td>
+
                   <td className="px-4 py-3 text-muted-foreground">{o?.date ?? "N/A"}</td>
                   <td className="px-4 py-3">{o?.hours ?? 0}</td>
                   <td className="px-4 py-3">

@@ -25,11 +25,12 @@ interface HRAttendanceProps {
   handleAutoAbsent: () => void;
   handleExportAttendance: () => void;
   attendance: any[];
-  editAttendanceId: number | null;
-  setEditAttendanceId: (id: number | null) => void;
-  handleUpdateAttendance: (id: number, status: string) => void;
+  editAttendanceId: string | null;
+  setEditAttendanceId: (id: string | null) => void;
+  handleUpdateAttendance: (id: string, status: string) => void;
   statusColor: (status: string) => string;
 }
+
 
 const HRAttendance = memo(({
   canDo,
@@ -96,7 +97,7 @@ const HRAttendance = memo(({
             </thead>
             <tbody className="divide-y divide-border">
               {(attendance ?? []).map((a, idx) => (
-                <tr key={a?.id ?? Math.random()} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-primary/5 transition-colors group`}>
+                <tr key={a?.id || `attendance-${idx}`} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-primary/5 transition-colors group`}>
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-xs">
@@ -114,6 +115,7 @@ const HRAttendance = memo(({
                     {editAttendanceId === a?.id ? (
                       <div className="flex justify-center">
                         <Select defaultValue={a?.status ?? "present"} onValueChange={(v) => handleUpdateAttendance(a?.id, v)}>
+
                           <SelectTrigger className="h-9 w-[130px] rounded-xl border-border bg-white font-bold text-xs">
                             <SelectValue />
                           </SelectTrigger>

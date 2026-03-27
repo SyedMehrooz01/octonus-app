@@ -13,7 +13,7 @@ interface HRLeavesProps {
   canDo: (action: string) => boolean;
   setShowLeaveRequestModal: (show: boolean) => void;
   leaves: any[];
-  handleLeaveAction: (id: number, status: string) => void;
+  handleLeaveAction: (id: string, status: string) => void;
   statusColor: (status: string) => string;
   showLeaveRequestModal: boolean;
   leaveForm: any;
@@ -21,6 +21,7 @@ interface HRLeavesProps {
   staff: any[];
   handleRequestLeave: () => void;
 }
+
 
 const HRLeaves = memo(({
   canDo,
@@ -58,7 +59,7 @@ const HRLeaves = memo(({
             </thead>
             <tbody className="divide-y divide-border">
               {(leaves ?? []).map((l, idx) => (
-                <tr key={l?.id ?? Math.random()} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-primary/5 transition-colors group`}>
+                <tr key={l?.id || `leave-${idx}`} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-primary/5 transition-colors group`}>
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-xs">
@@ -67,6 +68,7 @@ const HRLeaves = memo(({
                       <span className="text-sm font-black text-foreground">{l?.name ?? "Unknown"}</span>
                     </div>
                   </td>
+
                   <td className="px-6 py-5">
                     <Badge variant="outline" className="rounded-lg font-bold text-[10px] uppercase tracking-tighter bg-white border-border px-2.5 py-1">
                       {l?.type ?? "Annual"}
