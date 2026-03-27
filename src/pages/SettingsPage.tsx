@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, useCallback } from "react";
 import { 
   Building2, User, Bell, Shield, Palette, Save, Users, Plus, 
   Trash2, Key, History, Search, CheckCircle2, XCircle, Edit2, 
@@ -21,7 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { useAuth, ROLE_PERMISSIONS, UserRole, UserAction } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import * as userService from "@/services/userService";
+import * as authService from "@/services/authService";
 import SkeletonLoading from "@/components/SkeletonLoading";
 
 // Mock data for initial UI - in production this comes from Supabase
@@ -53,6 +54,7 @@ const SettingsPage = () => {
   const { user: currentUser, logAction } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   
   // User Management State
@@ -146,34 +148,34 @@ const SettingsPage = () => {
     }
   };
 
-  const fetchUsers = async () => {
-    setLoading(true);
+  const fetchUsers = useCallback(async (isMounted = true) => {
+    if (isMounted) {
+      setLoading(true);
+      setError(null);
+    }
     try {
-      const { data, error } = await supabase
-        .from('system_users')
-        .select('id, full_name, email, role, status, page_access, action_permissions, last_login, created_at')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) {
-        console.error("Users fetch error:", error);
-        setUsers([]);
-      } else {
-        setUsers(data ?? []);
-      }
+      const data = await userService.getUsers();
+      if (!isMounted) return;
+      if (!data) throw new Error("Failed to fetch system users.");
+      setUsers(data);
     } catch (err: any) {
       console.error("fetchUsers unexpected error:", err);
-      setUsers([]);
+      if (isMounted) {
+        setError(err.message || "An unexpected error occurred while fetching users.");
+        setUsers([]);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    let isMounted = true;
     if (currentUser?.role === "admin") {
-      fetchUsers();
+      fetchUsers(isMounted);
     }
-  }, [currentUser]);
+    return () => { isMounted = false; };
+  }, [currentUser, fetchUsers]);
 
   const validatePassword = (pwd: string) => {
     if (pwd.length < 8) return "Password must be at least 8 characters.";
@@ -198,21 +200,13 @@ const SettingsPage = () => {
     setSaving(true);
     try {
       // 1. signup in auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUser.email,
-        password: newUser.password,
-        options: {
-          data: {
-            full_name: newUser.name,
-          }
-        }
+      const authData = await authService.signUp(newUser.email, newUser.password, {
+        full_name: newUser.name,
       });
-
-      if (authError) throw authError;
 
       if (authData.user) {
         // 2. Insert into system_users table
-        const { error: dbError } = await supabase.from('system_users').insert([{
+        await userService.addUser({
           id: authData.user.id,
           full_name: newUser.name,
           email: newUser.email,
@@ -220,9 +214,7 @@ const SettingsPage = () => {
           page_access: newUser.permissions.pages,
           action_permissions: newUser.permissions.actions,
           status: 'active'
-        }]);
-
-        if (dbError) throw dbError;
+        });
       }
 
       toast({ title: "User Created", description: `${newUser.name} has been added to the system.` });
@@ -263,16 +255,12 @@ const SettingsPage = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('system_users')
-        .update({
-          role: editUser.role,
-          page_access: editUser.permissions.pages,
-          action_permissions: editUser.permissions.actions
-        })
-        .eq('id', editUser.id);
+      await userService.updateUser(editUser.id, {
+        role: editUser.role,
+        page_access: editUser.permissions.pages,
+        action_permissions: editUser.permissions.actions
+      });
 
-      if (error) throw error;
       toast({ title: "User Updated", description: "Permissions and role updated successfully." });
       logAction(`Updated user permissions for: ${editUser.name}`, "Settings");
       setShowEditUserModal(false);
@@ -316,12 +304,7 @@ const SettingsPage = () => {
   const handleUpdateUserStatus = async (id: string, status: string) => {
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('system_users')
-        .update({ status })
-        .eq('id', id);
-
-      if (error) throw error;
+      await userService.updateUser(id, { status });
       toast({ title: "User Status Updated" });
       logAction(`Updated user status for ID: ${id} to ${status}`, "Settings");
       fetchUsers();
@@ -336,8 +319,7 @@ const SettingsPage = () => {
     if (!confirm("Are you sure you want to delete this user? This cannot be undone.")) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('system_users').delete().eq('id', id);
-      if (error) throw error;
+      await userService.deleteUser(id);
       toast({ title: "User Deleted", variant: "destructive" });
       logAction(`Deleted user ID: ${id}`, "Settings");
       fetchUsers();
@@ -405,6 +387,13 @@ const SettingsPage = () => {
 
   return (
     <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <XCircle className="h-5 w-5" />
+          <p className="font-bold">{error}</p>
+          <Button variant="ghost" size="sm" onClick={() => fetchUsers(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
+        </div>
+      )}
       {/* Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div>

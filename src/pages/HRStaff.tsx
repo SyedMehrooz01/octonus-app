@@ -15,8 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import * as hrService from "@/services/hrService";
+import * as financeService from "@/services/financeService";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, PieChart, Pie, Cell, Legend 
@@ -38,7 +39,7 @@ const HROutsideWorkers = lazy(() => import("@/components/hr/HROutsideWorkers"));
 const HRReports = lazy(() => import("@/components/hr/HRReports"));
 
 const HRStaff = () => {
-  const { user } = useAuth();
+  const { user, canDo: authCanDo } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,44 +100,49 @@ const HRStaff = () => {
   const [assignmentForm, setAssignmentForm] = useState({ workerId: "", eventName: "", date: format(new Date(), 'yyyy-MM-dd'), amount: 0 });
   const [outsidePaymentForm, setOutsidePaymentForm] = useState({ workerId: "", amount: 0, date: format(new Date(), 'yyyy-MM-dd'), method: "cash" });
 
-  const fetchHRData = useCallback(async () => {
-    setLoading(true);
+  const fetchHRData = useCallback(async (isMounted = true) => {
+    if (isMounted) {
+      setLoading(true);
+      setError(null);
+    }
     try {
-      const results = await Promise.all([
-        supabase.from('staff').select('id, name, email, role, department, salary, status, phone, address, emergency_contact, join_date, rights').order('name').limit(50),
-        supabase.from('attendance').select('id, employee_id, date, status, check_in, check_out').order('date', { ascending: false }).limit(50),
-        supabase.from('leaves').select('id, employee_id, leave_type, start_date, end_date, reason, status').order('created_at', { ascending: false }).limit(50),
-        supabase.from('announcements').select('id, title, message, created_at').order('created_at', { ascending: false }).limit(5),
-        supabase.from('overtime').select('id, employee_id, hours, date, status').order('date', { ascending: false }).limit(50),
-        supabase.from('advance_salary').select('id, employee_id, amount, reason, status').order('created_at', { ascending: false }).limit(50),
-        supabase.from('outside_workers').select('id, name, type, skill, phone, rate, rate_type').order('name').limit(50),
-        supabase.from('worker_assignments').select('id, worker_id, event_name, date, amount, status').order('date', { ascending: false }).limit(50).then(r => r.error ? { data: [], error: null } : r),
-        supabase.from('worker_payments').select('id, worker_id, amount, date, method').order('date', { ascending: false }).limit(50).then(r => r.error ? { data: [], error: null } : r)
+      const [
+        staffDataRaw,
+        attendDataRaw,
+        leaveDataRaw,
+        announceDataRaw,
+        overtimeDataRaw,
+        advanceDataRaw,
+        outsideDataRaw,
+        assignDataRaw,
+        payDataRaw
+      ] = await Promise.all([
+        hrService.getStaff(),
+        hrService.getAttendance(),
+        hrService.getLeaves(),
+        hrService.getAnnouncements(),
+        hrService.getOvertime(),
+        hrService.getAdvanceSalary(),
+        hrService.getOutsideWorkers(),
+        hrService.getWorkerAssignments().catch(() => []),
+        hrService.getWorkerPayments().catch(() => [])
       ]);
 
-      const [
-        { data: staffData, error: err1 },
-        { data: attendData, error: err2 },
-        { data: leaveData, error: err3 },
-        { data: announceData, error: err4 },
-        { data: overtimeData, error: err5 },
-        { data: advanceData, error: err6 },
-        { data: outsideData, error: err7 },
-        { data: assignData, error: err8 },
-        { data: payData, error: err9 }
-      ] = results;
+      if (!isMounted) return;
 
-      if (err1) console.error("Error fetching staff:", err1);
-      if (err2) console.error("Error fetching attendance:", err2);
-      if (err3) console.error("Error fetching leaves:", err3);
-      if (err4) console.error("Error fetching announcements:", err4);
-      if (err5) console.error("Error fetching overtime:", err5);
-      if (err6) console.error("Error fetching advances:", err6);
-      if (err7) console.error("Error fetching outside workers:", err7);
-      if (err8) console.error("Error fetching outside assignments:", err8);
-      if (err9) console.error("Error fetching outside payments:", err9);
+      if (!staffDataRaw) throw new Error("Failed to fetch staff data.");
 
-      const staffWithDetails = (staffData ?? []).map(s => ({
+      const staffData = staffDataRaw;
+      const attendData = attendDataRaw ?? [];
+      const leaveData = leaveDataRaw ?? [];
+      const announceData = announceDataRaw ?? [];
+      const overtimeData = overtimeDataRaw ?? [];
+      const advanceData = advanceDataRaw ?? [];
+      const outsideData = outsideDataRaw ?? [];
+      const assignData = assignDataRaw ?? [];
+      const payData = payDataRaw ?? [];
+
+      const staffWithDetails = staffData.map(s => ({
         ...s,
         attendance: 95, 
         performance: [4, 5, 4, 5, 5],
@@ -145,52 +151,56 @@ const HRStaff = () => {
       }));
 
       setStaff(staffWithDetails);
-      setAttendance((attendData ?? []).map(a => ({
+      setAttendance(attendData.map(a => ({
         ...a,
-        name: (staffData ?? []).find(s => s.id === a.employee_id)?.name || "Unknown",
+        name: staffData.find(s => s.id === a.employee_id)?.name || "Unknown",
         checkIn: a.check_in,
         checkOut: a.check_out
       })));
-      setLeaves((leaveData ?? []).map(l => ({
+      setLeaves(leaveData.map(l => ({
         ...l,
         type: l.leave_type,
-        name: (staffData ?? []).find(s => s.id === l.employee_id)?.name || "Unknown",
+        name: staffData.find(s => s.id === l.employee_id)?.name || "Unknown",
         start: l.start_date,
         end: l.end_date
       })));
-      setAnnouncements(announceData ?? []);
-      setOvertime(overtimeData ?? []);
-      setAdvances(advanceData ?? []);
-      setOutsideWorkers(outsideData ?? []);
-      setOutsideAssignments(assignData ?? []);
-      setOutsidePayments(payData ?? []);
+      setAnnouncements(announceData);
+      setOvertime(overtimeData);
+      setAdvances(advanceData);
+      setOutsideWorkers(outsideData);
+      setOutsideAssignments(assignData);
+      setOutsidePayments(payData);
       setError(null);
     } catch (err: any) {
       console.error("HRStaff fetchHRData unexpected error:", err);
-      setError(err.message);
-      toast.error("Failed to fetch HR data");
-      setStaff([]);
-      setAttendance([]);
-      setLeaves([]);
-      setAnnouncements([]);
-      setOvertime([]);
-      setAdvances([]);
-      setOutsideWorkers([]);
-      setOutsideAssignments([]);
-      setOutsidePayments([]);
+      if (isMounted) {
+        setError(err.message || "An unexpected error occurred while fetching HR data.");
+        setStaff([]);
+        setAttendance([]);
+        setLeaves([]);
+        setAnnouncements([]);
+        setOvertime([]);
+        setAdvances([]);
+        setOutsideWorkers([]);
+        setOutsideAssignments([]);
+        setOutsidePayments([]);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    fetchHRData();
+    let isMounted = true;
+    fetchHRData(isMounted);
+    return () => { isMounted = false; };
   }, [fetchHRData]);
 
-  const canDo = useCallback((action: string) => {
-    if (user?.role === 'admin') return true;
-    return user?.rights?.includes('hr') || false;
-  }, [user]);
+  const canDo = useCallback((action: any) => {
+    return authCanDo(action);
+  }, [authCanDo]);
 
   const statusColor = useCallback((status: string) => {
     switch (status?.toLowerCase()) {
@@ -224,14 +234,14 @@ const HRStaff = () => {
   }, []);
 
   // Handler functions
-  const handleAddStaff = async () => {
+  const handleAddStaff = useCallback(async () => {
     if (!newStaff.name || !newStaff.email || !newStaff.salary) {
       toast.error("Please fill all required fields");
       return;
     }
     setSaving(true);
     try {
-      const { error } = await supabase.from('staff').insert([{
+      await hrService.addStaff({
         name: newStaff.name,
         email: newStaff.email,
         role: newStaff.role,
@@ -242,9 +252,8 @@ const HRStaff = () => {
         emergency_contact: newStaff.emergencyContact,
         join_date: newStaff.joinDate,
         status: 'active'
-      }]);
-      if (error) throw error;
-      await fetchHRData();
+      });
+      await fetchHRData(true);
       setShowAddModal(false);
       setNewStaff({ name: "", email: "", role: "", department: "Operations", salary: "", phone: "", address: "", emergencyContact: "", joinDate: format(new Date(), 'yyyy-MM-dd') });
       toast.success("New staff member registered");
@@ -253,13 +262,13 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [newStaff, fetchHRData]);
 
-  const handleUpdateStaff = async () => {
+  const handleUpdateStaff = useCallback(async () => {
     if (!editStaff) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('staff').update({
+      await hrService.updateStaff(editStaff.id, {
         name: editStaff.name,
         email: editStaff.email,
         role: editStaff.role,
@@ -269,9 +278,8 @@ const HRStaff = () => {
         phone: editStaff.phone,
         address: editStaff.address,
         emergency_contact: editStaff.emergency_contact || editStaff.emergencyContact
-      }).eq('id', editStaff.id);
-      if (error) throw error;
-      await fetchHRData();
+      });
+      await fetchHRData(true);
       setShowEditModal(false);
       toast.success("Staff profile updated");
     } catch (err: any) {
@@ -279,14 +287,13 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [editStaff, fetchHRData]);
 
-  const handleDeleteStaff = async (id: string) => {
+  const handleDeleteStaff = useCallback(async (id: string) => {
     setSaving(true);
     try {
-      const { error } = await supabase.from('staff').delete().eq('id', id);
-      if (error) throw error;
-      await fetchHRData();
+      await hrService.deleteStaff(id);
+      await fetchHRData(true);
       setShowDeleteConfirm(null);
       toast.success("Staff record removed");
     } catch (err: any) {
@@ -294,21 +301,20 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [fetchHRData]);
 
-  const handleMarkAttendance = async () => {
+  const handleMarkAttendance = useCallback(async () => {
     if (!attendanceForm.empId) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('attendance').upsert({
+      await hrService.upsertAttendance({
         employee_id: attendanceForm.empId,
         date: attendanceForm.date,
         status: attendanceForm.status,
         check_in: attendanceForm.checkIn,
         check_out: attendanceForm.checkOut
-      }, { onConflict: 'employee_id,date' });
-      if (error) throw error;
-      await fetchHRData();
+      });
+      await fetchHRData(true);
       setShowAttendanceModal(false);
       toast.success("Attendance marked");
     } catch (err: any) {
@@ -316,9 +322,9 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [attendanceForm, fetchHRData]);
 
-  const handleBulkAttendance = async () => {
+  const handleBulkAttendance = useCallback(async () => {
     setSaving(true);
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
@@ -329,9 +335,8 @@ const HRStaff = () => {
         check_in: '09:00',
         check_out: '18:00'
       }));
-      const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id,date' });
-      if (error) throw error;
-      await fetchHRData();
+      await hrService.upsertAttendance(records);
+      await fetchHRData(true);
       setShowBulkAttendanceModal(false);
       toast.success(`All staff marked as ${bulkStatus}`);
     } catch (err: any) {
@@ -339,9 +344,9 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [staff, bulkStatus, fetchHRData]);
 
-  const handleMarkAllPresent = async () => {
+  const handleMarkAllPresent = useCallback(async () => {
     setSaving(true);
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
@@ -352,30 +357,28 @@ const HRStaff = () => {
         check_in: '09:00',
         check_out: '18:00'
       }));
-      const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id,date' });
-      if (error) throw error;
-      await fetchHRData();
+      await hrService.upsertAttendance(records);
+      await fetchHRData(true);
       toast.success("All staff marked as present for today");
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       setSaving(false);
     }
-  };
+  }, [staff, fetchHRData]);
 
-  const handleUpdateAttendance = async (id: number, status: string) => {
+  const handleUpdateAttendance = useCallback(async (id: number, status: string) => {
     try {
-      const { error } = await supabase.from('attendance').update({ status }).eq('id', id);
-      if (error) throw error;
-      await fetchHRData();
+      await hrService.updateAttendance(id, status);
+      await fetchHRData(true);
       setEditAttendanceId(null);
       toast.success("Attendance updated");
     } catch (err: any) {
       toast.error("Failed to update attendance");
     }
-  };
+  }, [fetchHRData]);
 
-  const handleAutoAbsent = async () => {
+  const handleAutoAbsent = useCallback(async () => {
     setSaving(true);
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
@@ -390,29 +393,27 @@ const HRStaff = () => {
         date: today,
         status: 'absent'
       }));
-      const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'employee_id,date' });
-      if (error) throw error;
-      await fetchHRData();
+      await hrService.upsertAttendance(records);
+      await fetchHRData(true);
       toast.success(`${unmarkedStaff.length} staff members marked as absent`);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       setSaving(false);
     }
-  };
+  }, [attendance, staff, fetchHRData]);
 
-  const handleMarkAsPaid = async () => {
+  const handleMarkAsPaid = useCallback(async () => {
     setSaving(true);
     try {
-      const { error } = await supabase.from('ledger_entries').insert([{
+      await financeService.addLedgerEntry({
         category: 'Payroll',
         description: `Salary Payment - ${payrollForm.month}`,
         amount: payrollForm.netPay,
         type: 'expense',
         date: format(new Date(), 'yyyy-MM-dd'),
         status: 'completed'
-      }]);
-      if (error) throw error;
+      });
       toast.success("Payroll processed and ledger updated");
       setShowPayrollModal(false);
     } catch (err: any) {
@@ -420,22 +421,21 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [payrollForm]);
 
-  const handleRequestLeave = async () => {
+  const handleRequestLeave = useCallback(async () => {
     if (!leaveForm.empId || !leaveForm.reason) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('leaves').insert([{
+      await hrService.addLeave({
         employee_id: leaveForm.empId,
         leave_type: leaveForm.type,
         start_date: leaveForm.start,
         end_date: leaveForm.end,
         reason: leaveForm.reason,
         status: 'pending'
-      }]);
-      if (error) throw error;
-      await fetchHRData();
+      });
+      await fetchHRData(true);
       setShowLeaveRequestModal(false);
       setLeaveForm({ empId: "", type: "Annual", start: format(new Date(), 'yyyy-MM-dd'), end: format(new Date(), 'yyyy-MM-dd'), reason: "" });
       toast.success("Leave request submitted");
@@ -444,23 +444,22 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [leaveForm, fetchHRData]);
 
-  const handleLeaveAction = async (id: number, status: string) => {
+  const handleLeaveAction = useCallback(async (id: number, status: string) => {
     setSaving(true);
     try {
-      const { error } = await supabase.from('leaves').update({ status }).eq('id', id);
-      if (error) throw error;
-      await fetchHRData();
+      await hrService.updateLeaveStatus(id, status);
+      await fetchHRData(true);
       toast.success(`Leave request ${status}`);
     } catch (err: any) {
       toast.error("Failed to update leave request");
     } finally {
       setSaving(false);
     }
-  };
+  }, [fetchHRData]);
 
-  const handleAddPerformance = async () => {
+  const handleAddPerformance = useCallback(async () => {
     if (!performanceForm.empId) return;
     setSaving(true);
     try {
@@ -471,20 +470,19 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [performanceForm]);
 
-  const handleLogOvertime = async () => {
+  const handleLogOvertime = useCallback(async () => {
     if (!overtimeForm.empId || !overtimeForm.hours) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('overtime').insert([{
+      await hrService.addOvertime({
         employee_id: overtimeForm.empId,
         hours: Number(overtimeForm.hours),
         date: overtimeForm.date,
         status: 'pending'
-      }]);
-      if (error) throw error;
-      await fetchHRData();
+      });
+      await fetchHRData(true);
       setShowOvertimeModal(false);
       toast.success("Overtime logged for approval");
     } catch (err: any) {
@@ -492,20 +490,19 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [overtimeForm, fetchHRData]);
 
-  const handleRequestAdvance = async () => {
+  const handleRequestAdvance = useCallback(async () => {
     if (!advanceForm.empId || !advanceForm.amount) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('advance_salary').insert([{
+      await hrService.addAdvanceSalary({
         employee_id: advanceForm.empId,
         amount: Number(advanceForm.amount),
         reason: advanceForm.reason,
         status: 'pending'
-      }]);
-      if (error) throw error;
-      await fetchHRData();
+      });
+      await fetchHRData(true);
       setShowAdvanceModal(false);
       toast.success("Advance request submitted");
     } catch (err: any) {
@@ -513,18 +510,17 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [advanceForm, fetchHRData]);
 
-  const handleAddAnnouncement = async () => {
+  const handleAddAnnouncement = useCallback(async () => {
     if (!newAnnouncement.title || !newAnnouncement.content) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('announcements').insert([{
+      await hrService.addAnnouncement({
         title: newAnnouncement.title,
         message: newAnnouncement.content
-      }]);
-      if (error) throw error;
-      await fetchHRData();
+      });
+      await fetchHRData(true);
       setShowAnnounceModal(false);
       setNewAnnouncement({ title: "", content: "" });
       toast.success("Announcement posted");
@@ -533,14 +529,13 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [newAnnouncement, fetchHRData]);
 
-  const handleUpdateRights = async (id: string, newRights: string[]) => {
+  const handleUpdateRights = useCallback(async (id: string, newRights: string[]) => {
     setSaving(true);
     try {
-      const { error } = await supabase.from('staff').update({ rights: newRights }).eq('id', id);
-      if (error) throw error;
-      await fetchHRData();
+      await hrService.updateStaff(id, { rights: newRights });
+      await fetchHRData(true);
       setShowRightsModal(false);
       toast.success("Permissions updated");
     } catch (err: any) {
@@ -548,22 +543,21 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [fetchHRData]);
 
-  const handleAddOutsideWorker = async () => {
+  const handleAddOutsideWorker = useCallback(async () => {
     if (!newOutsideWorker.name || !newOutsideWorker.phone) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('outside_workers').insert([{
+      await hrService.addOutsideWorker({
         name: newOutsideWorker.name,
         type: newOutsideWorker.type,
         skill: newOutsideWorker.skill,
         phone: newOutsideWorker.phone,
         rate: Number(newOutsideWorker.rate),
         rate_type: newOutsideWorker.rateType
-      }]);
-      if (error) throw error;
-      await fetchHRData();
+      });
+      await fetchHRData(true);
       setShowAddOutsideModal(false);
       toast.success("Outside worker added");
     } catch (err: any) {
@@ -571,21 +565,20 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [newOutsideWorker, fetchHRData]);
 
-  const handleAssignToEvent = async () => {
+  const handleAssignToEvent = useCallback(async () => {
     if (!assignmentForm.workerId || !assignmentForm.eventName) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('worker_assignments').insert([{
+      await hrService.addWorkerAssignment({
         worker_id: assignmentForm.workerId,
         event_name: assignmentForm.eventName,
         date: assignmentForm.date,
         amount: assignmentForm.amount,
         status: 'assigned'
-      }]);
-      if (error) throw error;
-      await fetchHRData();
+      });
+      await fetchHRData(true);
       setShowAssignEventModal(false);
       toast.success("Worker assigned to event");
     } catch (err: any) {
@@ -593,20 +586,19 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [assignmentForm, fetchHRData]);
 
-  const handleOutsidePayment = async () => {
+  const handleOutsidePayment = useCallback(async () => {
     if (!outsidePaymentForm.workerId || !outsidePaymentForm.amount) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('worker_payments').insert([{
+      await hrService.addWorkerPayment({
         worker_id: outsidePaymentForm.workerId,
         amount: outsidePaymentForm.amount,
         date: outsidePaymentForm.date,
         method: outsidePaymentForm.method
-      }]);
-      if (error) throw error;
-      await fetchHRData();
+      });
+      await fetchHRData(true);
       setShowOutsidePaymentModal(false);
       toast.success("Payment recorded");
     } catch (err: any) {
@@ -614,7 +606,7 @@ const HRStaff = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [outsidePaymentForm, fetchHRData]);
 
   const prefillPayrollForm = useCallback((staffMember: any) => {
     const basic = staffMember?.salary || 0;
@@ -690,18 +682,22 @@ const HRStaff = () => {
   }, []);
 
   const handleOvertimeAction = useCallback(async (id: number, status: string) => {
-    const { error } = await supabase.from('overtime').update({ status }).eq('id', id);
-    if (!error) {
-      await fetchHRData();
+    try {
+      await hrService.updateOvertimeStatus(id, status);
+      await fetchHRData(true);
       toast.success(`Overtime ${status}`);
+    } catch (err: any) {
+      toast.error("Failed to update overtime status");
     }
   }, [fetchHRData]);
 
   const handleAdvanceAction = useCallback(async (id: number, status: string) => {
-    const { error } = await supabase.from('advance_salary').update({ status }).eq('id', id);
-    if (!error) {
-      await fetchHRData();
+    try {
+      await hrService.updateAdvanceSalaryStatus(id, status);
+      await fetchHRData(true);
       toast.success(`Advance ${status}`);
+    } catch (err: any) {
+      toast.error("Failed to update advance status");
     }
   }, [fetchHRData]);
 
@@ -752,6 +748,13 @@ const HRStaff = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-10 max-w-full overflow-hidden">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <XCircle className="h-5 w-5" />
+          <p className="font-bold">{error}</p>
+          <Button variant="ghost" size="sm" onClick={() => fetchHRData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
+        </div>
+      )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-foreground">Workforce Management</h2>

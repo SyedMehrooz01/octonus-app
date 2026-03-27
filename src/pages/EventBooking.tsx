@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
+import * as eventService from "@/services/eventService";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import SkeletonLoading from "@/components/SkeletonLoading";
@@ -76,6 +76,7 @@ const EMPTY = { clientName:"",phone:"",eventType:"",eventDate:"",bookingDate:new
 const EventBooking = () => {
   const { user, canDo, logAction } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [menus, setMenus] = useState<Menu[]>(INITIAL_MENUS);
   const [loadingMenus, setLoadingMenus] = useState(false);
@@ -117,33 +118,25 @@ const EventBooking = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const fetchMenus = useCallback(async () => {
-    setLoadingMenus(true);
+  const fetchMenus = useCallback(async (isMounted = true) => {
+    if (isMounted) setLoadingMenus(true);
     try {
-      const { data: menusData, error: menusError } = await supabase
-        .from('menus')
-        .select('id, name')
-        .order('id', { ascending: true })
-        .limit(50);
+      const [menusDataRaw, itemsDataRaw] = await Promise.all([
+        eventService.getMenus(),
+        eventService.getMenuItems()
+      ]);
 
-      if (menusError) {
-        console.error("Menus fetch error:", menusError);
-        setMenus(INITIAL_MENUS);
-      } else if (menusData && (menusData ?? []).length > 0) {
-        const { data: itemsData, error: itemsError } = await supabase
-          .from('menu_items')
-          .select('id, menu_id, name, quantity, unit, rate, created_at')
-          .order('id', { ascending: true })
-          .limit(100);
+      if (!isMounted) return;
 
-        if (itemsError) {
-          console.error("Menu items fetch error:", itemsError);
-          // Still use menusData but items might be empty
-        }
+      if (!menusDataRaw) throw new Error("Failed to fetch menu data.");
 
-        const formattedMenus = (menusData ?? []).map(m => ({
+      const menusData = menusDataRaw;
+      const itemsData = itemsDataRaw ?? [];
+
+      if (menusData.length > 0) {
+        const formattedMenus = menusData.map(m => ({
           ...m,
-          items: (itemsData ?? []).filter(i => i?.menu_id === m?.id).map(i => ({
+          items: itemsData.filter(i => i?.menu_id === m?.id).map(i => ({
             ...i,
             item: i.name // Mapping 'name' from DB to 'item' used in UI
           })) || []
@@ -154,114 +147,121 @@ const EventBooking = () => {
       }
     } catch (error: any) {
       console.error("fetchMenus unexpected error:", error);
-      setMenus(INITIAL_MENUS);
+      if (isMounted) {
+        setError(prev => prev || error.message || "Failed to fetch menus.");
+        setMenus(INITIAL_MENUS);
+      }
     } finally {
-      setLoadingMenus(false);
+      if (isMounted) setLoadingMenus(false);
     }
   }, []);
 
-  const fetchSuppliers = useCallback(async () => {
+  const fetchSuppliers = useCallback(async (isMounted = true) => {
     try {
-      const { data: sData, error: sErr } = await supabase.from('suppliers').select('id, name, contact_number, email, service_type, current_balance').limit(50);
-      if (sErr) {
-        console.error("Suppliers fetch error:", sErr);
-        setSuppliers([]);
-      } else {
-        setSuppliers(sData ?? []);
-      }
-      
-      const { data: pData, error: pErr } = await supabase.from('supplier_payments').select('id, supplier_id, date, amount, method, notes').order('date', { ascending: false }).limit(50);
-      if (pErr) {
-        console.error("Supplier payments fetch error:", pErr);
-        setSupplierPayments([]);
-      } else {
+      const [sData, pData] = await Promise.all([
+        eventService.getSuppliers(),
+        eventService.getSupplierPayments()
+      ]);
+      if (isMounted) {
+        if (!sData) throw new Error("Failed to fetch supplier data.");
+        setSuppliers(sData);
         setSupplierPayments(pData ?? []);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("fetchSuppliers unexpected error:", err);
-      setSuppliers([]);
-      setSupplierPayments([]);
+      if (isMounted) {
+        setError(prev => prev || err.message || "Failed to fetch suppliers.");
+        setSuppliers([]);
+        setSupplierPayments([]);
+      }
     }
   }, []);
 
-  const fetchBookingsData = useCallback(async () => {
-    setLoading(true);
+  const fetchBookingsData = useCallback(async (isMounted = true) => {
+    if (isMounted) setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('id, client_name, client_phone, event_type, event_date, venue, pax, total_amount, advance_paid, balance_due, status, created_at, menu, notes, payment_method, third_party, supplier_cost, selling_rate')
-        .order('event_date', { ascending: true })
-        .limit(50);
-
-      if (error) {
-        console.error("Bookings fetch error:", error);
-        setBookings([]);
-      } else if (data) {
-        setBookings((data ?? []).map(b => ({
-          id: b.id,
-          clientName: b.client_name,
-          phone: b.client_phone,
-          eventType: b.event_type,
-          eventDate: b.event_date,
-          bookingDate: b.created_at, 
-          venue: b.venue,
-          guests: b.pax,
-          totalAmount: b.total_amount,
-          advance: b.advance_paid,
-          balanceRemaining: b.balance_due,
-          status: b.status,
-          paymentMethod: b.payment_method || "N/A", 
-          menu: b.menu || "N/A", 
-          notes: b.notes || "", 
-          thirdParty: b.third_party || false, 
-          supplier_cost: b.supplier_cost || 0, 
-          selling_rate: b.selling_rate || 0 
-        })));
-      } else {
-        setBookings([]);
-      }
+      const data = await eventService.getBookings();
+      if (!isMounted) return;
+      if (!data) throw new Error("Failed to fetch bookings.");
+      
+      setBookings(data.map(b => ({
+        id: b.id,
+        clientName: b.client_name,
+        phone: b.client_phone,
+        eventType: b.event_type,
+        eventDate: b.event_date,
+        bookingDate: b.created_at, 
+        venue: b.venue,
+        guests: b.pax,
+        totalAmount: b.total_amount,
+        advance: b.advance_paid,
+        balanceRemaining: b.balance_due,
+        status: b.status,
+        paymentMethod: b.payment_method || "N/A", 
+        menu: b.menu || "N/A", 
+        notes: b.notes || "", 
+        thirdParty: b.third_party || false, 
+        supplierCost: b.supplier_cost || 0, 
+        sellingRate: b.selling_rate || 0 
+      })));
     } catch (err: any) {
       console.error("fetchBookingsData unexpected error:", err);
-      setBookings([]);
+      if (isMounted) {
+        setError(prev => prev || err.message || "Failed to fetch bookings.");
+        setBookings([]);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
     const init = async () => {
-      setLoading(true);
-      await Promise.all([fetchBookingsData(), fetchMenus(), fetchSuppliers()]);
-      setLoading(false);
+      if (isMounted) {
+        setLoading(true);
+        setError(null);
+      }
+      try {
+        await Promise.all([
+          fetchBookingsData(isMounted), 
+          fetchMenus(isMounted), 
+          fetchSuppliers(isMounted)
+        ]);
+      } catch (err: any) {
+        if (isMounted) setError(err.message || "An error occurred while loading data.");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     };
     init();
+    return () => { isMounted = false; };
   }, [fetchBookingsData, fetchMenus, fetchSuppliers]);
 
-  const handleAddSupplier = async () => {
+  const handleAddSupplier = useCallback(async () => {
     if (!supplierForm.name) return;
     setIsSaving(true);
     try {
-      const { error } = await supabase.from('suppliers').insert([{
+      await eventService.addSupplier({
         name: supplierForm.name,
         contact_number: supplierForm.contact,
         email: supplierForm.email,
         service_type: supplierForm.category,
         opening_balance: supplierForm.opening_balance,
         current_balance: supplierForm.opening_balance
-      }]);
-      if (error) throw error;
+      });
       toast.success("Supplier added successfully");
       setShowAddSupplierModal(false);
       setSupplierForm({ name: "", contact: "", email: "", category: "Food", opening_balance: 0 });
-      fetchSuppliers();
+      fetchSuppliers(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to add supplier");
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [supplierForm, fetchSuppliers]);
 
-  const handleSupplierPayment = async () => {
+  const handleSupplierPayment = useCallback(async () => {
     if (!selectedSupplier || supplierPaymentForm.amount <= 0) return;
     setIsSaving(true);
     try {
@@ -273,25 +273,23 @@ const EventBooking = () => {
         notes: supplierPaymentForm.notes
       };
 
-      const { error: pErr } = await supabase.from('supplier_payments').insert([payment]);
-      if (pErr) throw pErr;
+      await eventService.addSupplierPayment(payment);
 
-      const { error: sErr } = await supabase.from('suppliers').update({
+      await eventService.updateSupplier(selectedSupplier.id, {
         current_balance: selectedSupplier.current_balance - supplierPaymentForm.amount
-      }).eq('id', selectedSupplier.id);
-      if (sErr) throw sErr;
+      });
 
       toast.success("Payment recorded successfully");
       setShowSupplierPaymentModal(false);
-      fetchSuppliers();
+      fetchSuppliers(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to record payment");
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [selectedSupplier, supplierPaymentForm, fetchSuppliers]);
 
-  const openClientProfile = (clientName: string, phone: string) => {
+  const openClientProfile = useCallback((clientName: string, phone: string) => {
     const clientBookings = (bookings ?? []).filter(b => b?.clientName === clientName);
     const totalPaid = clientBookings.reduce((sum, b) => sum + (b?.advance ?? 0), 0);
     const remainingBalance = clientBookings.reduce((sum, b) => sum + (b?.balanceRemaining ?? 0), 0);
@@ -311,23 +309,23 @@ const EventBooking = () => {
       payments: clientPayments
     });
     setShowClientProfile(true);
-  };
+  }, [bookings]);
 
-  const handleEditClick = (item: MenuItem, menuId: number | string) => {
+  const handleEditClick = useCallback((item: MenuItem, menuId: number | string) => {
     setEditingItem(item);
     setActiveMenuId(menuId);
     setItemForm({ ...item });
     setShowItemModal(true);
-  };
+  }, []);
 
-  const handleAddClick = (menuId: number | string) => {
+  const handleAddClick = useCallback((menuId: number | string) => {
     setEditingItem(null);
     setActiveMenuId(menuId);
     setItemForm({ item: "", unit: "per plate", rate: 0 });
     setShowItemModal(true);
-  };
+  }, []);
 
-  const handleSaveItem = async () => {
+  const handleSaveItem = useCallback(async () => {
     if (!itemForm.item || itemForm.rate <= 0) {
       toast.error("Please provide item name and a valid rate");
       return;
@@ -336,47 +334,40 @@ const EventBooking = () => {
     setIsSaving(true);
     try {
       if (editingItem) {
-        const { error } = await supabase
-          .from('menu_items')
-          .update({
-            name: itemForm.item,
-            unit: itemForm.unit,
-            rate: itemForm.rate
-          })
-          .eq('id', editingItem.id);
-
-        if (error) throw error;
+        await eventService.updateMenuItem(editingItem.id!, {
+          name: itemForm.item,
+          unit: itemForm.unit,
+          rate: itemForm.rate
+        });
         logAction(`Updated menu item: ${itemForm.item}`, "Event Booking");
         toast.success("Item updated successfully");
       } else {
-        const { error } = await supabase
-          .from('menu_items')
-          .insert([{
-            name: itemForm.item,
-            unit: itemForm.unit,
-            rate: itemForm.rate,
-            menu_id: activeMenuId,
-            quantity: 1 // Default quantity if required
-          }]);
-
-        if (error) throw error;
+        await eventService.addMenuItem({
+          name: itemForm.item,
+          unit: itemForm.unit,
+          rate: itemForm.rate,
+          menu_id: activeMenuId,
+          quantity: 1 // Default quantity if required
+        });
         logAction(`Added new menu item: ${itemForm.item}`, "Event Booking");
         toast.success("Item added successfully");
       }
       
       setShowItemModal(false);
-      fetchMenus();
+      fetchMenus(true);
     } catch (error: any) {
       toast.error(error.message || "Failed to save item");
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [itemForm, editingItem, activeMenuId, logAction, fetchMenus]);
 
-  const fetchKitchenData = async (eventId: number) => {
+  const fetchKitchenData = useCallback(async (eventId: number) => {
     try {
-      const { data: kiData } = await supabase.from('kitchen_items').select('*').eq('event_id', eventId);
-      const { data: rmData } = await supabase.from('raw_materials').select('*').eq('event_id', eventId);
+      const [kiData, rmData] = await Promise.all([
+        eventService.getKitchenItems(eventId),
+        eventService.getRawMaterials(eventId)
+      ]);
       
       if (kiData && (kiData ?? []).length > 0) {
         setKitchenItems(kiData ?? []);
@@ -429,33 +420,34 @@ const EventBooking = () => {
     } catch (err) {
       toast.error("Failed to fetch kitchen data");
     }
-  };
+  }, [bookings, menus]);
 
-  const handleSaveKitchen = async () => {
+  const handleSaveKitchen = useCallback(async () => {
     if (!selected) return;
     setIsSaving(true);
     try {
-      const { error: kiErr } = await supabase.from('kitchen_items').upsert(
-        kitchenItems.map(item => ({ ...item, event_id: selected.id })),
-        { onConflict: 'event_id,item_name' }
-      );
-      if (kiErr) throw kiErr;
-
-      const { error: rmErr } = await supabase.from('raw_materials').upsert(
-        rawMaterials.map(item => ({ ...item, event_id: selected.id })),
-        { onConflict: 'event_id,material_name' }
-      );
-      if (rmErr) throw rmErr;
-
+      await eventService.upsertKitchenItems(kitchenItems.map(item => ({ ...item, event_id: selected.id })));
+      await eventService.upsertRawMaterials(rawMaterials.map(item => ({ ...item, event_id: selected.id })));
       toast.success("Kitchen data saved successfully");
     } catch (err: any) {
       toast.error(err.message || "Failed to save kitchen data");
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [selected, kitchenItems, rawMaterials]);
 
-  const handleAdd = async () => {
+  const checkAvailability = useCallback(() => {
+    if (!nb?.eventDate || !nb?.venue) return true;
+    const existing = (bookings ?? []).find(b => b?.eventDate === nb?.eventDate && b?.venue === nb?.venue && b?.status !== 'cancelled');
+    if (existing) {
+      setAvailabilityWarning(`This venue is already booked on this date for "${existing?.clientName}" (${existing?.eventType})`);
+      return false;
+    }
+    setAvailabilityWarning(null);
+    return true;
+  }, [nb, bookings]);
+
+  const handleAdd = useCallback(async () => {
     if (!nb?.clientName || !nb?.eventDate) {
       toast.error("Client name and event date are required");
       return;
@@ -484,16 +476,14 @@ const EventBooking = () => {
       };
 
       if ((nb as any).id) {
-        const { error } = await supabase.from('bookings').update(bookingData).eq('id', (nb as any).id);
-        if (error) throw error;
+        await eventService.updateBooking((nb as any).id, bookingData);
         toast.success("Booking updated successfully");
       } else {
-        const { error } = await supabase.from('bookings').insert([bookingData]);
-        if (error) throw error;
+        await eventService.addBooking(bookingData);
         toast.success("Booking created successfully");
       }
 
-      await fetchBookingsData();
+      await fetchBookingsData(true);
       setNb(EMPTY); 
       setShowAdd(false); 
       setAvailabilityWarning(null); 
@@ -503,47 +493,34 @@ const EventBooking = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [nb, proceedWithBooking, checkAvailability, fetchBookingsData]);
 
-  const handleDeleteBooking = async (id: number) => {
+  const handleDeleteBooking = useCallback(async (id: number) => {
     if (!confirm("Are you sure you want to permanently delete this booking?")) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('bookings').delete().eq('id', id);
-      if (error) throw error;
-      await fetchBookingsData();
+      await eventService.deleteBooking(id);
+      await fetchBookingsData(true);
       toast.success("Booking deleted successfully");
     } catch (err: any) {
       toast.error(err.message || "Failed to delete booking");
     } finally {
       setSaving(false);
     }
-  };
+  }, [fetchBookingsData]);
 
-  const handleStatusChange = async (id: number, status: BookingStatus) => {
+  const handleStatusChange = useCallback(async (id: number, status: BookingStatus) => {
     setSaving(true);
     try {
-      const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
-      if (error) throw error;
-      await fetchBookingsData();
+      await eventService.updateBooking(id, { status });
+      await fetchBookingsData(true);
       toast.success(`Booking status updated to ${status}`);
     } catch (err: any) {
       toast.error("Failed to update status");
     } finally {
       setSaving(false);
     }
-  };
-
-  const checkAvailability = () => {
-    if (!nb?.eventDate || !nb?.venue) return true;
-    const existing = (bookings ?? []).find(b => b?.eventDate === nb?.eventDate && b?.venue === nb?.venue && b?.status !== 'cancelled');
-    if (existing) {
-      setAvailabilityWarning(`This venue is already booked on this date for "${existing?.clientName}" (${existing?.eventType})`);
-      return false;
-    }
-    setAvailabilityWarning(null);
-    return true;
-  };
+  }, [fetchBookingsData]);
 
   const monthStart = startOfMonth(calMonth);
   const days = eachDayOfInterval({start:monthStart,end:endOfMonth(calMonth)});
@@ -562,7 +539,7 @@ const EventBooking = () => {
   }, [bookings, search, statusFilter, dateFilter]);
 
   const totalPages = Math.ceil((filtered ?? []).length / itemsPerPage);
-  const paginatedBookings = (filtered ?? []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginatedBookings = useMemo(() => (filtered ?? []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage), [filtered, currentPage]);
 
   if (loading) {
     return (
@@ -578,6 +555,13 @@ const EventBooking = () => {
 
   return (
     <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <AlertTriangle className="h-5 w-5" />
+          <p className="font-bold">{error}</p>
+          <Button variant="ghost" size="sm" onClick={() => fetchBookingsData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
+        </div>
+      )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
           <h1 className="text-3xl font-black text-[#0f172a] tracking-tight uppercase">Event Booking Hub</h1>

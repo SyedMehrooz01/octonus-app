@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, useCallback } from "react";
 import { 
   Calendar, 
   TrendingUp, 
@@ -16,7 +16,10 @@ import {
   Wallet
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths, isSameDay } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
+import * as eventService from "@/services/eventService";
+import * as inventoryService from "@/services/inventoryService";
+import * as hrService from "@/services/hrService";
+import * as financeService from "@/services/financeService";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +28,7 @@ import SkeletonLoading from "@/components/SkeletonLoading";
 const Dashboard = () => {
   const { user, canDo } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
     totalEvents: 0,
     upcomingEvents: 0,
@@ -39,8 +43,11 @@ const Dashboard = () => {
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [revenueGrowth, setRevenueGrowth] = useState("0%");
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = useCallback(async (isMounted = true) => {
+    if (isMounted) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const today = new Date();
       const todayStr = format(today, "yyyy-MM-dd");
@@ -50,65 +57,55 @@ const Dashboard = () => {
       const prevMonthEnd = endOfMonth(subMonths(today, 1)).toISOString();
 
       // 1. Fetch Stats in Parallel
-      const results = await Promise.all([
-        supabase.from('bookings').select('id', { count: 'exact', head: true }).neq('status', 'cancelled'),
-        supabase.from('bookings').select('id', { count: 'exact', head: true }).gte('event_date', todayStr).neq('status', 'cancelled'),
-        supabase.from('bookings').select('balance_due').neq('status', 'cancelled').gt('balance_due', 0).limit(50),
-        supabase.from('inventory_items').select('id, current_stock, min_stock_level').limit(50),
-        supabase.from('staff').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-        supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', todayStr),
-        supabase.from('ledger_entries').select('debit').gte('date', monthStart).lte('date', monthEnd).limit(50),
-        supabase.from('expenses').select('amount').eq('status', 'approved').gte('date', monthStart).lte('date', monthEnd).limit(50)
+      const [
+        bookingsSummaryRaw,
+        inventoryDataRaw,
+        staffSummaryRaw,
+        attendanceTodayRaw,
+        monthlyPaymentsRaw,
+        monthlyExpensesDataRaw
+      ] = await Promise.all([
+        eventService.getBookingsSummary(),
+        inventoryService.getInventoryItems(),
+        hrService.getStaffSummary(),
+        hrService.getAttendance().then(data => (data ?? []).filter(a => a.date === todayStr)),
+        financeService.getLedgerByDateRange(monthStart, monthEnd),
+        financeService.getExpensesByDateRange(monthStart, monthEnd)
       ]);
 
-      const [
-        { count: totalEvents, error: err1 },
-        { count: upcomingCount, error: err2 },
-        { data: balanceData, error: err3 },
-        { data: inventoryData, error: err4 },
-        { count: staffCount, error: err5 },
-        { count: attendanceCount, error: err6 },
-        { data: monthlyPayments, error: err7 },
-        { data: monthlyExpensesData, error: err8 }
-      ] = results;
+      if (!isMounted) return;
 
-      if (err1) console.error("Error fetching total events:", err1);
-      if (err2) console.error("Error fetching upcoming events count:", err2);
-      if (err3) console.error("Error fetching balance data:", err3);
-      if (err4) console.error("Error fetching inventory data:", err4);
-      if (err5) console.error("Error fetching staff count:", err5);
-      if (err6) console.error("Error fetching attendance count:", err6);
-      if (err7) console.error("Error fetching monthly payments:", err7);
-      if (err8) console.error("Error fetching monthly expenses:", err8);
+      if (!bookingsSummaryRaw) throw new Error("Failed to fetch dashboard summaries.");
 
-      const thisMonthRevenue = (monthlyPayments ?? []).reduce((sum, p) => sum + (p?.debit ?? 0), 0);
-      const thisMonthExpenses = (monthlyExpensesData ?? []).reduce((sum, e) => sum + (e?.amount ?? 0), 0);
-      const lowStock = (inventoryData ?? []).filter(item => (item?.current_stock ?? 0) <= (item?.min_stock_level ?? 0)).length;
-      const pendingPay = (balanceData ?? []).reduce((sum, b) => sum + (b?.balance_due ?? 0), 0);
+      const bookingsSummary = bookingsSummaryRaw;
+      const inventoryData = inventoryDataRaw ?? [];
+      const staffSummary = staffSummaryRaw ?? [];
+      const attendanceToday = attendanceTodayRaw ?? [];
+      const monthlyPayments = monthlyPaymentsRaw ?? [];
+      const monthlyExpensesData = monthlyExpensesDataRaw ?? [];
+
+      const totalEvents = bookingsSummary.filter(b => b.status !== 'cancelled').length;
+      const upcomingCount = bookingsSummary.filter(b => b.status !== 'cancelled' && b.event_date >= todayStr).length;
+      const thisMonthRevenue = (monthlyPayments).reduce((sum, p) => sum + (p?.debit ?? 0), 0);
+      const thisMonthExpenses = (monthlyExpensesData).reduce((sum, e) => sum + (e?.amount ?? 0), 0);
+      const lowStock = (inventoryData).filter(item => (item?.current_stock ?? 0) <= (item?.min_stock_level ?? 0)).length;
+      const pendingPay = bookingsSummary.filter(b => b.status !== 'cancelled' && (b.balance_due ?? 0) > 0).reduce((sum, b) => sum + (b?.balance_due ?? 0), 0);
 
       setStats({
-        totalEvents: totalEvents ?? 0,
-        upcomingEvents: upcomingCount ?? 0,
+        totalEvents: totalEvents,
+        upcomingEvents: upcomingCount,
         totalRevenue: thisMonthRevenue,
         totalExpenses: thisMonthExpenses,
-        activeStaff: staffCount ?? 0,
-        attendanceToday: attendanceCount ?? 0,
+        activeStaff: staffSummary.filter(s => s.status === 'active').length,
+        attendanceToday: attendanceToday.length,
         lowStockItems: lowStock,
         pendingPayments: pendingPay
       });
 
       // 7. Calculate Revenue Growth
-      const { data: prevMonthPayments, error: prevRevErr } = await supabase
-        .from('ledger_entries')
-        .select('debit')
-        .gte('date', prevMonthStart)
-        .lte('date', prevMonthEnd)
-        .limit(50);
-      
-      if (prevRevErr) {
-        console.error("Error fetching prev month payments:", prevRevErr);
-      }
+      const prevMonthPayments = await financeService.getLedgerByDateRange(prevMonthStart, prevMonthEnd);
       const prevRevenue = (prevMonthPayments ?? []).reduce((sum, p) => sum + (p?.debit ?? 0), 0);
+      
       if (prevRevenue > 0) {
         const growth = ((thisMonthRevenue - prevRevenue) / prevRevenue) * 100;
         setRevenueGrowth(`${growth > 0 ? '+' : ''}${growth.toFixed(1)}%`);
@@ -117,51 +114,39 @@ const Dashboard = () => {
       }
 
       // 8. Fetch Upcoming Events Table
-      const { data: upcoming, error: upcomingErr } = await supabase
-        .from('bookings')
-        .select(`id, client_name, event_date, total_amount, event_type, venue, status, pax, balance_due`)
-        .order('event_date', { ascending: true })
-        .limit(50);
-      
-      if (upcomingErr) {
-        console.error("Error fetching upcoming events:", upcomingErr);
-        setUpcomingEvents([]);
-      } else {
-        setUpcomingEvents(upcoming ?? []);
-      }
+      const upcoming = await eventService.getBookings();
+      if (!upcoming) throw new Error("Failed to fetch upcoming bookings.");
+      setUpcomingEvents(upcoming);
 
-      // 9. Fetch last 6 months revenue for chart
-      const last6Months = [];
+      // 9. Fetch last 6 months revenue for chart in parallel
+      const monthPromises = [];
       for (let i = 5; i >= 0; i--) {
         const date = subMonths(new Date(), i);
         const start = startOfMonth(date).toISOString();
         const end = endOfMonth(date).toISOString();
-        const { data: payments, error: loopErr } = await supabase
-          .from('ledger_entries')
-          .select('debit')
-          .gte('date', start)
-          .lte('date', end)
-          .limit(50);
-        
-        if (loopErr) console.error(`Error fetching payments for month offset ${i}:`, loopErr);
-        const total = (payments ?? []).reduce((sum, p) => sum + (p?.debit ?? 0), 0);
-        last6Months.push({
-          month: format(date, 'MMM'),
-          revenue: total
-        });
+        monthPromises.push(
+          financeService.getLedgerByDateRange(start, end).then(payments => ({
+            month: format(date, 'MMM'),
+            revenue: (payments ?? []).reduce((sum, p) => sum + (p?.debit ?? 0), 0)
+          }))
+        );
       }
+      const last6Months = await Promise.all(monthPromises);
       setRevenueData(last6Months);
 
     } catch (err: any) {
       console.error("Dashboard fetchDashboardData unexpected error:", err);
+      if (isMounted) setError(err.message || "An unexpected error occurred while loading dashboard data.");
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    let isMounted = true;
+    fetchDashboardData(isMounted);
+    return () => { isMounted = false; };
+  }, [fetchDashboardData]);
 
   if (loading) {
     return (
@@ -184,6 +169,13 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <AlertTriangle className="h-5 w-5" />
+          <p className="font-bold">{error}</p>
+          <Button variant="ghost" size="sm" onClick={() => fetchDashboardData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
+        </div>
+      )}
       {/* Welcome Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100 animate-in fade-in slide-in-from-top duration-500">
         <div>
@@ -197,7 +189,7 @@ const Dashboard = () => {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Today's Date</p>
             <p className="text-sm font-black text-slate-700">{format(new Date(), "MMMM do, yyyy")}</p>
           </div>
-          <Button onClick={fetchDashboardData} variant="outline" size="icon" className="h-12 w-12 rounded-xl border-slate-200 hover:bg-slate-50">
+          <Button onClick={() => fetchDashboardData(true)} variant="outline" size="icon" className="h-12 w-12 rounded-xl border-slate-200 hover:bg-slate-50">
             <Clock className="h-5 w-5 text-slate-500" />
           </Button>
         </div>

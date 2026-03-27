@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from "react";
+import * as authService from "@/services/authService";
 import { toast } from "sonner";
 
 export type UserRole = "admin" | "manager" | "staff" | "accountant";
@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // 2. Otherwise, check Supabase session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    authService.getSession().then((session) => {
       if (session?.user) {
         const authUser = mapSupabaseUser(session.user);
         // Security check: Hard block any non-env user from gaining 'admin' role
@@ -89,7 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = authService.onAuthStateChange((_event, session) => {
       if (session?.user) {
         const authUser = mapSupabaseUser(session.user);
         if (authUser.role === "admin") {
@@ -106,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const mapSupabaseUser = (sbUser: any): AuthUser => {
+  const mapSupabaseUser = useCallback((sbUser: any): AuthUser => {
     const meta = sbUser.user_metadata || {};
     const role = (meta.role as UserRole) || "staff";
     
@@ -124,9 +124,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isActive: meta.isActive !== undefined ? meta.isActive : true,
       lastLogin: sbUser.last_sign_in_at
     };
-  };
+  }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     try {
       // 1. Check if these are the hardcoded admin credentials from .env
       const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
@@ -148,18 +148,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // 2. Regular user login via Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const data = await authService.signIn(email, password);
 
-      if (error) {
-        if (error.message === "Failed to fetch") {
-          return { success: false, error: "Network error: Could not connect to Supabase. Please check your internet connection and Supabase URL." };
-        }
-        throw error;
-      }
-      
       if (data.user) {
         const authUser = mapSupabaseUser(data.user);
         
@@ -184,7 +174,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const loginTime = new Date().toISOString();
 
           // Log in audit_logs
-          await supabase.from("audit_logs").insert([{
+          await authService.logAuditAction({
             user_id: authUser.id,
             user_name: authUser.name,
             action: `Login from ${ip}`,
@@ -192,7 +182,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             timestamp: loginTime,
             // We can add metadata if the table supports it, or just in action string
             details: `Device: ${browserInfo}`
-          }]);
+          });
         } catch (e) {
           // Audit log failed
         }
@@ -205,14 +195,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (err: any) {
       return { success: false, error: err.message || "Invalid credentials." };
     }
-  };
+  }, [mapSupabaseUser]);
 
-
-  const logout = async () => {
-    await supabase.auth.signOut();
+  const logout = useCallback(async () => {
+    await authService.signOut();
     setUser(null);
     localStorage.removeItem("octonus_user");
-  };
+  }, []);
 
   // --- SESSION TIMEOUT (30 mins inactivity) ---
   useEffect(() => {
@@ -239,39 +228,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (timeoutId) clearTimeout(timeoutId);
       events.forEach(name => document.removeEventListener(name, resetTimer));
     };
-  }, [user]);
+  }, [user, logout]);
 
-  const hasAccess = (page: string) => {
+  const hasAccess = useCallback((page: string) => {
     if (!user) return false;
     if (user.role === "admin") return true;
     return user.permissions?.pages.includes(page) ?? false;
-  };
+  }, [user]);
 
-  const canDo = (action: UserAction) => {
+  const canDo = useCallback((action: UserAction) => {
     if (!user) return false;
     if (user.role === "admin") return true;
     return user.permissions?.actions.includes(action) ?? false;
-  };
+  }, [user]);
 
-  const logAction = async (action: string, page: string) => {
+  const logAction = useCallback(async (action: string, page: string) => {
     if (!user) return;
     try {
-      const { error } = await supabase.from("audit_logs").insert([
-        {
-          user_id: user.id,
-          user_name: user.name,
-          action,
-          page,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
+      await authService.logAuditAction({
+        user_id: user.id,
+        user_name: user.name,
+        action,
+        page,
+        timestamp: new Date().toISOString(),
+      });
     } catch (err) {
       // Audit log failed
     }
-  };
+  }, [user]);
+
+  const value = useMemo(() => ({
+    user,
+    loading,
+    login,
+    logout,
+    hasAccess,
+    canDo,
+    logAction
+  }), [user, loading, login, logout, hasAccess, canDo, logAction]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, hasAccess, canDo, logAction }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

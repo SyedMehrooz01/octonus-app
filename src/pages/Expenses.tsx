@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
+import * as financeService from "@/services/financeService";
 import { useAuth } from "@/contexts/AuthContext";
 import { format, startOfToday, startOfMonth, endOfMonth, eachMonthOfInterval, startOfYear, endOfYear, isWithinInterval, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -62,6 +62,7 @@ const Expenses = () => {
   const { user, canDo, logAction } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterHead, setFilterHead] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -91,32 +92,32 @@ const Expenses = () => {
     event_id: "" as string | null
   });
 
-  const fetchExpenses = async () => {
-    setLoading(true);
+  const fetchExpenses = useCallback(async (isMounted = true) => {
+    if (isMounted) {
+      setLoading(true);
+      setError(null);
+    }
     try {
-      const { data, error } = await supabase 
-        .from('expenses') 
-        .select('id, voucher_no, date, description, category, payment_mode, amount, linked_event, status, approved_by, approved_at, created_by, created_by_name, created_by_id, created_by_role, created_at') 
-        .order('created_at', { ascending: false })
-        .limit(50); 
-      
-      if (error) { 
-        console.error("fetchExpenses error:", error);
-        setExpenses([]);
-      } else { 
-        setExpenses(data ?? []); 
-      } 
+      const data = await financeService.getExpenses();
+      if (!isMounted) return;
+      if (!data) throw new Error("Failed to fetch expenses.");
+      setExpenses(data); 
     } catch (error: any) {
       console.error("fetchExpenses unexpected error:", error);
-      setExpenses([]);
+      if (isMounted) {
+        setError(error.message || "Failed to fetch expenses.");
+        setExpenses([]);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchExpenses();
-  }, []);
+    let isMounted = true;
+    fetchExpenses(isMounted);
+    return () => { isMounted = false; };
+  }, [fetchExpenses]);
 
   const handleAdd = async () => {
     if (!newExpense.description || !newExpense.amount || !newExpense.head) {
@@ -126,25 +127,21 @@ const Expenses = () => {
     
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('expenses')
-        .insert([{
-          date: newExpense.date,
-          description: newExpense.description,
-          category: newExpense.head,
-          amount: Number(newExpense.amount),
-          payment_mode: newExpense.payment_mode,
-          linked_event: newExpense.event_id,
-          status: 'pending',
-          created_by: user?.email,
-          created_by_name: user?.name || user?.email,
-          created_by_id: user?.id,
-          created_by_role: user?.role || 'user',
-          created_at: new Date().toISOString()
-        }]);
+      await financeService.addExpense({
+        date: newExpense.date,
+        description: newExpense.description,
+        category: newExpense.head,
+        amount: Number(newExpense.amount),
+        payment_mode: newExpense.payment_mode,
+        linked_event: newExpense.event_id,
+        status: 'pending',
+        created_by: user?.email,
+        created_by_name: user?.name || user?.email,
+        created_by_id: user?.id,
+        created_by_role: user?.role || 'user',
+        created_at: new Date().toISOString()
+      });
 
-      if (error) throw error;
-      
       logAction(`Added new expense: ${newExpense.description} (₨ ${newExpense.amount})`, "Expenses");
       toast.success("Expense added successfully");
       setShowAddModal(false);
@@ -167,16 +164,12 @@ const Expenses = () => {
   const handleApprove = async (id: string) => {
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('expenses')
-        .update({
-          status: 'approved',
-          approved_by: user?.name || user?.email,
-          approved_at: new Date().toISOString()
-        })
-        .eq('id', id);
+      await financeService.updateExpenseStatus(id, {
+        status: 'approved',
+        approved_by: user?.name || user?.email,
+        approved_at: new Date().toISOString()
+      });
 
-      if (error) throw error;
       toast.success("Expense approved");
       fetchExpenses();
     } catch (error: any) {
@@ -193,15 +186,11 @@ const Expenses = () => {
     }
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('expenses')
-        .update({
-          status: 'rejected',
-          rejection_reason: rejectionModal.reason
-        })
-        .eq('id', rejectionModal.id);
+      await financeService.updateExpenseStatus(rejectionModal.id, {
+        status: 'rejected',
+        rejection_reason: rejectionModal.reason
+      });
 
-      if (error) throw error;
       toast.success("Expense rejected");
       setRejectionModal({ show: false, id: "", reason: "" });
       fetchExpenses();
@@ -614,6 +603,13 @@ const Expenses = () => {
 
   return (
     <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-hidden">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <p className="font-bold">{error}</p>
+          <Button variant="ghost" size="sm" onClick={() => fetchExpenses(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
+        </div>
+      )}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
           <h1 className="text-3xl sm:text-4xl font-black text-[#0f172a] tracking-tight uppercase">Expense Management</h1>

@@ -5,10 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Mail, User, Eye, EyeOff, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { supabase } from "@/integrations/supabase/client";
+import * as authService from "@/services/authService";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -52,19 +51,11 @@ const Signup = () => {
 
     try {
       // SECURITY: Force role to 'staff' (regular user) regardless of what might be sent
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: "staff", // Hardcoded to staff for security
-            username: email.split('@')[0],
-          }
-        }
+      const data = await authService.signUp(email, password, {
+        full_name: fullName,
+        role: "staff", // Hardcoded to staff for security
+        username: email.split('@')[0],
       });
-
-      if (signUpError) throw signUpError;
 
       if (data.user) {
         toast.success("Account created successfully!");

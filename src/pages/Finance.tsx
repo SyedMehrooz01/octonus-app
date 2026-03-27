@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, useCallback, useMemo } from "react";
 import { Landmark, TrendingUp, TrendingDown, Plus, Search, FileText, Download, Calendar, Users, History, Wallet, Save, Loader2, RefreshCcw, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfYear, endOfYear, eachMonthOfInterval, isWithinInterval, parseISO } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
+import * as financeService from "@/services/financeService";
+import * as eventService from "@/services/eventService";
 import { useAuth } from "@/contexts/AuthContext";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
@@ -77,6 +78,7 @@ const Finance = () => {
   const { user, canDo, logAction } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [suppliers, setSuppliers] = useState(INIT_SUPPLIERS);
@@ -110,7 +112,7 @@ const Finance = () => {
   const handleRefreshVendors = async () => {
     setIsRefreshing(true);
     try {
-      await fetchVendors();
+      await fetchVendors(true);
       toast({ title: "Success", description: "Vendor ledger updated" });
     } catch (err) {
       toast({ title: "Error", description: "Failed to refresh vendors", variant: "destructive" });
@@ -119,18 +121,19 @@ const Finance = () => {
     }
   };
 
-  const fetchFinanceData = async () => {
-    setLoading(true);
+  const fetchFinanceData = useCallback(async (isMounted = true) => {
+    if (isMounted) {
+      setLoading(true);
+      setError(null);
+    }
     try {
-      const { data, error } = await supabase
-        .from('ledger_entries')
-        .select('id, date, description, debit, credit, balance, account_type, reference, created_at')
-        .order('date', { ascending: true })
-        .limit(50);
-
-      if (error) throw error;
+      const data = await financeService.getLedgerEntries();
       
-      const ledgerData = (data ?? []).map((entry: any) => {
+      if (!isMounted) return;
+
+      if (!data) throw new Error("No ledger entries found.");
+
+      const ledgerData = data.map((entry: any) => {
         return {
           id: entry?.id ?? "",
           date: entry?.date ?? format(new Date(), "yyyy-MM-dd"),
@@ -144,68 +147,64 @@ const Finance = () => {
       setLedger(ledgerData);
     } catch (err: any) {
       console.error("fetchFinanceData error:", err);
-      setLedger([]); 
+      if (isMounted) {
+        setError(err.message || "Failed to fetch financial data.");
+        setLedger([]); 
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
-  };
-
-  const fetchVendors = async () => {
-    try {
-      const { data: vData, error: vErr } = await supabase
-        .from('suppliers')
-        .select('id, name, contact_number, service_type, opening_balance, current_balance')
-        .limit(50);
-      
-      if (vErr) {
-        console.error("Vendors fetch error:", vErr);
-        setVendors([]);
-      } else {
-        setVendors((vData ?? []).map((v: any) => ({
-          id: v?.id ?? "",
-          name: v?.name ?? "Unknown",
-          contact: v?.contact_number ?? "N/A",
-          category: v?.service_type ?? "N/A",
-          total_bills: v?.opening_balance ?? 0,
-          paid: (v?.opening_balance ?? 0) - (v?.current_balance ?? 0),
-          balance: v?.current_balance ?? 0
-        })));
-      }
-      
-      const { data: pData, error: pErr } = await supabase
-        .from('supplier_payments')
-        .select('id, supplier_id, date, amount, method, notes')
-        .order('date', { ascending: false })
-        .limit(50);
-      
-      if (pErr) {
-        console.error("Vendor payments fetch error:", pErr);
-        setVendorPayments([]);
-      } else {
-        setVendorPayments((pData ?? []).map((p: any) => ({
-          id: p?.id ?? "",
-          vendor_id: p?.supplier_id ?? "",
-          date: p?.date ?? format(new Date(), "yyyy-MM-dd"),
-          amount: p?.amount ?? 0,
-          method: p?.method ?? "Cash",
-          notes: p?.notes ?? ""
-        })));
-      }
-    } catch (err) {
-      console.error("fetchVendors unexpected error:", err);
-      setVendors([]);
-      setVendorPayments([]);
-    }
-  };
-
-  useEffect(() => {
-    const init = async () => {
-      await Promise.all([fetchFinanceData(), fetchVendors()]);
-    };
-    init();
   }, []);
 
-  const filtered = (ledger ?? []).filter(l => {
+  const fetchVendors = useCallback(async (isMounted = true) => {
+    try {
+      const [vData, pData] = await Promise.all([
+        eventService.getSuppliers(),
+        eventService.getSupplierPayments()
+      ]);
+      
+      if (!isMounted) return;
+
+      if (!vData) throw new Error("No vendor data found.");
+
+      setVendors(vData.map((v: any) => ({
+        id: v?.id ?? "",
+        name: v?.name ?? "Unknown",
+        contact: v?.contact_number ?? "N/A",
+        category: v?.service_type ?? "N/A",
+        total_bills: v?.opening_balance ?? 0,
+        paid: (v?.opening_balance ?? 0) - (v?.current_balance ?? 0),
+        balance: v?.current_balance ?? 0
+      })));
+      
+      setVendorPayments((pData ?? []).map((p: any) => ({
+        id: p?.id ?? "",
+        vendor_id: p?.supplier_id ?? "",
+        date: p?.date ?? format(new Date(), "yyyy-MM-dd"),
+        amount: p?.amount ?? 0,
+        method: p?.method ?? "Cash",
+        notes: p?.notes ?? ""
+      })));
+    } catch (err: any) {
+      console.error("fetchVendors unexpected error:", err);
+      if (isMounted) {
+        setError(prev => prev || err.message || "Failed to fetch vendor data.");
+        setVendors([]);
+        setVendorPayments([]);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const init = async () => {
+      await Promise.all([fetchFinanceData(isMounted), fetchVendors(isMounted)]);
+    };
+    init();
+    return () => { isMounted = false; };
+  }, [fetchFinanceData, fetchVendors]);
+
+  const filtered = useMemo(() => (ledger ?? []).filter(l => {
     const matchesSearch = (l?.description ?? "").toLowerCase().includes((search ?? "").toLowerCase());
     const matchesAccount = accountFilter === "all" || l?.account === accountFilter;
     const matchesDate = isWithinInterval(parseISO(l?.date ?? format(new Date(), "yyyy-MM-dd")), { 
@@ -213,23 +212,31 @@ const Finance = () => {
       end: parseISO(toDate) 
     });
     return matchesSearch && matchesAccount && matchesDate;
-  });
+  }), [ledger, search, accountFilter, fromDate, toDate]);
 
-  const totalDebit = (ledger ?? []).filter(l=>l?.type==="debit").reduce((s,l)=>s+(l?.amount ?? 0),0);
-  const totalCredit = (ledger ?? []).filter(l=>l?.type==="credit").reduce((s,l)=>s+(l?.amount ?? 0),0);
-  const netBalance = totalDebit - totalCredit;
-  const totalRevenue = (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.totalAmount ?? 0),0);
-  const totalPending = (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.balance ?? 0),0);
-  const totalProfit = (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.profit ?? 0),0);
+  const { totalDebit, totalCredit, netBalance } = useMemo(() => {
+    const debit = (ledger ?? []).filter(l=>l?.type==="debit").reduce((s,l)=>s+(l?.amount ?? 0),0);
+    const credit = (ledger ?? []).filter(l=>l?.type==="credit").reduce((s,l)=>s+(l?.amount ?? 0),0);
+    return {
+      totalDebit: debit,
+      totalCredit: credit,
+      netBalance: debit - credit
+    };
+  }, [ledger]);
 
-  const handleAdd = async () => {
+  const totalRevenue = useMemo(() => (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.totalAmount ?? 0),0), []);
+  const totalPending = useMemo(() => (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.balance ?? 0),0), []);
+  const totalProfit = useMemo(() => (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.profit ?? 0),0), []);
+  const totalAdvances = useMemo(() => (EVENT_FINANCE ?? []).reduce((s,e)=>s+(e?.advance ?? 0),0), []);
+  
+  const handleAdd = useCallback(async () => {
     if (!newEntry.description || !newEntry.amount) {
       toast({ title: "Validation Error", description: "Please fill all required fields", variant: "destructive" });
       return;
     }
     setSaving(true);
     try {
-      const { error } = await supabase.from('ledger_entries').insert([{
+      await financeService.addLedgerEntry({
         date: newEntry.date,
         description: newEntry.description,
         account_type: newEntry.account,
@@ -237,10 +244,8 @@ const Finance = () => {
         credit: newEntry.type === 'credit' ? Number(newEntry.amount) : 0,
         balance: netBalance + (newEntry.type === 'debit' ? Number(newEntry.amount) : -Number(newEntry.amount)),
         reference: user?.email
-      }]);
+      });
 
-      if (error) throw error;
-      
       await fetchFinanceData();
       setNewEntry({date: format(new Date(), "yyyy-MM-dd"), description:"", account:"Cash", type:"debit", amount:""});
       setShowAdd(false); 
@@ -251,14 +256,13 @@ const Finance = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [newEntry, netBalance, user, fetchFinanceData, logAction, toast]);
 
-  const handleDeleteEntry = async (id: string | number) => {
+  const handleDeleteEntry = useCallback(async (id: string | number) => {
     if (!confirm("Are you sure you want to delete this entry?")) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('ledger_entries').delete().eq('id', id);
-      if (error) throw error;
+      await financeService.deleteLedgerEntry(id);
       await fetchFinanceData();
       toast({ title: "Success", description: "Entry deleted successfully" });
       logAction(`Deleted ledger entry ID: ${id}`, "Finance");
@@ -267,14 +271,14 @@ const Finance = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [fetchFinanceData, logAction, toast]);
 
-  const handlePaySupplier = async () => {
+  const handlePaySupplier = useCallback(async () => {
     if (!payAmount || !selectedSupplier) return;
     setIsSaving(true);
     try {
       const amt = Number(payAmount);
-      setSuppliers((suppliers ?? []).map(s => s?.id === selectedSupplier?.id 
+      setSuppliers(prev => (prev ?? []).map(s => s?.id === selectedSupplier?.id 
         ? { ...s, paid: (s?.paid ?? 0) + amt, balance: Math.max(0, (s?.balance ?? 0) - amt) } 
         : s
       ));
@@ -286,26 +290,24 @@ const Finance = () => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [payAmount, selectedSupplier, toast]);
 
-  const handlePayVendor = async () => {
+  const handlePayVendor = useCallback(async () => {
     if (!vendorPayForm.amount || !selectedVendor) return;
     setIsSaving(true);
     try {
       const amt = Number(vendorPayForm.amount);
-      const { error: pErr } = await supabase.from('supplier_payments').insert([{
+      await eventService.addSupplierPayment({
         supplier_id: selectedVendor?.id,
         amount: amt,
         method: vendorPayForm.method,
         date: vendorPayForm.date,
         notes: vendorPayForm.notes
-      }]);
-      if (pErr) throw pErr;
+      });
 
-      const { error: sErr } = await supabase.from('suppliers').update({
+      await eventService.updateSupplier(selectedVendor?.id, {
         current_balance: (selectedVendor?.balance ?? 0) - amt
-      }).eq('id', selectedVendor?.id);
-      if (sErr) throw sErr;
+      });
 
       toast({title:"Vendor payment recorded"});
       setShowPayVendor(false);
@@ -315,19 +317,19 @@ const Finance = () => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [vendorPayForm, selectedVendor, fetchVendors, toast]);
 
   // Export Logic
-  const exportToExcel = (data: any[], fileName: string) => {
+  const exportToExcel = useCallback((data: any[], fileName: string) => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
     const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     saveAs(blob, `${fileName}.xlsx`);
-  };
+  }, []);
 
-  const exportToPDF = (headers: string[], data: any[][], title: string, fileName: string) => {
+  const exportToPDF = useCallback((headers: string[], data: any[][], title: string, fileName: string) => {
     const doc = new jsPDF();
     doc.text(title, 14, 15);
     autoTable(doc, {
@@ -336,9 +338,9 @@ const Finance = () => {
       startY: 20,
     });
     doc.save(`${fileName}.pdf`);
-  };
+  }, []);
 
-  const exportPL = (format: 'pdf' | 'excel') => {
+  const exportPL = useCallback((format: 'pdf' | 'excel') => {
     const data = (EVENT_FINANCE ?? []).map(e => ({
       Event: e?.event ?? "N/A",
       Date: e?.date ?? "N/A",
@@ -356,9 +358,9 @@ const Finance = () => {
       const rows = data.map(d => Object.values(d));
       exportToPDF(headers, rows, `Profit & Loss Report - ${selectedYear}`, `Profit_and_Loss_${selectedYear}`);
     }
-  };
+  }, [selectedYear, exportToExcel, exportToPDF]);
 
-  const exportStatement = (format: 'pdf' | 'excel') => {
+  const exportStatement = useCallback((format: 'pdf' | 'excel') => {
     const data = (filtered ?? []).map(l => ({
       Date: l?.date ?? "N/A",
       Description: l?.description ?? "N/A",
@@ -375,9 +377,7 @@ const Finance = () => {
       const rows = data.map(d => Object.values(d));
       exportToPDF(headers, rows, `Account Statement: ${accountFilter} (${fromDate} to ${toDate})`, `Account_Statement_${accountFilter}`);
     }
-  };
-
-  const totalAdvances = (EVENT_FINANCE ?? []).reduce((s,e)=>s+(e?.advance ?? 0),0);
+  }, [filtered, accountFilter, fromDate, toDate, exportToExcel, exportToPDF]);
   
   const yearlyMonths = eachMonthOfInterval({
     start: startOfYear(parseISO(`${selectedYear}-01-01`)),
@@ -401,6 +401,13 @@ const Finance = () => {
 
   return (
     <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <RefreshCcw className="h-5 w-5 animate-spin-slow" />
+          <p className="font-bold">{error}</p>
+          <Button variant="ghost" size="sm" onClick={() => fetchFinanceData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
+        </div>
+      )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
           <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Finance & Accounts</h1>

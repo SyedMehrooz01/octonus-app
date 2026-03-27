@@ -31,7 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
+import * as documentService from "@/services/documentService";
 import { useAuth } from "@/contexts/AuthContext";
 import Logo from "@/components/Logo";
 
@@ -77,6 +77,7 @@ const Documents = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"Quotation" | "Invoice" | "archive">("Quotation");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [documents, setDocuments] = useState<DocumentData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,56 +98,38 @@ const Documents = () => {
   
   const invoiceTerms = `1. Amount Including 15% SRB & 11% Income Taxes.\n2. All Payment Should be Favor in Octonus Solutions by Cheque/IBFT.\n3. Payment Made Before Due Date.`;
 
-  useEffect(() => {
-    fetchDocuments();
-    generateDocNo();
-  }, [activeTab]);
-
-  useEffect(() => {
-    setTerms(activeTab === "Quotation" ? quotationTerms : invoiceTerms);
-  }, [activeTab]);
-
-  const fetchDocuments = async () => {
-    setLoading(true);
+  const fetchDocuments = useCallback(async (isMounted = true) => {
+    if (isMounted) {
+      setLoading(true);
+      setError(null);
+    }
     try {
-      const { data, error } = await supabase
-        .from("documents")
-        .select("id, doc_number, doc_type, client_company, contact_person, client_address, event_name, invoice_date, event_date, valid_until, items, total_amount, srb_amount, sub_total, terms, status, created_by, created_at")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (error) {
-        console.error("Documents fetch error:", error);
-        setDocuments([]);
-      } else {
-        setDocuments(data ?? []);
-      }
+      const data = await documentService.getDocuments();
+      if (!isMounted) return;
+      if (!data) throw new Error("Failed to fetch documents.");
+      setDocuments(data);
     } catch (err: any) {
       console.error("fetchDocuments unexpected error:", err);
-      setDocuments([]);
+      if (isMounted) {
+        setError(err.message || "An unexpected error occurred while fetching documents.");
+        setDocuments([]);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
-  };
+  }, []);
 
-  const generateDocNo = async () => {
+  const generateDocNo = useCallback(async (isMounted = true) => {
     try {
       const prefix = activeTab === "Quotation" ? "QT" : "INV";
       const currentYear = new Date().getFullYear();
       
-      const { data, error } = await supabase
-        .from("documents")
-        .select("doc_number")
-        .eq("doc_type", activeTab)
-        .like("doc_number", `${prefix}-${currentYear}-%`)
-        .order("doc_number", { ascending: false })
-        .limit(1);
+      const lastNo = await documentService.getLatestDocumentNumber(activeTab, prefix, currentYear);
 
-      if (error) throw error;
+      if (!isMounted) return;
 
       let nextNum = 1;
-      if (data && data.length > 0) {
-        const lastNo = data[0].doc_number;
+      if (lastNo) {
         const parts = lastNo.split("-");
         const lastNum = parseInt(parts[parts.length - 1]);
         if (!isNaN(lastNum)) {
@@ -155,9 +138,20 @@ const Documents = () => {
       }
       setDocNo(`${prefix}-${currentYear}-${nextNum.toString().padStart(3, "0")}`);
     } catch (err: any) {
-      toast.error("Failed to generate document number");
+      if (isMounted) toast.error("Failed to generate document number");
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchDocuments(isMounted);
+    generateDocNo(isMounted);
+    return () => { isMounted = false; };
+  }, [fetchDocuments, generateDocNo]);
+
+  useEffect(() => {
+    setTerms(activeTab === "Quotation" ? quotationTerms : invoiceTerms);
+  }, [activeTab]);
 
   const handleAddItem = () => {
     setItems([...items, { description: "", qty: 1, rate: 0, amount: 0 }]);
@@ -225,9 +219,7 @@ const Documents = () => {
         docData.event_date = eventDate;
       }
 
-      const { error } = await supabase.from("documents").insert([docData]);
-
-      if (error) throw error;
+      await documentService.addDocument(docData);
 
       toast.success(`${activeTab} saved successfully`);
       fetchDocuments();
@@ -547,8 +539,7 @@ const Documents = () => {
     if (!confirm("Are you sure you want to delete this document?")) return;
     
     try {
-      const { error } = await supabase.from("documents").delete().eq("id", id);
-      if (error) throw error;
+      await documentService.deleteDocument(id);
       toast.success("Document deleted");
       fetchDocuments();
     } catch (err: any) {
@@ -564,6 +555,13 @@ const Documents = () => {
 
   return (
     <div className="space-y-8 pb-10">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <Receipt className="h-5 w-5" />
+          <p className="font-bold">{error}</p>
+          <Button variant="ghost" size="sm" onClick={() => fetchDocuments(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
+        </div>
+      )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="animate-in fade-in slide-in-from-left duration-500">
           <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Documents Generator</h1>

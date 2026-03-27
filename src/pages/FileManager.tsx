@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import * as fileService from "@/services/fileService";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface FileManagerData {
@@ -47,6 +47,7 @@ const FileManager = () => {
   // File Manager State
   const [files, setFiles] = useState<FileManagerData[]>([]);
   const [fileLoading, setFileLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [fileSearch, setFileSearch] = useState("");
   const [fileCategory, setFileCategory] = useState("all");
   const [isUploading, setIsUploading] = useState(false);
@@ -63,32 +64,32 @@ const FileManager = () => {
     "Client Documents", "Financial Records", "HR Documents", "General"
   ];
 
-  useEffect(() => {
-    fetchFiles();
-  }, []);
-
-  const fetchFiles = async () => {
-    setFileLoading(true);
+  const fetchFiles = useCallback(async (isMounted = true) => {
+    if (isMounted) {
+      setFileLoading(true);
+      setError(null);
+    }
     try {
-      const { data, error } = await supabase
-        .from("file_manager")
-        .select("id, file_name, file_url, file_type, file_size, category, description, uploaded_by, created_at")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (error) {
-        console.error("Files fetch error:", error);
-        setFiles([]);
-      } else {
-        setFiles(data ?? []);
-      }
+      const data = await fileService.getFiles();
+      if (!isMounted) return;
+      if (!data) throw new Error("Failed to fetch files.");
+      setFiles(data);
     } catch (err: any) {
       console.error("fetchFiles unexpected error:", err);
-      setFiles([]);
+      if (isMounted) {
+        setError(err.message || "An unexpected error occurred while fetching files.");
+        setFiles([]);
+      }
     } finally {
-      setFileLoading(false);
+      if (isMounted) setFileLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchFiles(isMounted);
+    return () => { isMounted = false; };
+  }, [fetchFiles]);
 
   const handleFileUpload = async () => {
     if (!uploadFile) {
@@ -103,33 +104,23 @@ const FileManager = () => {
       const filePath = `${Math.random()}.${fileExt}`;
 
       // 1. Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(filePath, uploadFile);
-
-      if (uploadError) throw uploadError;
+      await fileService.uploadFile("documents", filePath, uploadFile);
 
       // 2. Get Public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from("documents")
-        .getPublicUrl(filePath);
+      const publicUrl = fileService.getPublicUrl("documents", filePath);
 
       // 3. Save Metadata to DB
-      const { error: dbError } = await supabase.from("file_manager").insert([
-        {
-          file_name: fileName,
-          file_url: publicUrl,
-          file_type: uploadFile.type,
-          file_size: (uploadFile.size / 1024 / 1024).toFixed(2) + " MB",
-          category: uploadCategory,
-          description: uploadDescription,
-          uploaded_by: user?.name || user?.email || "System",
-          user_id: user?.id,
-          created_at: new Date().toISOString()
-        },
-      ]);
-
-      if (dbError) throw dbError;
+      await fileService.addFileRecord({
+        file_name: fileName,
+        file_url: publicUrl,
+        file_type: uploadFile.type,
+        file_size: (uploadFile.size / 1024 / 1024).toFixed(2) + " MB",
+        category: uploadCategory,
+        description: uploadDescription,
+        uploaded_by: user?.name || user?.email || "System",
+        user_id: user?.id,
+        created_at: new Date().toISOString()
+      });
 
       toast.success("File uploaded successfully");
       setIsUploading(false);
@@ -151,11 +142,10 @@ const FileManager = () => {
       // Extract file path from URL
       const filePath = fileUrl.split("/").pop();
       if (filePath) {
-        await supabase.storage.from("documents").remove([filePath]);
+        await fileService.deleteFileStorage("documents", [filePath]);
       }
 
-      const { error } = await supabase.from("file_manager").delete().eq("id", id);
-      if (error) throw error;
+      await fileService.deleteFileRecord(id);
 
       toast.success("File deleted successfully");
       fetchFiles();
@@ -182,6 +172,13 @@ const FileManager = () => {
 
   return (
     <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <FolderOpen className="h-5 w-5" />
+          <p className="font-bold">{error}</p>
+          <Button variant="ghost" size="sm" onClick={() => fetchFiles(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
+        </div>
+      )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
           <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">File Manager</h1>

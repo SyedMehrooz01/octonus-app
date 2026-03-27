@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, useCallback, useMemo } from "react";
 import { Package, Plus, Search, AlertTriangle, ArrowUp, ArrowDown, RotateCcw, FileText, Download, Loader2, Wallet, Landmark, Eye, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
+import * as inventoryService from "@/services/inventoryService";
 import { format, isWithinInterval, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { saveAs } from "file-saver";
@@ -50,6 +50,7 @@ const Inventory = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [history, setHistory] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   
   // Filters
@@ -71,64 +72,64 @@ const Inventory = () => {
   const [newItem, setNewItem] = useState({ name: "", category: "Other", unit: "", current_stock: "", min_stock_level: "", purchase_price: "", supplier: "", type: "consumable" as const });
   const [returnForm, setReturnForm] = useState({ qty: "", returned_by: "", note: "" });
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (isMounted = true) => {
+    if (isMounted) {
+      setLoading(true);
+      setError(null);
+    }
     try {
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('inventory_items')
-        .select('id, name, type, category, unit, current_stock, min_stock_level, purchase_price, supplier, status, created_at')
-        .limit(50);
+      const [itemsDataRaw, historyDataRaw] = await Promise.all([
+        inventoryService.getInventoryItems(),
+        inventoryService.getStockMovements()
+      ]);
       
-      if (itemsError) {
-        console.error("Inventory items fetch error:", itemsError);
-        setItems([]);
-      } else {
-        setItems((itemsData ?? []).map(i => ({
-          id: i?.id ?? "",
-          name: i?.name ?? "Unknown",
-          category: i?.category ?? "Other",
-          unit: i?.unit ?? "Unit",
-          current_stock: i?.current_stock ?? 0,
-          min_stock_level: i?.min_stock_level ?? 0,
-          purchase_price: i?.purchase_price ?? 0,
-          supplier: i?.supplier ?? "N/A",
-          type: i?.type ?? "consumable",
-          status: i?.status ?? "active",
-          created_at: i?.created_at ?? new Date().toISOString()
-        })));
-      }
+      if (!isMounted) return;
 
-      const { data: historyData, error: historyError } = await supabase
-        .from('stock_movements')
-        .select('id, date, item_id, item_name, type, category, qty, note, issued_to, returned_by, return_date')
-        .order('date', { ascending: false })
-        .limit(50);
-      
-      if (historyError) {
-        console.error("Stock movements fetch error:", historyError);
-        setHistory([]);
-      } else {
-        setHistory(historyData ?? []);
-      }
+      if (!itemsDataRaw) throw new Error("Failed to fetch inventory items.");
+      if (!historyDataRaw) throw new Error("Failed to fetch stock movements.");
+
+      const itemsData = itemsDataRaw;
+      const historyData = historyDataRaw;
+
+      setItems(itemsData.map(i => ({
+        id: i?.id ?? "",
+        name: i?.name ?? "Unknown",
+        category: i?.category ?? "Other",
+        unit: i?.unit ?? "Unit",
+        current_stock: i?.current_stock ?? 0,
+        min_stock_level: i?.min_stock_level ?? 0,
+        purchase_price: i?.purchase_price ?? 0,
+        supplier: i?.supplier ?? "N/A",
+        type: i?.type ?? "consumable",
+        status: i?.status ?? "active",
+        created_at: i?.created_at ?? new Date().toISOString()
+      })));
+
+      setHistory(historyData);
     } catch (err: any) {
       console.error("Inventory fetchData unexpected error:", err);
-      setItems([]);
-      setHistory([]);
+      if (isMounted) {
+        setError(err.message || "Failed to fetch inventory data.");
+        setItems([]);
+        setHistory([]);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchData();
   }, []);
 
-  const filteredItems = (items ?? []).filter(i =>
+  useEffect(() => {
+    let isMounted = true;
+    fetchData(isMounted);
+    return () => { isMounted = false; };
+  }, [fetchData]);
+
+  const filteredItems = useMemo(() => (items ?? []).filter(i =>
     (i?.name ?? "").toLowerCase().includes((search ?? "").toLowerCase()) ||
     (i?.category ?? "").toLowerCase().includes((search ?? "").toLowerCase())
-  );
+  ), [items, search]);
 
-  const filteredHistory = (history ?? []).filter(h => {
+  const filteredHistory = useMemo(() => (history ?? []).filter(h => {
     const matchesSearch = (h?.item_name ?? "").toLowerCase().includes((historySearch ?? "").toLowerCase());
     const matchesCategory = categoryFilter === "all" || h?.category === categoryFilter;
     let matchesDate = true;
@@ -139,16 +140,20 @@ const Inventory = () => {
       });
     }
     return matchesSearch && matchesCategory && matchesDate;
-  });
+  }), [history, historySearch, categoryFilter, fromDate, toDate]);
 
-  const lowStock = (items ?? []).filter(i => (i?.current_stock ?? 0) <= (i?.min_stock_level ?? 0));
-  const totalValue = (items ?? []).reduce((s, i) => s + ((i?.current_stock ?? 0) * (i?.purchase_price ?? 0)), 0);
+  const lowStock = useMemo(() => (items ?? []).filter(i => (i?.current_stock ?? 0) <= (i?.min_stock_level ?? 0)), [items]);
+  const totalValue = useMemo(() => (items ?? []).reduce((s, i) => s + ((i?.current_stock ?? 0) * (i?.purchase_price ?? 0)), 0), [items]);
+  const categoryCount = useMemo(() => {
+    const cats = (items ?? []).map(i => i?.category).filter(Boolean);
+    return [...new Set(cats)].length;
+  }, [items]);
 
-  const handleAdd = async () => {
+  const handleAdd = useCallback(async () => {
     if (!newItem?.name) return;
     setIsSaving(true);
     try {
-      const { data, error } = await supabase.from('inventory_items').insert([{
+      const data = await inventoryService.addInventoryItem({
         name: newItem.name,
         type: newItem.type,
         category: newItem.category,
@@ -158,12 +163,10 @@ const Inventory = () => {
         purchase_price: Number(newItem.purchase_price || 0),
         supplier: newItem.supplier,
         status: 'active'
-      }]).select('id, name, type, category, unit, current_stock, min_stock_level, purchase_price, supplier, status, created_at');
+      });
 
-      if (error) throw error;
-      
       if (Number(newItem.current_stock) > 0 && data && data.length > 0) {
-        await supabase.from('stock_movements').insert([{
+        await inventoryService.addStockMovement({
           date: format(new Date(), "yyyy-MM-dd"),
           item_id: data[0].id,
           item_name: newItem.name,
@@ -171,21 +174,21 @@ const Inventory = () => {
           category: newItem.type,
           qty: Number(newItem.current_stock),
           note: "Initial Stock"
-        }]);
+        });
       }
 
       toast.success("Item added successfully");
       setShowAddModal(false);
       setNewItem({ name: "", category: "Other", unit: "", current_stock: "", min_stock_level: "", purchase_price: "", supplier: "", type: "consumable" });
-      fetchData();
+      fetchData(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to add item");
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [newItem, fetchData]);
 
-  const handleStockUpdate = async () => {
+  const handleStockUpdate = useCallback(async () => {
     if (!stockAction.qty || !selectedItem) return;
     setIsSaving(true);
     try {
@@ -193,13 +196,11 @@ const Inventory = () => {
       const currentStock = selectedItem.current_stock ?? 0;
       const newStock = stockAction.type === "purchase" ? currentStock + qty : Math.max(0, currentStock - qty);
       
-      const { error: itemError } = await supabase.from('inventory_items').update({
+      await inventoryService.updateInventoryItem(selectedItem.id.toString(), {
         current_stock: newStock
-      }).eq('id', selectedItem.id);
+      });
 
-      if (itemError) throw itemError;
-
-      const { error: moveError } = await supabase.from('stock_movements').insert([{
+      await inventoryService.addStockMovement({
         date: format(new Date(), "yyyy-MM-dd"),
         item_id: selectedItem.id,
         item_name: selectedItem.name,
@@ -208,22 +209,20 @@ const Inventory = () => {
         qty: qty,
         note: stockAction.note,
         issued_to: stockAction.type === "issue" ? stockAction.issued_to : null
-      }]);
-
-      if (moveError) throw moveError;
+      });
 
       toast.success("Stock updated successfully");
       setShowStockModal(false);
       setStockAction({ type: "purchase", qty: "", note: "", issued_to: "" });
-      fetchData();
+      fetchData(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to update stock");
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [stockAction, selectedItem, fetchData]);
 
-  const handleReturn = async () => {
+  const handleReturn = useCallback(async () => {
     if (!returnForm.qty || !selectedMovement || !selectedItem) return;
     setIsSaving(true);
     try {
@@ -235,14 +234,12 @@ const Inventory = () => {
 
       // Update item stock
       const currentStock = selectedItem.current_stock ?? 0;
-      const { error: itemError } = await supabase.from('inventory_items').update({
+      await inventoryService.updateInventoryItem(selectedItem.id.toString(), {
         current_stock: currentStock + qty
-      }).eq('id', selectedItem.id);
-
-      if (itemError) throw itemError;
+      });
 
       // Record return movement
-      const { error: moveError } = await supabase.from('stock_movements').insert([{
+      await inventoryService.addStockMovement({
         date: format(new Date(), "yyyy-MM-dd"),
         item_id: selectedItem.id,
         item_name: selectedItem.name,
@@ -252,22 +249,20 @@ const Inventory = () => {
         note: returnForm.note,
         returned_by: returnForm.returned_by,
         return_date: format(new Date(), "yyyy-MM-dd")
-      }]);
-
-      if (moveError) throw moveError;
+      });
 
       toast.success("Item returned successfully");
       setShowReturnModal(false);
       setReturnForm({ qty: "", returned_by: "", note: "" });
-      fetchData();
+      fetchData(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to process return");
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [returnForm, selectedMovement, selectedItem, fetchData]);
 
-  const exportHistory = () => {
+  const exportHistory = useCallback(() => {
     const data = (filteredHistory ?? []).map(h => ({
       Date: h?.date ?? "N/A",
       Item: h?.item_name ?? "Unknown",
@@ -284,7 +279,7 @@ const Inventory = () => {
     const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     saveAs(blob, `Stock_Movement_History_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-  };
+  }, [filteredHistory]);
 
   if (loading) {
     return (
@@ -301,6 +296,13 @@ const Inventory = () => {
 
   return (
     <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <RotateCcw className="h-5 w-5 animate-spin-slow" />
+          <p className="font-bold">{error}</p>
+          <Button variant="ghost" size="sm" onClick={() => fetchData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
+        </div>
+      )}
       {/* Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div>
@@ -334,7 +336,7 @@ const Inventory = () => {
           { label: "Total Asset Types", value: (items ?? []).length, icon: Package, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20" },
           { label: "Low Stock Alerts", value: (lowStock ?? []).length, icon: AlertTriangle, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20" },
           { label: "Est. Stock Value", value: `₨ ${(totalValue ?? 0).toLocaleString()}`, icon: Wallet, color: "from-emerald-500 to-emerald-700", shadow: "shadow-emerald-500/20" },
-          { label: "Active Categories", value: [...new Set((items ?? []).map(i => i?.category))].length, icon: Landmark, color: "from-violet-500 to-violet-700", shadow: "shadow-violet-500/20" },
+          { label: "Active Categories", value: categoryCount, icon: Landmark, color: "from-violet-500 to-violet-700", shadow: "shadow-violet-500/20" },
         ].map((card, i) => (
           <div key={card.label} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.color} p-6 text-white shadow-xl ${card.shadow} transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
             <div className="relative z-10 flex flex-col gap-4">
