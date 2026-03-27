@@ -14,19 +14,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import SkeletonLoading from "@/components/SkeletonLoading";
 
 type BookingStatus = "tentative" | "confirmed" | "postponed" | "cancelled";
-interface Booking { id: number; clientName: string; phone: string; eventType: string; eventDate: string; bookingDate: string; venue: string; guests: number; totalAmount: number; advance: number; balanceRemaining: number; status: BookingStatus; paymentMethod: string; menu: string; notes: string; thirdParty: boolean; supplierCost: number; sellingRate: number; }
+interface Booking { id: string; clientName: string; phone: string; eventType: string; eventDate: string; bookingDate: string; venue: string; guests: number; totalAmount: number; advance: number; balanceRemaining: number; status: BookingStatus; paymentMethod: string; menu: string; notes: string; thirdParty: boolean; supplierCost: number; sellingRate: number; }
 
 const DUMMY_BOOKINGS: Booking[] = [
-  { id:1, clientName:"Tariq & Sana", phone:"0300-1111111", eventType:"Wedding", eventDate:"2024-03-18", bookingDate:"2024-03-01", venue:"Main Hall", guests:500, totalAmount:350000, advance:150000, balanceRemaining:200000, status:"confirmed", paymentMethod:"Bank", menu:"Menu A - Desi", notes:"VIP tables required", thirdParty:false, supplierCost:0, sellingRate:0 },
-  { id:2, clientName:"Ali Corp Dinner", phone:"0301-2222222", eventType:"Corporate", eventDate:"2024-03-20", bookingDate:"2024-03-03", venue:"Banquet Hall", guests:200, totalAmount:180000, advance:100000, balanceRemaining:80000, status:"confirmed", paymentMethod:"Cheque", menu:"Menu B - Continental", notes:"", thirdParty:true, supplierCost:120000, sellingRate:180000 },
+  { id:"1", clientName:"Tariq & Sana", phone:"0300-1111111", eventType:"Wedding", eventDate:"2024-03-18", bookingDate:"2024-03-01", venue:"Main Hall", guests:500, totalAmount:350000, advance:150000, balanceRemaining:200000, status:"confirmed", paymentMethod:"Bank", menu:"Menu A - Desi", notes:"VIP tables required", thirdParty:false, supplierCost:0, sellingRate:0 },
+  { id:"2", clientName:"Ali Corp Dinner", phone:"0301-2222222", eventType:"Corporate", eventDate:"2024-03-20", bookingDate:"2024-03-03", venue:"Banquet Hall", guests:200, totalAmount:180000, advance:100000, balanceRemaining:80000, status:"confirmed", paymentMethod:"Cheque", menu:"Menu B - Continental", notes:"", thirdParty:true, supplierCost:120000, sellingRate:180000 },
 ];
 
 interface MenuItem { id?: number | string; item: string; unit: string; rate: number; menu_id?: number | string; raw_materials?: RawMaterialRequirement[]; }
 interface Menu { id: number | string; name: string; items: MenuItem[]; }
 
 interface RawMaterialRequirement { material: string; unit: string; ratio_per_guest: number; }
-interface KitchenItem { id?: string; event_id: number; item_name: string; unit: string; estimated_qty: number; actual_qty: number; is_adjusted: boolean; }
-interface RawMaterial { id?: string; event_id: number; material_name: string; unit: string; estimated_qty: number; actual_qty: number; }
+interface KitchenItem { id?: string; event_id: string; item_name: string; unit: string; estimated_qty: number; actual_qty: number; is_adjusted: boolean; }
+interface RawMaterial { id?: string; event_id: string; material_name: string; unit: string; estimated_qty: number; actual_qty: number; }
+
 
 interface Supplier { id: string; name: string; contact_number: string; email: string; service_type: string; opening_balance: number; current_balance: number; created_at?: string; }
 interface SupplierPayment { id: string; supplier_id: string; date: string; amount: number; method: string; notes?: string; }
@@ -133,16 +134,17 @@ const EventBooking = () => {
       const menusData = menusDataRaw;
       const itemsData = itemsDataRaw ?? [];
 
-      if (menusData.length > 0) {
-        const formattedMenus = menusData.map(m => ({
+      if ((menusData ?? []).length > 0) {
+        const formattedMenus = (menusData ?? []).map(m => ({
           ...m,
-          items: itemsData.filter(i => i?.menu_id === m?.id).map(i => ({
+          items: (itemsData ?? []).filter(i => i?.menu_id === m?.id).map(i => ({
             ...i,
             item: i.name // Mapping 'name' from DB to 'item' used in UI
           })) || []
         }));
         setMenus(formattedMenus);
       } else {
+
         setMenus(INITIAL_MENUS);
       }
     } catch (error: any) {
@@ -182,9 +184,8 @@ const EventBooking = () => {
     try {
       const data = await eventService.getBookings();
       if (!isMounted) return;
-      if (!data) throw new Error("Failed to fetch bookings.");
       
-      setBookings(data.map(b => ({
+      setBookings((data ?? []).map(b => ({
         id: b.id,
         clientName: b.client_name,
         phone: b.client_phone,
@@ -197,12 +198,12 @@ const EventBooking = () => {
         advance: b.advance_paid,
         balanceRemaining: b.balance_due,
         status: b.status,
-        paymentMethod: b.payment_method || "N/A", 
+        paymentMethod: "N/A", // Removed from select
         menu: b.menu || "N/A", 
         notes: b.notes || "", 
-        thirdParty: b.third_party || false, 
-        supplierCost: b.supplier_cost || 0, 
-        sellingRate: b.selling_rate || 0 
+        thirdParty: false, // Removed from select
+        supplierCost: 0, // Removed from select
+        sellingRate: 0 // Removed from select
       })));
     } catch (err: any) {
       console.error("fetchBookingsData unexpected error:", err);
@@ -214,6 +215,7 @@ const EventBooking = () => {
       if (isMounted) setLoading(false);
     }
   }, []);
+
 
   useEffect(() => {
     let isMounted = true;
@@ -362,7 +364,7 @@ const EventBooking = () => {
     }
   }, [itemForm, editingItem, activeMenuId, logAction, fetchMenus]);
 
-  const fetchKitchenData = useCallback(async (eventId: number) => {
+  const fetchKitchenData = useCallback(async (eventId: string) => {
     try {
       const [kiData, rmData] = await Promise.all([
         eventService.getKitchenItems(eventId),
@@ -418,6 +420,7 @@ const EventBooking = () => {
         }
       }
     } catch (err) {
+      console.error("fetchKitchenData error:", err);
       toast.error("Failed to fetch kitchen data");
     }
   }, [bookings, menus]);
@@ -426,8 +429,8 @@ const EventBooking = () => {
     if (!selected) return;
     setIsSaving(true);
     try {
-      await eventService.upsertKitchenItems(kitchenItems.map(item => ({ ...item, event_id: selected.id })));
-      await eventService.upsertRawMaterials(rawMaterials.map(item => ({ ...item, event_id: selected.id })));
+      await eventService.upsertKitchenItems((kitchenItems ?? []).map(item => ({ ...item, event_id: selected.id })));
+      await eventService.upsertRawMaterials((rawMaterials ?? []).map(item => ({ ...item, event_id: selected.id })));
       toast.success("Kitchen data saved successfully");
     } catch (err: any) {
       toast.error(err.message || "Failed to save kitchen data");
@@ -472,6 +475,8 @@ const EventBooking = () => {
         advance_paid: adv,
         balance_due: total - adv,
         status: nb.status,
+        menu: nb.menu,
+        notes: nb.notes,
         created_at: nb.bookingDate || new Date().toISOString()
       };
 
@@ -495,7 +500,7 @@ const EventBooking = () => {
     }
   }, [nb, proceedWithBooking, checkAvailability, fetchBookingsData]);
 
-  const handleDeleteBooking = useCallback(async (id: number) => {
+  const handleDeleteBooking = useCallback(async (id: string) => {
     if (!confirm("Are you sure you want to permanently delete this booking?")) return;
     setSaving(true);
     try {
@@ -509,7 +514,7 @@ const EventBooking = () => {
     }
   }, [fetchBookingsData]);
 
-  const handleStatusChange = useCallback(async (id: number, status: BookingStatus) => {
+  const handleStatusChange = useCallback(async (id: string, status: BookingStatus) => {
     setSaving(true);
     try {
       await eventService.updateBooking(id, { status });
@@ -521,6 +526,7 @@ const EventBooking = () => {
       setSaving(false);
     }
   }, [fetchBookingsData]);
+
 
   const monthStart = startOfMonth(calMonth);
   const days = eachDayOfInterval({start:monthStart,end:endOfMonth(calMonth)});
@@ -794,7 +800,8 @@ const EventBooking = () => {
                     <div className={`mb-2 text-xs font-black ${isToday ? "text-primary" : "text-muted-foreground"}`}>{format(day,"d")}</div>
                     <div className="space-y-1">
                       {(db ?? []).map((b,i)=>(
-                        <div key={i} className="truncate rounded-lg px-2 py-1.5 text-[9px] font-black border shadow-sm cursor-pointer hover:brightness-95 transition-all uppercase tracking-tighter" onClick={() => { setSelected(bookings.find(x => x.clientName === b.name) || null); setShowView(true); }}
+                        <div key={i} className="truncate rounded-lg px-2 py-1.5 text-[9px] font-black border shadow-sm cursor-pointer hover:brightness-95 transition-all uppercase tracking-tighter" onClick={() => { setSelected((bookings ?? []).find(x => x.clientName === b.name) || null); setShowView(true); }}
+
                           style={{
                             backgroundColor: b.status === "confirmed" ? "#dcfce7" : b.status === "tentative" ? "#fef9c3" : b.status === "cancelled" ? "#fee2e2" : "#ffedd5",
                             color: b.status === "confirmed" ? "#166534" : b.status === "tentative" ? "#854f0b" : b.status === "cancelled" ? "#991b1b" : "#9a3412",
@@ -840,8 +847,9 @@ const EventBooking = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
-                        {menu.items.map((item,idx)=>(
+                        {(menu?.items ?? []).map((item,idx)=>(
                           <tr key={item.id || idx} className="hover:bg-muted/10 transition-colors group">
+
                             <td className="px-6 py-4 text-sm font-bold text-foreground">{item.item}</td>
                             <td className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase">{item.unit}</td>
                             <td className="px-6 py-4 text-sm font-black text-primary">₨ {item.rate}</td>
@@ -879,7 +887,7 @@ const EventBooking = () => {
               <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-end p-8 bg-muted/5 rounded-2xl border border-border">
                 <div className="flex-1 w-full space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Target Event Selection</Label>
-                  <Select onValueChange={v=>{const b=bookings.find(x=>x.id===Number(v));setSelected(b||null); if(b) fetchKitchenData(b.id);}}>
+                  <Select onValueChange={v=>{const b=(bookings ?? []).find(x=>x.id===v);setSelected(b||null); if(b) fetchKitchenData(b.id);}}>
                     <SelectTrigger className="w-full h-14 rounded-xl border-border bg-white font-black text-lg shadow-sm">
                       <SelectValue placeholder="Select an upcoming event schedule..."/>
                     </SelectTrigger>
@@ -888,6 +896,7 @@ const EventBooking = () => {
                     </SelectContent>
                   </Select>
                 </div>
+
                 {selected && (
                   <div className="flex gap-3 w-full lg:w-auto">
                     <Button className="h-14 px-8 rounded-xl bg-primary text-white font-black shadow-xl shadow-primary/20 flex-1 lg:flex-none" onClick={handleSaveKitchen} disabled={isSaving}>
