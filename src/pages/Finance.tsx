@@ -19,7 +19,7 @@ import autoTable from "jspdf-autotable";
 import SkeletonLoading from "@/components/SkeletonLoading";
 
 interface LedgerEntry {
-  id: string | number;
+  id: string;
   date: string;
   description: string;
   account: string;
@@ -47,42 +47,28 @@ interface VendorPayment {
   notes?: string;
 }
 
-const INIT_LEDGER: LedgerEntry[] = [
-  { id:1, date:"2024-03-01", description:"Wedding Advance - Tariq & Sana", account:"Cash", type:"debit", amount:150000, balance:150000 },
-  { id:2, date:"2024-03-02", description:"Decoration Purchase", account:"Cash", type:"credit", amount:25000, balance:125000 },
-  { id:3, date:"2024-03-05", description:"Corporate Dinner Advance - Ali Corp", account:"Bank", type:"debit", amount:100000, balance:225000 },
-  { id:4, date:"2024-03-07", description:"Staff Payroll - February", account:"Bank", type:"credit", amount:205500, balance:19500 },
-  { id:5, date:"2024-03-10", description:"Birthday Party Advance - Farhan", account:"Cash", type:"debit", amount:30000, balance:49500 },
-  { id:6, date:"2024-03-12", description:"Catering Supplies", account:"Cash", type:"credit", amount:18000, balance:31500 },
-  { id:7, date:"2024-03-14", description:"Mehndi Ceremony Advance", account:"Cash", type:"debit", amount:110000, balance:141500 },
-];
-
-const INIT_SUPPLIERS: any[] = [
-  { id:1, name:"Fresh Foods Co.", contact:"0300-9999999", totalBills:185000, paid:120000, balance:65000 },
-  { id:2, name:"Decoration World", contact:"0301-8888888", totalBills:95000, paid:95000, balance:0 },
-  { id:3, name:"Tent & Furniture Rental", contact:"0302-7777777", totalBills:75000, paid:50000, balance:25000 },
-  { id:4, name:"Sound & Lights Pro", contact:"0303-6666666", totalBills:60000, paid:30000, balance:30000 },
-];
-
-const EVENT_FINANCE: any[] = [
-  { id:1, event:"Tariq & Sana Wedding", date:"2024-03-18", totalAmount:350000, advance:150000, balance:200000, menuCost:300000, thirdPartyCost:15000, profit:35000, status:"confirmed" },
-  { id:2, event:"Ali Corp Annual Dinner", date:"2024-03-20", totalAmount:180000, advance:100000, balance:80000, menuCost:60000, thirdPartyCost:0, profit:120000, status:"confirmed" },
-  { id:3, event:"Farhan Birthday Party", date:"2024-03-22", totalAmount:75000, advance:30000, balance:45000, menuCost:0, thirdPartyCost:0, profit:75000, status:"tentative" },
-  { id:4, event:"Mehndi Ceremony", date:"2024-03-25", totalAmount:220000, advance:110000, balance:110000, menuCost:0, thirdPartyCost:30000, profit:190000, status:"confirmed" },
-];
-
 const ACCOUNTS = ["Cash","Bank","Supplier","Vendor","Other"];
-const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque", "Online Transfer"];
+const PAYMENT_METHODS = [ 
+  "Cash", 
+  "Bank Transfer", 
+  "Cheque", 
+  "Online Transfer", 
+  "EasyPaisa", 
+  "JazzCash" 
+]; 
 
 const Finance = () => {
+
   const { user, canDo, logAction } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
-  const [suppliers, setSuppliers] = useState(INIT_SUPPLIERS);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -127,24 +113,26 @@ const Finance = () => {
       setError(null);
     }
     try {
-      const data = await financeService.getLedgerEntries();
+      const [lData, bData, eData] = await Promise.all([
+        financeService.getLedgerEntries(),
+        eventService.getBookings(),
+        financeService.getExpenses()
+      ]);
       
       if (!isMounted) return;
 
-      if (!data) throw new Error("No ledger entries found.");
+      setLedger((lData ?? []).map((entry: any) => ({
+        id: String(entry?.id ?? ""),
+        date: entry?.date ?? format(new Date(), "yyyy-MM-dd"),
+        description: entry?.description ?? "No description",
+        account: entry?.account_type ?? "N/A",
+        type: (entry?.debit ?? 0) > 0 ? 'debit' : 'credit',
+        amount: (entry?.debit ?? 0) > 0 ? entry.debit : entry.credit,
+        balance: entry?.balance ?? 0
+      })));
 
-      const ledgerData = data.map((entry: any) => {
-        return {
-          id: entry?.id ?? "",
-          date: entry?.date ?? format(new Date(), "yyyy-MM-dd"),
-          description: entry?.description ?? "No description",
-          account: entry?.account_type ?? "N/A",
-          type: (entry?.debit ?? 0) > 0 ? 'debit' : 'credit',
-          amount: (entry?.debit ?? 0) > 0 ? entry.debit : entry.credit,
-          balance: entry?.balance ?? 0
-        };
-      });
-      setLedger(ledgerData);
+      setBookings(bData ?? []);
+      setExpenses((eData ?? []).filter(ex => ex.status === 'approved'));
     } catch (err: any) {
       console.error("fetchFinanceData error:", err);
       if (isMounted) {
@@ -155,6 +143,7 @@ const Finance = () => {
       if (isMounted) setLoading(false);
     }
   }, []);
+
 
   const fetchVendors = useCallback(async (isMounted = true) => {
     try {
@@ -224,12 +213,29 @@ const Finance = () => {
     };
   }, [ledger]);
 
-  const totalRevenue = useMemo(() => (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.totalAmount ?? 0),0), []);
-  const totalPending = useMemo(() => (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.balance ?? 0),0), []);
-  const totalProfit = useMemo(() => (EVENT_FINANCE ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.profit ?? 0),0), []);
-  const totalAdvances = useMemo(() => (EVENT_FINANCE ?? []).reduce((s,e)=>s+(e?.advance ?? 0),0), []);
+  const eventFinance = useMemo(() => (bookings ?? []).map(b => {
+    const bExpenses = (expenses ?? []).filter(e => e.linked_event === b.id || e.description.includes(b.client_name));
+    const totalExp = bExpenses.reduce((s, e) => s + (e.amount ?? 0), 0);
+    return {
+      id: b.id,
+      event: `${b.client_name} - ${b.event_type}`,
+      date: b.event_date,
+      totalAmount: b.total_amount ?? 0,
+      advance: b.advance_paid ?? 0,
+      balance: b.balance_due ?? 0,
+      expenses: totalExp,
+      profit: (b.total_amount ?? 0) - totalExp,
+      status: b.status
+    };
+  }), [bookings, expenses]);
+
+  const totalRevenue = useMemo(() => (eventFinance ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.totalAmount ?? 0),0), [eventFinance]);
+  const totalPending = useMemo(() => (eventFinance ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.balance ?? 0),0), [eventFinance]);
+  const totalProfit = useMemo(() => (eventFinance ?? []).filter(e=>e?.status!=="cancelled").reduce((s,e)=>s+(e?.profit ?? 0),0), [eventFinance]);
+  const totalAdvances = useMemo(() => (eventFinance ?? []).reduce((s,e)=>s+(e?.advance ?? 0),0), [eventFinance]);
   
   const handleAdd = useCallback(async () => {
+
     if (!newEntry.description || !newEntry.amount) {
       toast({ title: "Validation Error", description: "Please fill all required fields", variant: "destructive" });
       return;
@@ -341,12 +347,11 @@ const Finance = () => {
   }, []);
 
   const exportPL = useCallback((format: 'pdf' | 'excel') => {
-    const data = (EVENT_FINANCE ?? []).map(e => ({
+    const data = (eventFinance ?? []).map(e => ({
       Event: e?.event ?? "N/A",
       Date: e?.date ?? "N/A",
       Revenue: e?.totalAmount ?? 0,
-      "Menu Cost": e?.menuCost ?? 0,
-      "3rd Party Cost": e?.thirdPartyCost ?? 0,
+      Expenses: e?.expenses ?? 0,
       Profit: e?.profit ?? 0,
       Margin: `${Math.round(((e?.profit ?? 0)/(e?.totalAmount ?? 1))*100)}%`
     }));
@@ -354,11 +359,12 @@ const Finance = () => {
     if (format === 'excel') {
       exportToExcel(data, `Profit_and_Loss_${selectedYear}`);
     } else {
-      const headers = ["Event", "Date", "Revenue", "Menu Cost", "3rd Party Cost", "Profit", "Margin"];
+      const headers = ["Event", "Date", "Revenue", "Expenses", "Profit", "Margin"];
       const rows = data.map(d => Object.values(d));
       exportToPDF(headers, rows, `Profit & Loss Report - ${selectedYear}`, `Profit_and_Loss_${selectedYear}`);
     }
-  }, [selectedYear, exportToExcel, exportToPDF]);
+  }, [selectedYear, eventFinance, exportToExcel, exportToPDF]);
+
 
   const exportStatement = useCallback((format: 'pdf' | 'excel') => {
     const data = (filtered ?? []).map(l => ({
@@ -554,7 +560,7 @@ const Finance = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {(EVENT_FINANCE ?? []).map((e, idx)=>(
+                  {(eventFinance ?? []).map((e, idx)=>(
                     <tr key={e?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/10'} hover:bg-primary/5 transition-colors`}>
                       <td className="px-6 py-5 text-sm font-black text-foreground">{e?.event}</td>
                       <td className="px-6 py-5 text-xs font-bold text-muted-foreground uppercase tracking-tighter">{e?.date ? format(new Date(e.date), 'MMM d, yyyy') : "N/A"}</td>
@@ -572,6 +578,7 @@ const Finance = () => {
                     </tr>
                   ))}
                 </tbody>
+
               </table>
             </div>
           </div>
@@ -590,7 +597,7 @@ const Finance = () => {
               <table className="w-full min-w-[700px]">
               <thead><tr className="border-b border-border bg-muted/40">{["Event","Total","Advance","Balance","% Paid"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
               <tbody>
-                {(EVENT_FINANCE ?? []).map(e=>{
+                {(eventFinance ?? []).map(e=>{
                   const pct = Math.round(((e?.advance ?? 0)/(e?.totalAmount ?? 1))*100);
                   return <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     <td className="px-4 py-3 text-sm font-medium text-card-foreground">{e?.event}</td>
@@ -606,6 +613,7 @@ const Finance = () => {
                   </tr>;
                 })}
               </tbody>
+
             </table>
             </div>
           </div>
@@ -721,15 +729,14 @@ const Finance = () => {
               {plView === "monthly" ? (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[900px]">
-                    <thead><tr className="border-b border-border bg-muted/40">{["Event","Revenue","Menu Cost","3rd Party Cost","Net Profit","Margin"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
+                    <thead><tr className="border-b border-border bg-muted/40">{["Event","Revenue","Expenses","Net Profit","Margin"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                     <tbody>
-                      {(EVENT_FINANCE ?? []).map(e=>{
+                      {(eventFinance ?? []).map(e=>{
                         const margin = Math.round(((e?.profit ?? 0)/(e?.totalAmount ?? 1))*100);
                         return <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                           <td className="px-4 py-3 text-sm font-medium text-card-foreground">{e?.event}</td>
                           <td className="px-4 py-3 text-sm text-success">₨{(e?.totalAmount ?? 0).toLocaleString()}</td>
-                          <td className="px-4 py-3 text-sm text-destructive">{(e?.menuCost ?? 0)>0?`₨${(e?.menuCost ?? 0).toLocaleString()}`:"-"}</td>
-                          <td className="px-4 py-3 text-sm text-destructive">{(e?.thirdPartyCost ?? 0)>0?`₨${(e?.thirdPartyCost ?? 0).toLocaleString()}`:"-"}</td>
+                          <td className="px-4 py-3 text-sm text-destructive">{(e?.expenses ?? 0)>0?`₨${(e?.expenses ?? 0).toLocaleString()}`:"-"}</td>
                           <td className="px-4 py-3 text-sm font-bold text-success">₨{(e?.profit ?? 0).toLocaleString()}</td>
                           <td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${margin>=50?"bg-success/10 text-success border-success/20":margin>=30?"bg-warning/10 text-warning border-warning/20":"bg-destructive/10 text-destructive border-destructive/20"}`}>{margin}%</span></td>
                         </tr>;
@@ -738,7 +745,7 @@ const Finance = () => {
                     <tfoot><tr className="bg-muted/40">
                       <td className="px-4 py-3 text-sm font-semibold">Monthly Total</td>
                       <td className="px-4 py-3 text-sm font-bold text-success">₨{(totalRevenue ?? 0).toLocaleString()}</td>
-                      <td colSpan={2} className="px-4 py-3 text-sm font-bold text-destructive">₨{(EVENT_FINANCE ?? []).reduce((s,e)=>s+(e?.menuCost ?? 0)+(e?.thirdPartyCost ?? 0),0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-destructive">₨{(eventFinance ?? []).reduce((s,e)=>s+(e?.expenses ?? 0),0).toLocaleString()}</td>
                       <td className="px-4 py-3 text-sm font-bold text-success">₨{(totalProfit ?? 0).toLocaleString()}</td>
                       <td/>
                     </tr></tfoot>
@@ -751,9 +758,9 @@ const Finance = () => {
                     <tbody>
                       {yearlyMonths.map(month => {
                         const monthStr = format(month, "MM");
-                        const monthEvents = (EVENT_FINANCE ?? []).filter(e => (e?.date ?? "").startsWith(`${selectedYear}-${monthStr}`));
+                        const monthEvents = (eventFinance ?? []).filter(e => (e?.date ?? "").startsWith(`${selectedYear}-${monthStr}`));
                         const mIncome = monthEvents.reduce((s, e) => s + (e?.totalAmount ?? 0), 0);
-                        const mExpenses = monthEvents.reduce((s, e) => s + (e?.menuCost ?? 0) + (e?.thirdPartyCost ?? 0), 0);
+                        const mExpenses = monthEvents.reduce((s, e) => s + (e?.expenses ?? 0), 0);
                         const mProfit = mIncome - mExpenses;
                         return (
                           <tr key={month.toISOString()} className="border-b border-border last:border-0 hover:bg-muted/20">
@@ -768,12 +775,13 @@ const Finance = () => {
                     <tfoot><tr className="bg-muted/40">
                       <td className="px-4 py-3 text-sm font-bold uppercase tracking-widest">Yearly Totals</td>
                       <td className="px-4 py-3 text-lg font-black text-success">₨{(totalRevenue ?? 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-lg font-black text-destructive">₨{(EVENT_FINANCE ?? []).reduce((s,e)=>s+(e?.menuCost ?? 0)+(e?.thirdPartyCost ?? 0),0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-lg font-black text-destructive">₨{(eventFinance ?? []).reduce((s,e)=>s+(e?.expenses ?? 0),0).toLocaleString()}</td>
                       <td className="px-4 py-3 text-xl font-black text-primary">₨{(totalProfit ?? 0).toLocaleString()}</td>
                     </tr></tfoot>
                   </table>
                 </div>
               )}
+
             </div>
 
             {/* Monthly P&L Summary */}
