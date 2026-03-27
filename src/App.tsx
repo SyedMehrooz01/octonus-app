@@ -20,7 +20,7 @@ const FileManager = lazy(() => import("@/pages/FileManager"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
-import ErrorBoundary from "./components/ErrorBoundary";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -62,7 +62,8 @@ const AppRoutes = () => {
         </div>
       </div>
     }>
-      <Routes>
+      <ErrorBoundary>
+        <Routes>
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <ErrorBoundary><Login /></ErrorBoundary>} />
         <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <ErrorBoundary><Signup /></ErrorBoundary>} />
         <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
@@ -79,6 +80,7 @@ const AppRoutes = () => {
         </Route>
         <Route path="*" element={<ErrorBoundary><NotFound /></ErrorBoundary>} />
       </Routes>
+      </ErrorBoundary>
     </Suspense>
   );
 };

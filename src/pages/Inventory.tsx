@@ -90,14 +90,14 @@ const Inventory = () => {
         name: i?.name ?? "Unknown",
         category: i?.category ?? "Other",
         unit: i?.unit ?? "Unit",
-        current_stock: i?.current_stock ?? 0,
-        min_stock_level: i?.min_stock_level ?? 0,
-        purchase_price: i?.purchase_price ?? 0,
+        current_stock: Number(i?.current_stock ?? 0),
+        min_stock_level: Number(i?.min_stock_level ?? 0),
+        purchase_price: Number(i?.purchase_price ?? 0),
         supplier: i?.supplier ?? "N/A",
         type: i?.type ?? "consumable",
         status: i?.status ?? "active",
         created_at: i?.created_at ?? new Date().toISOString()
-      })));
+      })) ?? []);
 
       setHistory((historyDataRaw ?? []).map(h => ({
         id: String(h?.id ?? ""),
@@ -105,12 +105,13 @@ const Inventory = () => {
         item_id: String(h?.item_id ?? ""),
         item_name: h?.item_name ?? "Unknown",
         movement_type: h?.movement_type ?? "in",
-        quantity: h?.quantity ?? 0,
+        quantity: Number(h?.quantity ?? 0),
         notes: h?.notes ?? "",
         event_id: h?.event_id,
         created_by: h?.created_by,
         created_at: h?.created_at ?? new Date().toISOString()
-      })));
+      })) ?? []);
+
     } catch (err: any) {
       console.error("Inventory fetchData unexpected error:", err);
       if (isMounted) {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   Plus, 
   Trash2, 
@@ -72,12 +72,11 @@ const FileManager = () => {
     try {
       const data = await fileService.getFiles();
       if (!isMounted) return;
-      if (!data) throw new Error("Failed to fetch files.");
-      setFiles(data);
+      setFiles(data ?? []);
     } catch (err: any) {
       console.error("fetchFiles unexpected error:", err);
       if (isMounted) {
-        setError(err.message || "An unexpected error occurred while fetching files.");
+        setError(err.message || "Failed to fetch files.");
         setFiles([]);
       }
     } finally {

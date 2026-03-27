@@ -156,8 +156,7 @@ const SettingsPage = () => {
     try {
       const data = await userService.getUsers();
       if (!isMounted) return;
-      if (!data) throw new Error("Failed to fetch system users.");
-      setUsers(data);
+      setUsers(data ?? []);
     } catch (err: any) {
       console.error("fetchUsers unexpected error:", err);
       if (isMounted) {

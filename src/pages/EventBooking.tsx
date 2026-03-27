@@ -186,25 +186,25 @@ const EventBooking = () => {
       if (!isMounted) return;
       
       setBookings((data ?? []).map(b => ({
-        id: b.id,
-        clientName: b.client_name,
-        phone: b.client_phone,
-        eventType: b.event_type,
-        eventDate: b.event_date,
-        bookingDate: b.created_at, 
-        venue: b.venue,
-        guests: b.pax,
-        totalAmount: b.total_amount,
-        advance: b.advance_paid,
-        balanceRemaining: b.balance_due,
-        status: b.status,
-        paymentMethod: "N/A", // Removed from select
-        menu: b.menu || "N/A", 
-        notes: b.notes || "", 
-        thirdParty: false, // Removed from select
-        supplierCost: 0, // Removed from select
-        sellingRate: 0 // Removed from select
-      })));
+        id: String(b?.id ?? ""),
+        clientName: b?.client_name ?? "Unnamed",
+        phone: b?.client_phone ?? "N/A",
+        eventType: b?.event_type ?? "Event",
+        eventDate: b?.event_date ?? "",
+        bookingDate: b?.created_at ?? "", 
+        venue: b?.venue ?? "N/A",
+        guests: Number(b?.pax ?? 0),
+        totalAmount: Number(b?.total_amount ?? 0),
+        advance: Number(b?.advance_paid ?? 0),
+        balanceRemaining: Number(b?.balance_due ?? 0),
+        status: b?.status ?? "tentative",
+        paymentMethod: "N/A", 
+        menu: b?.menu || "N/A", 
+        notes: b?.notes || "", 
+        thirdParty: false, 
+        supplierCost: 0, 
+        sellingRate: 0 
+      })) ?? []);
     } catch (err: any) {
       console.error("fetchBookingsData unexpected error:", err);
       if (isMounted) {
@@ -215,6 +215,7 @@ const EventBooking = () => {
       if (isMounted) setLoading(false);
     }
   }, []);
+
 
 
   useEffect(() => {

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, memo, Suspense, lazy, useCallback } from "react";
 import { format, subMonths, isWithinInterval, parseISO } from "date-fns";
-import { 
-  Users, CheckCircle, XCircle, DollarSign, Plus, Download, 
-  Search, Edit, Trash2, Mail, Phone, MapPin, Calendar, 
-  Clock, BarChart3, Bell, UserPlus, FileText, 
-  PieChart as PieChartIcon, Receipt, TrendingDown
+import {
+  Users, CheckCircle, XCircle, DollarSign, Plus, Download,
+  Search, Edit, Trash2, Mail, Phone, MapPin, Calendar,
+  Clock, BarChart3, Bell, UserPlus, FileText,
+  PieChart as PieChartIcon, Receipt, TrendingDown, Wallet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -151,27 +151,40 @@ const HRStaff = () => {
         performanceRecords: []
       }));
 
-      setStaff(staffWithDetails);
+      setStaff(staffWithDetails ?? []);
       setAttendance((attendData ?? []).map(a => ({
         ...a,
         name: (staffData ?? []).find(s => s.id === a.employee_id)?.name || "Unknown",
         checkIn: a.check_in,
         checkOut: a.check_out
-      })));
+      })) ?? []);
       setLeaves((leaveData ?? []).map(l => ({
         ...l,
         type: l.leave_type,
         name: (staffData ?? []).find(s => s.id === l.employee_id)?.name || "Unknown",
         start: l.start_date,
         end: l.end_date
-      })));
+      })) ?? []);
 
-      setAnnouncements(announceData);
-      setOvertime(overtimeData);
-      setAdvances(advanceData);
-      setOutsideWorkers(outsideData);
-      setOutsideAssignments(assignData);
-      setOutsidePayments(payData);
+      setAnnouncements(announceData ?? []);
+      setOvertime((overtimeData ?? []).map(o => ({
+        ...o,
+        name: (staffData ?? []).find(s => s.id === o.employee_id)?.name || "Unknown"
+      })) ?? []);
+      setAdvances((advanceData ?? []).map(a => ({
+        ...a,
+        name: (staffData ?? []).find(s => s.id === a.employee_id)?.name || "Unknown"
+      })) ?? []);
+      setOutsideWorkers(outsideData ?? []);
+      setOutsideAssignments((assignData ?? []).map(a => ({
+        ...a,
+        eventName: a.event_name,
+        workerId: a.worker_id
+      })) ?? []);
+      setOutsidePayments((payData ?? []).map(p => ({
+        ...p,
+        workerId: p.worker_id
+      })) ?? []);
       setError(null);
     } catch (err: any) {
       console.error("HRStaff fetchHRData unexpected error:", err);
@@ -388,7 +401,7 @@ const HRStaff = () => {
       const today = format(new Date(), 'yyyy-MM-dd');
       const markedEmpIds = (attendance ?? []).filter(a => a.date === today).map(a => a.employee_id);
       const unmarkedStaff = (staff ?? []).filter(s => !markedEmpIds.includes(s.id));
-      if (unmarkedStaff.length === 0) {
+      if ((unmarkedStaff ?? []).length === 0) {
         toast.info("No unmarked staff found for today");
         return;
       }
@@ -399,13 +412,14 @@ const HRStaff = () => {
       }));
       await hrService.upsertAttendance(records);
       await fetchHRData(true);
-      toast.success(`${unmarkedStaff.length} staff members marked as absent`);
+      toast.success(`${(unmarkedStaff ?? []).length} staff members marked as absent`);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       setSaving(false);
     }
   }, [attendance, staff, fetchHRData]);
+
 
 
   const handleMarkAsPaid = useCallback(async () => {
@@ -715,8 +729,17 @@ const HRStaff = () => {
   ), [staff, search]);
 
   const monthlyPayrollTotal = useMemo(() => {
-    return (staff ?? []).reduce((acc, s) => acc + (s?.salary || 0), 0);
+    return (staff ?? []).reduce((sum, s) => sum + (Number(s?.salary ?? 0)), 0);
   }, [staff]);
+
+  const leaveRequestsCount = useMemo(() => {
+    return (leaves ?? []).filter(l => l.status === 'pending').length;
+  }, [leaves]);
+
+  const presentCount = useMemo(() => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    return (attendance ?? []).filter(a => a.date === today && a.status === 'present').length;
+  }, [attendance]);
 
   const handleExportTotalLedgerExcel = useCallback(() => {
     const data = staff.map(s => ({
@@ -794,10 +817,10 @@ const HRStaff = () => {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         {[
-          { label: "Total Workforce", value: staff?.length, icon: Users, color: "from-blue-500 to-blue-700" },
-          { label: "Active Staff", value: (staff ?? []).filter(s => s?.status === 'active').length, icon: CheckCircle, color: "from-emerald-500 to-emerald-700" },
-          { label: "Leaves Today", value: (leaves ?? []).filter(l => l?.status === 'approved').length, icon: XCircle, color: "from-rose-500 to-rose-700" },
-          { label: "Monthly Payroll", value: `₨ ${(monthlyPayrollTotal ?? 0).toLocaleString()}`, icon: DollarSign, color: "from-violet-500 to-violet-700" },
+          { label: "Active Workforce", value: (staff ?? []).filter(s => s.status === 'active').length.toString(), icon: Users, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20", sub: "Registered Staff" },
+          { label: "Present Today", value: presentCount.toString(), icon: Clock, color: "from-emerald-500 to-emerald-700", shadow: "shadow-emerald-500/20", sub: "Attendance Recorded" },
+          { label: "Monthly Payroll", value: `₨ ${monthlyPayrollTotal.toLocaleString()}`, icon: Wallet, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20", sub: "Estimated Total" },
+          { label: "Leave Requests", value: leaveRequestsCount.toString(), icon: FileText, color: "from-amber-500 to-amber-700", shadow: "shadow-amber-500/20", sub: "Pending Approval" },
         ].map((card, i) => (
           <div key={card.label} className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.color} p-5 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]`}>
             <div className="relative z-10 flex flex-col gap-3">

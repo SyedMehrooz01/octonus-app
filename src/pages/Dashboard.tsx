@@ -75,36 +75,48 @@ const Dashboard = () => {
 
       if (!isMounted) return;
 
-      if (!bookingsSummaryRaw) throw new Error("Failed to fetch dashboard summaries.");
+      const bookingsSummary = (bookingsSummaryRaw ?? []).map(b => ({
+        id: b.id,
+        status: b.status,
+        event_date: b.event_date,
+        balance_due: Number(b.balance_due ?? 0),
+        total_amount: Number(b.total_amount ?? 0)
+      }));
+      const inventoryData = (inventoryDataRaw ?? []).map(i => ({
+        id: i.id,
+        current_stock: Number(i.current_stock ?? 0),
+        min_stock_level: Number(i.min_stock_level ?? 0)
+      }));
+      const staffSummary = (staffSummaryRaw ?? []).map(s => ({
+        id: s.id,
+        status: s.status
+      }));
+      const attendanceToday = (attendanceTodayRaw ?? []);
+      const monthlyPayments = (monthlyPaymentsRaw ?? []);
+      const monthlyExpensesData = (monthlyExpensesDataRaw ?? []);
 
-      const bookingsSummary = bookingsSummaryRaw;
-      const inventoryData = inventoryDataRaw ?? [];
-      const staffSummary = staffSummaryRaw ?? [];
-      const attendanceToday = attendanceTodayRaw ?? [];
-      const monthlyPayments = monthlyPaymentsRaw ?? [];
-      const monthlyExpensesData = monthlyExpensesDataRaw ?? [];
+      const totalEvents = (bookingsSummary ?? []).filter(b => b.status !== 'cancelled').length;
+      const upcomingCount = (bookingsSummary ?? []).filter(b => b.status !== 'cancelled' && b.event_date >= todayStr).length;
+      const thisMonthRevenue = (monthlyPayments ?? []).reduce((sum, p) => sum + (Number(p?.debit ?? 0)), 0);
+      const thisMonthExpenses = (monthlyExpensesData ?? []).reduce((sum, e) => sum + (Number(e?.amount ?? 0)), 0);
+      const lowStock = (inventoryData ?? []).filter(item => (Number(item?.current_stock ?? 0)) <= (Number(item?.min_stock_level ?? 0))).length;
+      const pendingPay = (bookingsSummary ?? []).filter(b => b.status !== 'cancelled' && (Number(b.balance_due ?? 0)) > 0).reduce((sum, b) => sum + (Number(b?.balance_due ?? 0)), 0);
 
-      const totalEvents = bookingsSummary.filter(b => b.status !== 'cancelled').length;
-      const upcomingCount = bookingsSummary.filter(b => b.status !== 'cancelled' && b.event_date >= todayStr).length;
-      const thisMonthRevenue = (monthlyPayments).reduce((sum, p) => sum + (p?.debit ?? 0), 0);
-      const thisMonthExpenses = (monthlyExpensesData).reduce((sum, e) => sum + (e?.amount ?? 0), 0);
-      const lowStock = (inventoryData).filter(item => (item?.current_stock ?? 0) <= (item?.min_stock_level ?? 0)).length;
-      const pendingPay = bookingsSummary.filter(b => b.status !== 'cancelled' && (b.balance_due ?? 0) > 0).reduce((sum, b) => sum + (b?.balance_due ?? 0), 0);
 
       setStats({
         totalEvents: totalEvents,
         upcomingEvents: upcomingCount,
         totalRevenue: thisMonthRevenue,
         totalExpenses: thisMonthExpenses,
-        activeStaff: staffSummary.filter(s => s.status === 'active').length,
-        attendanceToday: attendanceToday.length,
+        activeStaff: (staffSummary ?? []).filter(s => s.status === 'active').length,
+        attendanceToday: (attendanceToday ?? []).length,
         lowStockItems: lowStock,
         pendingPayments: pendingPay
       });
 
       // 7. Calculate Revenue Growth
       const prevMonthPayments = await financeService.getLedgerByDateRange(prevMonthStart, prevMonthEnd);
-      const prevRevenue = (prevMonthPayments ?? []).reduce((sum, p) => sum + (p?.debit ?? 0), 0);
+      const prevRevenue = (prevMonthPayments ?? []).reduce((sum, p) => sum + (Number(p?.debit ?? 0)), 0);
       
       if (prevRevenue > 0) {
         const growth = ((thisMonthRevenue - prevRevenue) / prevRevenue) * 100;
@@ -115,8 +127,9 @@ const Dashboard = () => {
 
       // 8. Fetch Upcoming Events Table
       const upcoming = await eventService.getBookings();
-      if (!upcoming) throw new Error("Failed to fetch upcoming bookings.");
-      setUpcomingEvents(upcoming);
+      if (!isMounted) return;
+      setUpcomingEvents(upcoming ?? []);
+
 
       // 9. Fetch last 6 months revenue for chart in parallel
       const monthPromises = [];
@@ -127,7 +140,7 @@ const Dashboard = () => {
         monthPromises.push(
           financeService.getLedgerByDateRange(start, end).then(payments => ({
             month: format(date, 'MMM'),
-            revenue: (payments ?? []).reduce((sum, p) => sum + (p?.debit ?? 0), 0)
+            revenue: (payments ?? []).reduce((sum, p) => sum + (Number(p?.debit ?? 0)), 0)
           }))
         );
       }
@@ -141,6 +154,7 @@ const Dashboard = () => {
       if (isMounted) setLoading(false);
     }
   }, []);
+
 
   useEffect(() => {
     let isMounted = true;
@@ -200,7 +214,7 @@ const Dashboard = () => {
         {[
           { 
             label: "Monthly Revenue", 
-            value: `₨ ${stats.totalRevenue.toLocaleString()}`, 
+            value: `₨ ${(stats.totalRevenue ?? 0).toLocaleString()}`, 
             growth: revenueGrowth, 
             icon: DollarSign, 
             color: "from-emerald-500 to-emerald-700",
@@ -208,27 +222,28 @@ const Dashboard = () => {
           },
           { 
             label: "Monthly Expenses", 
-            value: `₨ ${stats.totalExpenses.toLocaleString()}`, 
+            value: `₨ ${(stats.totalExpenses ?? 0).toLocaleString()}`, 
             icon: Wallet,
             color: "from-rose-500 to-rose-700",
             shadow: "shadow-rose-500/20"
           },
           { 
             label: "Active Staff", 
-            value: stats.activeStaff.toString(), 
-            subValue: `${stats.attendanceToday} present today`,
+            value: (stats.activeStaff ?? 0).toString(), 
+            subValue: `${stats.attendanceToday ?? 0} present today`,
             icon: Users, 
             color: "from-blue-500 to-blue-700",
             shadow: "shadow-blue-500/20"
           },
           { 
             label: "Upcoming Events", 
-            value: stats.upcomingEvents.toString(), 
+            value: (stats.upcomingEvents ?? 0).toString(), 
             subValue: "Confirmed bookings",
             icon: Calendar, 
             color: "from-amber-500 to-amber-700",
             shadow: "shadow-amber-500/20"
           }
+
         ].map((stat, idx) => (
           <div key={idx} className={`relative overflow-hidden rounded-3xl border-none shadow-xl ${stat.shadow} group hover:scale-[1.02] transition-all duration-300`}>
             <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-90`} />
@@ -284,18 +299,18 @@ const Dashboard = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {upcomingEvents.length > 0 ? (
-                      upcomingEvents.map((event) => (
+                    {(upcomingEvents ?? []).length > 0 ? (
+                      (upcomingEvents ?? []).slice(0, 5).map((event) => (
                         <tr key={event.id} className="group hover:bg-slate-50/50 transition-colors">
                           <td className="px-8 py-5">
                             <div className="flex flex-col">
-                              <span className="text-sm font-black text-slate-700">{event.client_name}</span>
-                              <span className="text-[10px] font-bold text-slate-400 uppercase">{event.event_type} • {event.venue}</span>
+                              <span className="text-sm font-black text-slate-700">{event.client_name ?? "Unknown"}</span>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">{event.event_type ?? "Event"} • {event.venue ?? "N/A"}</span>
                             </div>
                           </td>
                           <td className="px-8 py-5 text-center">
                             <div className="inline-flex flex-col items-center bg-slate-100 px-3 py-1 rounded-xl">
-                              <span className="text-[10px] font-black text-slate-700">{format(new Date(event.event_date), "MMM d")}</span>
+                              <span className="text-[10px] font-black text-slate-700">{event.event_date ? format(new Date(event.event_date), "MMM d") : "N/A"}</span>
                             </div>
                           </td>
                           <td className="px-8 py-5 text-center">
@@ -304,17 +319,18 @@ const Dashboard = () => {
                               event.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
                               'bg-slate-50 text-slate-600 border-slate-100'
                             }`}>
-                              {event.status}
+                              {event.status ?? "N/A"}
                             </Badge>
                           </td>
                           <td className="px-8 py-5 text-right">
-                            <span className={`text-sm font-black ${event.balance_due > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                              ₨ {event.balance_due?.toLocaleString()}
+                            <span className={`text-sm font-black ${(Number(event.balance_due ?? 0)) > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                              ₨ {(Number(event.balance_due ?? 0)).toLocaleString()}
                             </span>
                           </td>
                         </tr>
                       ))
                     ) : (
+
                       <tr>
                         <td colSpan={4} className="px-8 py-10 text-center">
                           <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No upcoming events scheduled</p>
@@ -335,9 +351,9 @@ const Dashboard = () => {
                </h2>
              </div>
              <div className="h-64 flex items-end justify-between gap-4 px-2">
-               {revenueData.map((data, i) => {
-                 const max = Math.max(...revenueData.map(d => d.revenue), 1);
-                 const height = (data.revenue / max) * 100;
+               {(revenueData ?? []).map((data, i) => {
+                 const max = Math.max(...(revenueData ?? []).map(d => d.revenue), 1);
+                 const height = (Number(data.revenue ?? 0) / max) * 100;
                  return (
                    <div key={data.month} className="flex-1 flex flex-col items-center gap-4 group">
                      <div className="w-full relative">
@@ -351,7 +367,7 @@ const Dashboard = () => {
                          />
                        </div>
                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all transform group-hover:-translate-y-1">
-                         <Badge className="bg-[#0f172a] text-white border-none text-[10px] font-black px-2 py-1 shadow-xl">₨ {data.revenue.toLocaleString()}</Badge>
+                         <Badge className="bg-[#0f172a] text-white border-none text-[10px] font-black px-2 py-1 shadow-xl">₨ {(Number(data.revenue ?? 0)).toLocaleString()}</Badge>
                        </div>
                      </div>
                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{data.month}</p>
@@ -359,6 +375,7 @@ const Dashboard = () => {
                  );
                })}
              </div>
+
           </div>
         </div>
 
@@ -390,40 +407,41 @@ const Dashboard = () => {
               <p className="text-xs font-bold text-slate-400 mt-1">ISSUES REQUIRING ATTENTION</p>
             </div>
             <div className="px-8 pb-8 space-y-4">
-              {stats.lowStockItems > 0 && (
+              {(Number(stats.lowStockItems ?? 0)) > 0 && (
                 <div className="flex items-start gap-4 p-4 bg-rose-50 rounded-2xl border border-rose-100">
                   <div className="p-2 bg-rose-500 rounded-xl text-white">
                     <AlertTriangle className="h-4 w-4" />
                   </div>
                   <div>
                     <p className="text-sm font-black text-rose-700">Low Stock Warning</p>
-                    <p className="text-[10px] font-bold text-rose-500 uppercase">{stats.lowStockItems} items are below minimum level</p>
+                    <p className="text-[10px] font-bold text-rose-500 uppercase">{(Number(stats.lowStockItems ?? 0))} items are below minimum level</p>
                   </div>
                 </div>
               )}
-              {stats.attendanceToday < stats.activeStaff && (
+              {(Number(stats.attendanceToday ?? 0)) < (Number(stats.activeStaff ?? 0)) && (
                 <div className="flex items-start gap-4 p-4 bg-amber-50 rounded-2xl border border-amber-100">
                   <div className="p-2 bg-amber-500 rounded-xl text-white">
                     <Users className="h-4 w-4" />
                   </div>
                   <div>
                     <p className="text-sm font-black text-amber-700">Staff Attendance</p>
-                    <p className="text-[10px] font-bold text-amber-500 uppercase">{stats.activeStaff - stats.attendanceToday} staff members not present</p>
+                    <p className="text-[10px] font-bold text-amber-500 uppercase">{(Number(stats.activeStaff ?? 0)) - (Number(stats.attendanceToday ?? 0))} staff members not present</p>
                   </div>
                 </div>
               )}
-              {stats.pendingPayments > 0 && (
+              {(Number(stats.pendingPayments ?? 0)) > 0 && (
                 <div className="flex items-start gap-4 p-4 bg-blue-50 rounded-2xl border border-blue-100">
                   <div className="p-2 bg-blue-500 rounded-xl text-white">
                     <DollarSign className="h-4 w-4" />
                   </div>
                   <div>
                     <p className="text-sm font-black text-blue-700">Receivables</p>
-                    <p className="text-[10px] font-bold text-blue-500 uppercase">₨ {stats.pendingPayments.toLocaleString()} pending from clients</p>
+                    <p className="text-[10px] font-bold text-blue-500 uppercase">₨ {(Number(stats.pendingPayments ?? 0)).toLocaleString()} pending from clients</p>
                   </div>
                 </div>
               )}
-              {stats.lowStockItems === 0 && stats.attendanceToday === stats.activeStaff && stats.pendingPayments === 0 && (
+              {(Number(stats.lowStockItems ?? 0)) === 0 && (Number(stats.attendanceToday ?? 0)) === (Number(stats.activeStaff ?? 0)) && (Number(stats.pendingPayments ?? 0)) === 0 && (
+
                 <div className="flex flex-col items-center py-6 text-center">
                   <div className="p-4 bg-emerald-50 rounded-full text-emerald-500 mb-4">
                     <CheckCircle2 className="h-8 w-8" />

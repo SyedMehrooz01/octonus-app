@@ -43,9 +43,9 @@ const TopHeader = ({ onMenuClick, user, onLogout }: TopHeaderProps) => {
       // 1. New Bookings
       const newBookings = await eventService.getBookings();
       (newBookings ?? []).slice(0, 3).forEach(b => alerts.push({
-        id: `booking-${b.id}`,
-        title: `New booking: ${b.client_name}`,
-        time: b.created_at,
+        id: `booking-${b?.id}`,
+        title: `New booking: ${b?.client_name ?? 'Unnamed'}`,
+        time: b?.created_at ?? new Date().toISOString(),
         icon: CalendarDays,
         color: "text-blue-500",
         path: "/events"
@@ -53,10 +53,10 @@ const TopHeader = ({ onMenuClick, user, onLogout }: TopHeaderProps) => {
 
       // 2. Pending Expense Approvals
       const allExpenses = await financeService.getExpenses();
-      (allExpenses ?? []).filter(e => e.status === 'pending').slice(0, 3).forEach(e => alerts.push({
-        id: `expense-${e.id}`,
-        title: `Pending approval: ${e.description}`,
-        time: new Date().toISOString(),
+      (allExpenses ?? []).filter(e => e?.status === 'pending').slice(0, 3).forEach(e => alerts.push({
+        id: `expense-${e?.id}`,
+        title: `Pending approval: ${e?.description ?? 'Unnamed Expense'}`,
+        time: e?.created_at ?? new Date().toISOString(),
         icon: Receipt,
         color: "text-rose-500",
         path: "/expenses"
@@ -64,10 +64,10 @@ const TopHeader = ({ onMenuClick, user, onLogout }: TopHeaderProps) => {
 
       // 3. Low Inventory Alerts
       const inventoryItems = await inventoryService.getInventoryItems();
-      (inventoryItems ?? []).filter(i => (i.current_stock ?? 0) <= (i.min_stock_level ?? 0)).slice(0, 3).forEach(i => alerts.push({
-        id: `inv-${i.id}`,
-        title: `Low stock: ${i.name}`,
-        time: new Date().toISOString(),
+      (inventoryItems ?? []).filter(i => (Number(i?.current_stock ?? 0)) <= (Number(i?.min_stock_level ?? 0))).slice(0, 3).forEach(i => alerts.push({
+        id: `inv-${i?.id}`,
+        title: `Low stock: ${i?.name ?? 'Unnamed Item'}`,
+        time: i?.created_at ?? new Date().toISOString(),
         icon: Package,
         color: "text-orange-500",
         path: "/inventory"
@@ -75,14 +75,15 @@ const TopHeader = ({ onMenuClick, user, onLogout }: TopHeaderProps) => {
 
       // 4. Pending Leave Requests
       const leaves = await hrService.getLeaves();
-      (leaves ?? []).filter(l => l.status === 'pending').slice(0, 3).forEach(l => alerts.push({
-        id: `leave-${l.id}`,
-        title: `Leave request: ${(l as any).leave_type ?? 'Pending'}`,
-        time: new Date().toISOString(),
+      (leaves ?? []).filter(l => l?.status === 'pending').slice(0, 3).forEach(l => alerts.push({
+        id: `leave-${l?.id}`,
+        title: `Leave request: ${l?.leave_type ?? 'Pending'}`,
+        time: l?.created_at ?? new Date().toISOString(),
         icon: CheckCircle,
         color: "text-violet-500",
         path: "/hr"
       }));
+
 
       if (isMounted) {
         setNotifications(alerts.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 8));
@@ -121,9 +122,10 @@ const TopHeader = ({ onMenuClick, user, onLogout }: TopHeaderProps) => {
         financeService.searchExpenses(val)
       ]);
 
-      bookings?.forEach(b => results.push({ type: 'Booking', title: b.client_name, sub: b.event_type, path: '/events', icon: CalendarDays }));
-      staff?.forEach(s => results.push({ type: 'Staff', title: s.name, sub: s.role, path: '/hr', icon: User }));
-      expenses?.forEach(e => results.push({ type: 'Expense', title: e.description, sub: `₨ ${e.amount.toLocaleString()}`, path: '/expenses', icon: Receipt }));
+      bookings?.forEach(b => results.push({ type: 'Booking', title: b?.client_name ?? 'Unnamed', sub: b?.event_type ?? 'Event', path: '/events', icon: CalendarDays }));
+      staff?.forEach(s => results.push({ type: 'Staff', title: s?.name ?? 'Unnamed', sub: s?.role ?? 'Staff', path: '/hr', icon: User }));
+      expenses?.forEach(e => results.push({ type: 'Expense', title: e?.description ?? 'Unnamed', sub: `₨ ${(Number(e?.amount ?? 0)).toLocaleString()}`, path: '/expenses', icon: Receipt }));
+
 
       setSearchResults(results);
     } catch (err) {

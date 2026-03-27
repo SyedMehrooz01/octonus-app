@@ -126,13 +126,13 @@ const Finance = () => {
         date: entry?.date ?? format(new Date(), "yyyy-MM-dd"),
         description: entry?.description ?? "No description",
         account: entry?.account_type ?? "N/A",
-        type: (entry?.debit ?? 0) > 0 ? 'debit' : 'credit',
-        amount: (entry?.debit ?? 0) > 0 ? entry.debit : entry.credit,
-        balance: entry?.balance ?? 0
-      })));
+        type: (Number(entry?.debit ?? 0)) > 0 ? 'debit' : 'credit',
+        amount: (Number(entry?.debit ?? 0)) > 0 ? Number(entry.debit) : Number(entry.credit ?? 0),
+        balance: Number(entry?.balance ?? 0)
+      })) ?? []);
 
       setBookings(bData ?? []);
-      setExpenses((eData ?? []).filter(ex => ex.status === 'approved'));
+      setExpenses((eData ?? []).filter(ex => ex.status === 'approved') ?? []);
     } catch (err: any) {
       console.error("fetchFinanceData error:", err);
       if (isMounted) {
@@ -143,6 +143,7 @@ const Finance = () => {
       if (isMounted) setLoading(false);
     }
   }, []);
+
 
 
   const fetchVendors = useCallback(async (isMounted = true) => {

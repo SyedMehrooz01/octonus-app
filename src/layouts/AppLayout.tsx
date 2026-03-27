@@ -24,6 +24,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import Logo from "@/components/Logo";
 import { Input } from "@/components/ui/input";
 
+import ErrorBoundary from "@/components/ErrorBoundary";
+
 const AppLayout = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
@@ -154,12 +156,15 @@ const AppLayout = () => {
         
         <main className="flex-1 overflow-y-auto bg-slate-50/50 relative scroll-smooth p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto animate-in fade-in duration-700">
-            <Outlet />
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </main>
       </div>
     </div>
   );
 };
+
 
 export default memo(AppLayout);
