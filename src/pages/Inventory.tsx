@@ -16,7 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import SkeletonLoading from "@/components/SkeletonLoading";
 
 interface InventoryItem {
-  id: string | number;
+  id: string;
   name: string;
   category: string;
   unit: string;
@@ -30,18 +30,18 @@ interface InventoryItem {
 }
 
 interface StockMovement {
-  id: string | number;
+  id: string;
   date: string;
-  item_id: string | number;
+  item_id: string;
   item_name: string;
-  type: "purchase" | "issue" | "return";
-  category: "consumable" | "non-consumable";
-  qty: number;
-  note: string;
-  issued_to?: string;
-  returned_by?: string;
-  return_date?: string;
+  movement_type: "in" | "out" | "return" | "purchase" | "issue";
+  quantity: number;
+  notes: string;
+  event_id?: string;
+  created_by?: string;
+  created_at: string;
 }
+
 
 const CATEGORIES = ["Kitchen", "Furniture", "Decoration", "Linens", "Electronics", "Other"];
 
@@ -85,14 +85,8 @@ const Inventory = () => {
       
       if (!isMounted) return;
 
-      if (!itemsDataRaw) throw new Error("Failed to fetch inventory items.");
-      if (!historyDataRaw) throw new Error("Failed to fetch stock movements.");
-
-      const itemsData = itemsDataRaw;
-      const historyData = historyDataRaw;
-
-      setItems(itemsData.map(i => ({
-        id: i?.id ?? "",
+      setItems((itemsDataRaw ?? []).map(i => ({
+        id: String(i?.id ?? ""),
         name: i?.name ?? "Unknown",
         category: i?.category ?? "Other",
         unit: i?.unit ?? "Unit",
@@ -105,7 +99,18 @@ const Inventory = () => {
         created_at: i?.created_at ?? new Date().toISOString()
       })));
 
-      setHistory(historyData);
+      setHistory((historyDataRaw ?? []).map(h => ({
+        id: String(h?.id ?? ""),
+        date: h?.date ?? format(new Date(), "yyyy-MM-dd"),
+        item_id: String(h?.item_id ?? ""),
+        item_name: h?.item_name ?? "Unknown",
+        movement_type: h?.movement_type ?? "in",
+        quantity: h?.quantity ?? 0,
+        notes: h?.notes ?? "",
+        event_id: h?.event_id,
+        created_by: h?.created_by,
+        created_at: h?.created_at ?? new Date().toISOString()
+      })));
     } catch (err: any) {
       console.error("Inventory fetchData unexpected error:", err);
       if (isMounted) {
@@ -117,6 +122,7 @@ const Inventory = () => {
       if (isMounted) setLoading(false);
     }
   }, []);
+
 
   useEffect(() => {
     let isMounted = true;
@@ -131,7 +137,7 @@ const Inventory = () => {
 
   const filteredHistory = useMemo(() => (history ?? []).filter(h => {
     const matchesSearch = (h?.item_name ?? "").toLowerCase().includes((historySearch ?? "").toLowerCase());
-    const matchesCategory = categoryFilter === "all" || h?.category === categoryFilter;
+    const matchesCategory = categoryFilter === "all" || (items ?? []).find(i => i.id === h.item_id)?.category === categoryFilter;
     let matchesDate = true;
     if (fromDate && toDate) {
       matchesDate = isWithinInterval(parseISO(h?.date ?? format(new Date(), "yyyy-MM-dd")), {
@@ -140,7 +146,7 @@ const Inventory = () => {
       });
     }
     return matchesSearch && matchesCategory && matchesDate;
-  }), [history, historySearch, categoryFilter, fromDate, toDate]);
+  }), [history, historySearch, categoryFilter, fromDate, toDate, items]);
 
   const lowStock = useMemo(() => (items ?? []).filter(i => (i?.current_stock ?? 0) <= (i?.min_stock_level ?? 0)), [items]);
   const totalValue = useMemo(() => (items ?? []).reduce((s, i) => s + ((i?.current_stock ?? 0) * (i?.purchase_price ?? 0)), 0), [items]);
@@ -148,6 +154,7 @@ const Inventory = () => {
     const cats = (items ?? []).map(i => i?.category).filter(Boolean);
     return [...new Set(cats)].length;
   }, [items]);
+
 
   const handleAdd = useCallback(async () => {
     if (!newItem?.name) return;
@@ -170,10 +177,9 @@ const Inventory = () => {
           date: format(new Date(), "yyyy-MM-dd"),
           item_id: data[0].id,
           item_name: newItem.name,
-          type: "purchase",
-          category: newItem.type,
-          qty: Number(newItem.current_stock),
-          note: "Initial Stock"
+          movement_type: "in",
+          quantity: Number(newItem.current_stock),
+          notes: "Initial Stock"
         });
       }
 
@@ -196,7 +202,7 @@ const Inventory = () => {
       const currentStock = selectedItem.current_stock ?? 0;
       const newStock = stockAction.type === "purchase" ? currentStock + qty : Math.max(0, currentStock - qty);
       
-      await inventoryService.updateInventoryItem(selectedItem.id.toString(), {
+      await inventoryService.updateInventoryItem(selectedItem.id, {
         current_stock: newStock
       });
 
@@ -204,11 +210,9 @@ const Inventory = () => {
         date: format(new Date(), "yyyy-MM-dd"),
         item_id: selectedItem.id,
         item_name: selectedItem.name,
-        type: stockAction.type,
-        category: selectedItem.type,
-        qty: qty,
-        note: stockAction.note,
-        issued_to: stockAction.type === "issue" ? stockAction.issued_to : null
+        movement_type: stockAction.type === "purchase" ? "in" : "out",
+        quantity: qty,
+        notes: stockAction.note
       });
 
       toast.success("Stock updated successfully");
@@ -227,14 +231,14 @@ const Inventory = () => {
     setIsSaving(true);
     try {
       const qty = Number(returnForm.qty);
-      const issuedQty = selectedMovement.qty ?? 0;
+      const issuedQty = selectedMovement.quantity ?? 0;
       if (qty > issuedQty) {
         throw new Error("Return quantity cannot exceed issued quantity");
       }
 
       // Update item stock
       const currentStock = selectedItem.current_stock ?? 0;
-      await inventoryService.updateInventoryItem(selectedItem.id.toString(), {
+      await inventoryService.updateInventoryItem(selectedItem.id, {
         current_stock: currentStock + qty
       });
 
@@ -243,12 +247,9 @@ const Inventory = () => {
         date: format(new Date(), "yyyy-MM-dd"),
         item_id: selectedItem.id,
         item_name: selectedItem.name,
-        type: "return",
-        category: selectedItem.type,
-        qty: qty,
-        note: returnForm.note,
-        returned_by: returnForm.returned_by,
-        return_date: format(new Date(), "yyyy-MM-dd")
+        movement_type: "return",
+        quantity: qty,
+        notes: returnForm.note
       });
 
       toast.success("Item returned successfully");
@@ -262,15 +263,14 @@ const Inventory = () => {
     }
   }, [returnForm, selectedMovement, selectedItem, fetchData]);
 
+
   const exportHistory = useCallback(() => {
     const data = (filteredHistory ?? []).map(h => ({
       Date: h?.date ?? "N/A",
       Item: h?.item_name ?? "Unknown",
-      Type: h?.type ?? "N/A",
-      Category: h?.category ?? "N/A",
-      Quantity: h?.qty ?? 0,
-      "Issued To / Returned By": h?.issued_to || h?.returned_by || "-",
-      Note: h?.note ?? "-"
+      Type: h?.movement_type ?? "N/A",
+      Quantity: h?.quantity ?? 0,
+      Note: h?.notes ?? "-"
     }));
     
     const ws = XLSX.utils.json_to_sheet(data);
@@ -280,6 +280,7 @@ const Inventory = () => {
     const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     saveAs(blob, `Stock_Movement_History_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
   }, [filteredHistory]);
+
 
   if (loading) {
     return (
@@ -493,53 +494,55 @@ const Inventory = () => {
               <table className="w-full min-w-[900px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    {["Date", "Item", "Type", "Qty", "Issued To / Returned By", "Note", "Action"].map(h => (
+                    {["Date", "Item", "Type", "Qty", "Note", "Action"].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={7} className="px-4 py-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" /></td></tr>
-                  ) : (filteredHistory ?? []).map(h => (
-                    <tr key={h?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{h?.date}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-card-foreground">
-                        {h?.item_name}
-                        <span className="ml-2 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase border bg-muted/50">
-                          {h?.category}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${h?.type === "purchase" ? "bg-success/10 text-success border-success/20" : h?.type === "return" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-destructive/10 text-destructive border-destructive/20"}`}>
-                          {h?.type === "purchase" ? <ArrowUp className="h-3 w-3" /> : h?.type === "return" ? <RotateCcw className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                          {h?.type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm font-bold text-card-foreground">{h?.qty}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{h?.issued_to || h?.returned_by || "-"}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{h?.note}</td>
-                      <td className="px-4 py-3">
-                        {canDo("edit") && h?.type === "issue" && h?.category === "non-consumable" && (
-                          <Button variant="ghost" size="sm" onClick={() => {
-                            const item = (items ?? []).find(i => i?.id === h?.item_id);
-                            if (item) {
-                              setSelectedItem(item);
-                              setSelectedMovement(h);
-                              setReturnForm({ qty: String(h?.qty ?? 0), returned_by: "", note: "" });
-                              setShowReturnModal(true);
-                            }
-                          }} className="h-7 px-2 text-[10px] gap-1">
-                            <RotateCcw className="h-3 w-3" /> Return
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                    <tr><td colSpan={6} className="px-4 py-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" /></td></tr>
+                  ) : (filteredHistory ?? []).map(h => {
+                    const item = (items ?? []).find(i => i.id === h.item_id);
+                    return (
+                      <tr key={h?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{h?.date}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-card-foreground">
+                          {h?.item_name}
+                          <span className="ml-2 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase border bg-muted/50">
+                            {item?.category ?? "Other"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${h?.movement_type === "in" ? "bg-success/10 text-success border-success/20" : h?.movement_type === "return" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-destructive/10 text-destructive border-destructive/20"}`}>
+                            {h?.movement_type === "in" ? <ArrowUp className="h-3 w-3" /> : h?.movement_type === "return" ? <RotateCcw className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                            {h?.movement_type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-bold text-card-foreground">{h?.quantity}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{h?.notes}</td>
+                        <td className="px-4 py-3">
+                          {canDo("edit") && h?.movement_type === "out" && item?.type === "non-consumable" && (
+                            <Button variant="ghost" size="sm" onClick={() => {
+                              if (item) {
+                                setSelectedItem(item);
+                                setSelectedMovement(h);
+                                setReturnForm({ qty: String(h?.quantity ?? 0), returned_by: "", note: "" });
+                                setShowReturnModal(true);
+                              }
+                            }} className="h-7 px-2 text-[10px] gap-1">
+                              <RotateCcw className="h-3 w-3" /> Return
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {!loading && (filteredHistory ?? []).length === 0 && (
-                    <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No stock movements found.</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No stock movements found.</td></tr>
                   )}
                 </tbody>
+
               </table>
             </div>
           </div>
