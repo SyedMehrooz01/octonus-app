@@ -106,8 +106,7 @@ const Documents = () => {
     try {
       const data = await documentService.getDocuments();
       if (!isMounted) return;
-      if (!data) throw new Error("Failed to fetch documents.");
-      setDocuments(data);
+      setDocuments(data ?? []);
     } catch (err: any) {
       console.error("fetchDocuments unexpected error:", err);
       if (isMounted) {
@@ -118,6 +117,7 @@ const Documents = () => {
       if (isMounted) setLoading(false);
     }
   }, []);
+
 
   const generateDocNo = useCallback(async (isMounted = true) => {
     try {
@@ -268,7 +268,13 @@ const Documents = () => {
   };
 
   const generatePDF = async (doc: DocumentData) => {
+    if (!doc.client_company || !doc.doc_number || (doc.items ?? []).length === 0) {
+      toast.error("Required document fields are missing");
+      return;
+    }
+
     const pdf = new jsPDF();
+
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const companyGreen = "#2D6A4F";
