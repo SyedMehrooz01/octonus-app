@@ -163,8 +163,8 @@ export const getSupplierPayments = async () => {
   try {
     const { data, error } = await supabase
       .from('supplier_payments')
-      .select('id, supplier_id, date, amount, method, notes')
-      .order('date', { ascending: false });
+      .select('id, supplier_id, amount, payment_date, payment_method, notes, created_by, created_at')
+      .order('payment_date', { ascending: false });
     if (error) throw error;
     return data || [];
   } catch (error) {
@@ -175,7 +175,16 @@ export const getSupplierPayments = async () => {
 
 export const addSupplierPayment = async (paymentData: any) => {
   try {
-    const { data, error } = await supabase.from('supplier_payments').insert([paymentData]);
+    // Map UI fields to DB fields if they differ
+    const dbData = {
+      supplier_id: paymentData.supplier_id,
+      amount: paymentData.amount,
+      payment_date: paymentData.payment_date || paymentData.date,
+      payment_method: paymentData.payment_method || paymentData.method,
+      notes: paymentData.notes,
+      created_by: paymentData.created_by
+    };
+    const { data, error } = await supabase.from('supplier_payments').insert([dbData]);
     if (error) throw error;
     return data;
   } catch (error) {

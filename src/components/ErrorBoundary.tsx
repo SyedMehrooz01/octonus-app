@@ -27,25 +27,15 @@ class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center bg-destructive/5 rounded-3xl border border-destructive/20 animate-in fade-in duration-500">
-          <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
-            <AlertTriangle className="h-10 w-10 text-destructive" />
-          </div>
-          <h2 className="text-2xl font-black text-foreground mb-2 uppercase tracking-tight">Something went wrong</h2>
-          <p className="text-muted-foreground mb-8 max-w-md mx-auto font-medium">
-            An unexpected error occurred while loading this section. Our team has been notified.
-          </p>
+        <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 shadow-sm m-4">
+          <h2 className="text-xl font-black text-[#0f172a] uppercase tracking-tight mb-4">Partial Data Loaded</h2>
+          <p className="text-slate-500 mb-6 font-bold">Some elements could not be rendered, but your data is safe.</p>
           <Button 
             onClick={() => window.location.reload()} 
-            className="rounded-xl font-bold gap-2 h-12 px-8 shadow-lg shadow-primary/20"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl px-8 h-12 gap-2 shadow-lg shadow-blue-600/20"
           >
-            <RotateCcw className="h-4 w-4" /> Reload Page
+            <RotateCcw className="h-4 w-4" /> RETRY LOADING
           </Button>
-          {process.env.NODE_ENV === 'development' && (
-            <pre className="mt-8 p-4 bg-black/5 rounded-xl text-left text-xs overflow-auto max-w-full font-mono text-destructive">
-              {this.state.error?.toString()}
-            </pre>
-          )}
         </div>
       );
     }

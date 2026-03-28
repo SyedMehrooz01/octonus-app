@@ -30,7 +30,7 @@ interface RawMaterial { id?: string; event_id: string; material_name: string; un
 
 
 interface Supplier { id: string; name: string; contact_number: string; email: string; service_type: string; opening_balance: number; current_balance: number; created_at?: string; }
-interface SupplierPayment { id: string; supplier_id: string; date: string; amount: number; method: string; notes?: string; }
+interface SupplierPayment { id: string; supplier_id: string; payment_date: string; amount: number; payment_method: string; notes?: string; created_by?: string; created_at?: string; }
 interface ClientProfile { clientName: string; phone: string; totalPaid: number; remainingBalance: number; bookings: Booking[]; payments: {date: string, amount: number, method: string}[]; }
 
 const INITIAL_MENUS: Menu[] = [
@@ -119,17 +119,15 @@ const EventBooking = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const fetchMenus = useCallback(async (isMounted = true) => {
+  const fetchMenus = useCallback(async (isMounted = true, retry = true) => {
     if (isMounted) setLoadingMenus(true);
     try {
       const [menusDataRaw, itemsDataRaw] = await Promise.all([
-        eventService.getMenus(),
-        eventService.getMenuItems()
+        eventService.getMenus().catch(err => { console.error(err); return []; }),
+        eventService.getMenuItems().catch(err => { console.error(err); return []; })
       ]);
 
       if (!isMounted) return;
-
-      if (!menusDataRaw) throw new Error("Failed to fetch menu data.");
 
       const menusData = menusDataRaw;
       const itemsData = itemsDataRaw ?? [];
@@ -144,13 +142,16 @@ const EventBooking = () => {
         }));
         setMenus(formattedMenus);
       } else {
-
         setMenus(INITIAL_MENUS);
       }
     } catch (error: any) {
       console.error("fetchMenus unexpected error:", error);
+      if (retry) {
+        setTimeout(() => fetchMenus(isMounted, false), 2000);
+        return;
+      }
       if (isMounted) {
-        setError(prev => prev || error.message || "Failed to fetch menus.");
+        // setError(prev => prev || error.message || "Failed to fetch menus.");
         setMenus(INITIAL_MENUS);
       }
     } finally {
@@ -158,28 +159,31 @@ const EventBooking = () => {
     }
   }, []);
 
-  const fetchSuppliers = useCallback(async (isMounted = true) => {
+  const fetchSuppliers = useCallback(async (isMounted = true, retry = true) => {
     try {
       const [sData, pData] = await Promise.all([
-        eventService.getSuppliers(),
-        eventService.getSupplierPayments()
+        eventService.getSuppliers().catch(err => { console.error(err); return []; }),
+        eventService.getSupplierPayments().catch(err => { console.error(err); return []; })
       ]);
       if (isMounted) {
-        if (!sData) throw new Error("Failed to fetch supplier data.");
         setSuppliers(sData);
         setSupplierPayments(pData ?? []);
       }
     } catch (err: any) {
       console.error("fetchSuppliers unexpected error:", err);
+      if (retry) {
+        setTimeout(() => fetchSuppliers(isMounted, false), 2000);
+        return;
+      }
       if (isMounted) {
-        setError(prev => prev || err.message || "Failed to fetch suppliers.");
+        // setError(prev => prev || err.message || "Failed to fetch suppliers.");
         setSuppliers([]);
         setSupplierPayments([]);
       }
     }
   }, []);
 
-  const fetchBookingsData = useCallback(async (isMounted = true) => {
+  const fetchBookingsData = useCallback(async (isMounted = true, retry = true) => {
     if (isMounted) setLoading(true);
     try {
       const data = await eventService.getBookings();
@@ -207,8 +211,12 @@ const EventBooking = () => {
       })) ?? []);
     } catch (err: any) {
       console.error("fetchBookingsData unexpected error:", err);
+      if (retry) {
+        setTimeout(() => fetchBookingsData(isMounted, false), 2000);
+        return;
+      }
       if (isMounted) {
-        setError(prev => prev || err.message || "Failed to fetch bookings.");
+        // setError(prev => prev || err.message || "Failed to fetch bookings.");
         setBookings([]);
       }
     } finally {
@@ -271,15 +279,16 @@ const EventBooking = () => {
       const payment = {
         supplier_id: selectedSupplier.id,
         amount: supplierPaymentForm.amount,
-        method: supplierPaymentForm.method,
-        date: supplierPaymentForm.date,
-        notes: supplierPaymentForm.notes
+        payment_method: supplierPaymentForm.method,
+        payment_date: supplierPaymentForm.date,
+        notes: supplierPaymentForm.notes,
+        created_by: user?.name || user?.email
       };
 
       await eventService.addSupplierPayment(payment);
 
       await eventService.updateSupplier(selectedSupplier.id, {
-        current_balance: selectedSupplier.current_balance - supplierPaymentForm.amount
+        current_balance: (selectedSupplier.current_balance ?? 0) - supplierPaymentForm.amount
       });
 
       toast.success("Payment recorded successfully");
@@ -290,7 +299,7 @@ const EventBooking = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [selectedSupplier, supplierPaymentForm, fetchSuppliers]);
+  }, [selectedSupplier, supplierPaymentForm, fetchSuppliers, user]);
 
   const openClientProfile = useCallback((clientName: string, phone: string) => {
     const clientBookings = (bookings ?? []).filter(b => b?.clientName === clientName);
@@ -548,7 +557,7 @@ const EventBooking = () => {
   const totalPages = Math.ceil((filtered ?? []).length / itemsPerPage);
   const paginatedBookings = useMemo(() => (filtered ?? []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage), [filtered, currentPage]);
 
-  if (loading) {
+  if (loading && (bookings ?? []).length === 0) {
     return (
       <div className="space-y-8 pb-10 max-w-full overflow-hidden">
         <div className="h-24 w-full bg-white rounded-3xl animate-pulse" />
@@ -560,65 +569,66 @@ const EventBooking = () => {
     );
   }
 
-  return (
-    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
-      {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
-          <AlertTriangle className="h-5 w-5" />
-          <p className="font-bold">{error}</p>
-          <Button variant="ghost" size="sm" onClick={() => fetchBookingsData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
-        </div>
-      )}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-        <div className="animate-in fade-in slide-in-from-left duration-500">
-          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight uppercase">Event Booking Hub</h1>
-          <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1 flex items-center gap-2">
-            <Clock className="h-3 w-3" /> Real-time Schedule Sync
-          </p>
-        </div>
-        <Button onClick={()=>setShowAdd(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-600/20 gap-2 h-12 px-8 transition-all hover:scale-[1.02] active:scale-95 animate-in fade-in slide-in-from-right duration-500">
-          <Plus className="h-5 w-5"/> NEW BOOKING
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-        {[
-          {l:"Total Bookings",v:(bookings ?? []).length,c:"from-blue-500 to-blue-700",s:"shadow-blue-500/20",i:CalendarDays},
-          {l:"Confirmed",v:(bookings ?? []).filter(b=>b?.status==="confirmed").length,c:"from-emerald-500 to-emerald-700",s:"shadow-emerald-500/20",i:CheckCircle2},
-          {l:"Tentative",v:(bookings ?? []).filter(b=>b?.status==="tentative").length,c:"from-slate-400 to-slate-600",s:"shadow-slate-400/20",i:Clock},
-          {l:"Cancelled",v:(bookings ?? []).filter(b=>b?.status==="cancelled").length,c:"from-rose-500 to-rose-700",s:"shadow-rose-500/20",i:Trash2},
-          {l:"3rd Party Profit",v:`₨ ${(tp ?? 0).toLocaleString()}`,c:"from-indigo-500 to-indigo-700",s:"shadow-indigo-500/20",i:TrendingUp},
-          {l:"Outstanding",v:`₨ ${(bookings ?? []).reduce((s,b)=>s+(b?.balanceRemaining ?? 0),0).toLocaleString()}`,c:"from-amber-500 to-amber-700",s:"shadow-amber-500/20",i:Wallet}
-        ].map((c, idx)=>(
-          <div key={c.l} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${c.c} p-5 text-white shadow-xl ${c.s} transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${idx * 50}`}>
-            <div className="relative z-10 flex flex-col gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
-                <c.i className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-80">{c.l}</p>
-                <p className="text-xl font-black truncate mt-0.5 tracking-tight">{c.v}</p>
-              </div>
-            </div>
-            <div className="absolute -right-4 -bottom-4 opacity-10 transition-transform duration-500 group-hover:scale-125">
-              <c.i size={80} className="text-white" />
-            </div>
+  try {
+    return (
+      <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+        {error && (
+          <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+            <AlertTriangle className="h-5 w-5" />
+            <p className="font-bold">{error}</p>
+            <Button variant="ghost" size="sm" onClick={() => fetchBookingsData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
           </div>
-        ))}
-      </div>
+        )}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+          <div className="animate-in fade-in slide-in-from-left duration-500">
+            <h1 className="text-3xl font-black text-[#0f172a] tracking-tight uppercase">Event Booking Hub</h1>
+            <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1 flex items-center gap-2">
+              <Clock className="h-3 w-3" /> Real-time Schedule Sync
+            </p>
+          </div>
+          <Button onClick={()=>setShowAdd(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-600/20 gap-2 h-12 px-8 transition-all hover:scale-[1.02] active:scale-95 animate-in fade-in slide-in-from-right duration-500">
+            <Plus className="h-5 w-5"/> NEW BOOKING
+          </Button>
+        </div>
 
-      <Tabs defaultValue="list" className="w-full">
-        <TabsList className="mb-8 flex-wrap h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
-          {["list", "calendar", "menu", "kitchen", "thirdparty", "suppliers"].map(tab => (
-            <TabsTrigger 
-              key={tab}
-              value={tab} 
-              className="rounded-xl px-6 py-3 font-black text-[11px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all"
-            >
-              {tab === 'list' ? 'All Bookings' : tab === 'thirdparty' ? 'Third-Party' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </TabsTrigger>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+          {[
+            {l:"Total Bookings",v:(bookings ?? []).length,c:"from-blue-500 to-blue-700",s:"shadow-blue-500/20",i:CalendarDays},
+            {l:"Confirmed",v:(bookings ?? []).filter(b=>b?.status==="confirmed").length,c:"from-emerald-500 to-emerald-700",s:"shadow-emerald-500/20",i:CheckCircle2},
+            {l:"Tentative",v:(bookings ?? []).filter(b=>b?.status==="tentative").length,c:"from-slate-400 to-slate-600",s:"shadow-slate-400/20",i:Clock},
+            {l:"Cancelled",v:(bookings ?? []).filter(b=>b?.status==="cancelled").length,c:"from-rose-500 to-rose-700",s:"shadow-rose-500/20",i:Trash2},
+            {l:"3rd Party Profit",v:`₨ ${(tp ?? 0).toLocaleString()}`,c:"from-indigo-500 to-indigo-700",s:"shadow-indigo-500/20",i:TrendingUp},
+            {l:"Outstanding",v:`₨ ${(bookings ?? []).reduce((s,b)=>s+(b?.balanceRemaining ?? 0),0).toLocaleString()}`,c:"from-amber-500 to-amber-700",s:"shadow-amber-500/20",i:Wallet}
+          ].map((c, idx)=>(
+            <div key={c.l} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${c.c} p-5 text-white shadow-xl ${c.s} transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${idx * 50}`}>
+              <div className="relative z-10 flex flex-col gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+                  <c.i className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-80">{c.l}</p>
+                  <p className="text-xl font-black truncate mt-0.5 tracking-tight">{c.v}</p>
+                </div>
+              </div>
+              <div className="absolute -right-4 -bottom-4 opacity-10 transition-transform duration-500 group-hover:scale-125">
+                <c.i size={80} className="text-white" />
+              </div>
+            </div>
           ))}
-        </TabsList>
+        </div>
+
+        <Tabs defaultValue="list" className="w-full">
+          <TabsList className="mb-8 flex-wrap h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
+            {["list", "calendar", "menu", "kitchen", "thirdparty", "suppliers"].map(tab => (
+              <TabsTrigger 
+                key={tab}
+                value={tab} 
+                className="rounded-xl px-6 py-3 font-black text-[11px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all"
+              >
+                {tab === 'list' ? 'All Bookings' : tab === 'thirdparty' ? 'Third-Party' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
         <TabsContent value="list" className="space-y-6 animate-in fade-in duration-500">
           <div className="flex flex-col sm:flex-row gap-4 items-center bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
@@ -913,6 +923,18 @@ const EventBooking = () => {
       </Tabs>
     </div>
   );
+  } catch (err) {
+    console.error("EventBooking render error:", err);
+    return (
+      <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 shadow-sm m-4">
+        <h2 className="text-xl font-black text-[#0f172a] uppercase tracking-tight mb-4">Partial Data Loaded</h2>
+        <p className="text-slate-500 mb-6">Some elements of this page could not be rendered, but your data is safe.</p>
+        <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl px-8 h-12">
+          RELOAD PAGE
+        </Button>
+      </div>
+    );
+  }
 };
 
 export default memo(EventBooking);

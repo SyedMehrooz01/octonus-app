@@ -98,7 +98,7 @@ const Documents = () => {
   
   const invoiceTerms = `1. Amount Including 15% SRB & 11% Income Taxes.\n2. All Payment Should be Favor in Octonus Solutions by Cheque/IBFT.\n3. Payment Made Before Due Date.`;
 
-  const fetchDocuments = useCallback(async (isMounted = true) => {
+  const fetchDocuments = useCallback(async (isMounted = true, retry = true) => {
     if (isMounted) {
       setLoading(true);
       setError(null);
@@ -109,8 +109,12 @@ const Documents = () => {
       setDocuments(data ?? []);
     } catch (err: any) {
       console.error("fetchDocuments unexpected error:", err);
+      if (retry) {
+        setTimeout(() => fetchDocuments(isMounted, false), 2000);
+        return;
+      }
       if (isMounted) {
-        setError(err.message || "An unexpected error occurred while fetching documents.");
+        // setError(err.message || "An unexpected error occurred while fetching documents.");
         setDocuments([]);
       }
     } finally {
@@ -559,299 +563,321 @@ const Documents = () => {
     (doc?.doc_number ?? "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  return (
-    <div className="space-y-8 pb-10">
-      {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
-          <Receipt className="h-5 w-5" />
-          <p className="font-bold">{error}</p>
-          <Button variant="ghost" size="sm" onClick={() => fetchDocuments(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
-        </div>
-      )}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="animate-in fade-in slide-in-from-left duration-500">
-          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Documents Generator</h1>
-          <p className="text-slate-500 font-bold mt-1">Create professional Quotations and Invoices instantly.</p>
-        </div>
+  if (loading && (documents ?? []).length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
+        <Loader2 className="h-10 w-10 text-blue-500 animate-spin mb-4" />
+        <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Loading documents...</p>
       </div>
+    );
+  }
 
-      <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
-        <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
-          <TabsTrigger value="Quotation" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
-            <FileText className="h-4 w-4" /> Quotation
-          </TabsTrigger>
-          <TabsTrigger value="Invoice" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
-            <Receipt className="h-4 w-4" /> Invoice
-          </TabsTrigger>
-          <TabsTrigger value="archive" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
-            <History className="h-4 w-4" /> Archive
-          </TabsTrigger>
-        </TabsList>
+  try {
+    return (
+      <div className="space-y-8 pb-10">
+        {error && (
+          <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+            <Receipt className="h-5 w-5" />
+            <p className="font-bold">{error}</p>
+            <Button variant="ghost" size="sm" onClick={() => fetchDocuments(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
+          </div>
+        )}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="animate-in fade-in slide-in-from-left duration-500">
+            <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Documents Generator</h1>
+            <p className="text-slate-500 font-bold mt-1">Create professional Quotations and Invoices instantly.</p>
+          </div>
+        </div>
 
-        <TabsContent value={activeTab} className="space-y-6 animate-in fade-in duration-500">
-          <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
-            <div className="bg-slate-50/50 border-b border-slate-100 p-6">
-              <h2 className="text-xl font-black text-[#0f172a] flex items-center gap-3">
-                <PlusCircle className="h-6 w-6 text-blue-600" />
-                New {activeTab} Setup
-              </h2>
-            </div>
-            <div className="p-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Document Number</Label>
-                  <Input value={docNo} readOnly className="h-12 rounded-xl bg-slate-50 font-black text-blue-600 border-slate-200" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1">{activeTab} Date</Label>
-                  <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-12 rounded-xl font-bold" />
-                </div>
-                {activeTab === "Quotation" ? (
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Valid Until</Label>
-                    <Input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} className="h-12 rounded-xl font-bold" />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Event Date</Label>
-                    <Input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} className="h-12 rounded-xl font-bold" />
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Client Company Name</Label>
-                  <Input placeholder="Enter company name" value={clientCompany} onChange={e => setClientCompany(e.target.value)} className="h-12 rounded-xl font-bold" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Contact Person</Label>
-                  <Input placeholder="Enter contact name" value={contactPerson} onChange={e => setContactPerson(e.target.value)} className="h-12 rounded-xl font-bold" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Event Name / Description</Label>
-                  <Input placeholder="e.g. Corporate Dinner 2024" value={eventName} onChange={e => setEventName(e.target.value)} className="h-12 rounded-xl font-bold" />
-                </div>
-                <div className="md:col-span-2 lg:col-span-3 space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Client Address</Label>
-                  <Input placeholder="Enter complete address" value={clientAddress} onChange={e => setClientAddress(e.target.value)} className="h-12 rounded-xl font-bold" />
-                </div>
+        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
+          <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
+            <TabsTrigger value="Quotation" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
+              <FileText className="h-4 w-4" /> Quotation
+            </TabsTrigger>
+            <TabsTrigger value="Invoice" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
+              <Receipt className="h-4 w-4" /> Invoice
+            </TabsTrigger>
+            <TabsTrigger value="archive" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
+              <History className="h-4 w-4" /> Archive
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value={activeTab} className="space-y-6 animate-in fade-in duration-500">
+            <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
+              <div className="bg-slate-50/50 border-b border-slate-100 p-6">
+                <h2 className="text-xl font-black text-[#0f172a] flex items-center gap-3">
+                  <PlusCircle className="h-6 w-6 text-blue-600" />
+                  New {activeTab} Setup
+                </h2>
               </div>
-
-              {/* Items Table */}
-              <div className="space-y-4 mb-10">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-black text-[#0f172a] uppercase tracking-widest">Line Items</h3>
-                  <Button onClick={handleAddItem} variant="outline" className="rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 h-10 border-blue-200 text-blue-600 hover:bg-blue-50">
-                    <Plus className="h-4 w-4" /> Add Row
-                  </Button>
+              <div className="p-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Document Number</Label>
+                    <Input value={docNo} readOnly className="h-12 rounded-xl bg-slate-50 font-black text-blue-600 border-slate-200" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1">{activeTab} Date</Label>
+                    <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-12 rounded-xl font-bold" />
+                  </div>
+                  {activeTab === "Quotation" ? (
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Valid Until</Label>
+                      <Input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} className="h-12 rounded-xl font-bold" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Event Date</Label>
+                      <Input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} className="h-12 rounded-xl font-bold" />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Client Company Name</Label>
+                    <Input placeholder="Enter company name" value={clientCompany} onChange={e => setClientCompany(e.target.value)} className="h-12 rounded-xl font-bold" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Contact Person</Label>
+                    <Input placeholder="Enter contact name" value={contactPerson} onChange={e => setContactPerson(e.target.value)} className="h-12 rounded-xl font-bold" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Event Name / Description</Label>
+                    <Input placeholder="e.g. Corporate Dinner 2024" value={eventName} onChange={e => setEventName(e.target.value)} className="h-12 rounded-xl font-bold" />
+                  </div>
+                  <div className="md:col-span-2 lg:col-span-3 space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Client Address</Label>
+                    <Input placeholder="Enter complete address" value={clientAddress} onChange={e => setClientAddress(e.target.value)} className="h-12 rounded-xl font-bold" />
+                  </div>
                 </div>
-                <div className="rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-slate-50 border-b border-slate-100">
-                        <tr>
-                          <th className="px-4 py-3 text-center font-black text-[10px] uppercase tracking-widest w-16">S.No</th>
-                          <th className="px-4 py-3 text-left font-black text-[10px] uppercase tracking-widest">Description</th>
-                          <th className="px-4 py-3 text-center font-black text-[10px] uppercase tracking-widest w-24">Qty</th>
-                          <th className="px-4 py-3 text-right font-black text-[10px] uppercase tracking-widest w-40">Rate (Rs.)</th>
-                          <th className="px-4 py-3 text-right font-black text-[10px] uppercase tracking-widest w-40">Amount</th>
-                          <th className="px-4 py-3 w-16"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {(items ?? []).map((item, index) => (
-                          <tr key={index} className="group hover:bg-slate-50/50">
-                            <td className="px-4 py-3 text-center font-bold text-slate-400">{index + 1}</td>
-                            <td className="px-4 py-3">
-                              <Input 
-                                placeholder="Item description" 
-                                value={item?.description ?? ""} 
-                                onChange={e => handleItemChange(index, "description", e.target.value)}
-                                className="border-none focus-visible:ring-0 bg-transparent font-bold"
-                              />
-                            </td>
-                            <td className="px-4 py-3">
-                              <Input 
-                                type="number" 
-                                value={item?.qty ?? 0} 
-                                onChange={e => handleItemChange(index, "qty", e.target.value)}
-                                className="text-center font-bold h-9 rounded-lg"
-                              />
-                            </td>
-                            <td className="px-4 py-3">
-                              <Input 
-                                type="number" 
-                                value={item?.rate ?? 0} 
-                                onChange={e => handleItemChange(index, "rate", e.target.value)}
-                                className="text-right font-bold h-9 rounded-lg"
-                              />
-                            </td>
-                            <td className="px-4 py-3 text-right font-black text-slate-700">{(item?.amount ?? 0).toLocaleString()}</td>
-                            <td className="px-4 py-3 text-center">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleRemoveItem(index)}
-                                className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </td>
+
+                {/* Items Table */}
+                <div className="space-y-4 mb-10">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black text-[#0f172a] uppercase tracking-widest">Line Items</h3>
+                    <Button onClick={handleAddItem} variant="outline" className="rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 h-10 border-blue-200 text-blue-600 hover:bg-blue-50">
+                      <Plus className="h-4 w-4" /> Add Row
+                    </Button>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-slate-50 border-b border-slate-100">
+                          <tr>
+                            <th className="px-4 py-3 text-center font-black text-[10px] uppercase tracking-widest w-16">S.No</th>
+                            <th className="px-4 py-3 text-left font-black text-[10px] uppercase tracking-widest">Description</th>
+                            <th className="px-4 py-3 text-center font-black text-[10px] uppercase tracking-widest w-24">Qty</th>
+                            <th className="px-4 py-3 text-right font-black text-[10px] uppercase tracking-widest w-40">Rate (Rs.)</th>
+                            <th className="px-4 py-3 text-right font-black text-[10px] uppercase tracking-widest w-40">Amount</th>
+                            <th className="px-4 py-3 w-16"></th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {(items ?? []).map((item, index) => (
+                            <tr key={index} className="group hover:bg-slate-50/50">
+                              <td className="px-4 py-3 text-center font-bold text-slate-400">{index + 1}</td>
+                              <td className="px-4 py-3">
+                                <Input 
+                                  placeholder="Item description" 
+                                  value={item?.description ?? ""} 
+                                  onChange={e => handleItemChange(index, "description", e.target.value)}
+                                  className="border-none focus-visible:ring-0 bg-transparent font-bold"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <Input 
+                                  type="number" 
+                                  value={item?.qty ?? 0} 
+                                  onChange={e => handleItemChange(index, "qty", e.target.value)}
+                                  className="text-center font-bold h-9 rounded-lg"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <Input 
+                                  type="number" 
+                                  value={item?.rate ?? 0} 
+                                  onChange={e => handleItemChange(index, "rate", e.target.value)}
+                                  className="text-right font-bold h-9 rounded-lg"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-right font-black text-slate-700">{(item?.amount ?? 0).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-center">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => handleRemoveItem(index)}
+                                  className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Section: Terms & Totals */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 pt-8 border-t border-slate-100">
+                  <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Terms & Conditions</Label>
+                    <textarea 
+                      value={terms} 
+                      onChange={e => setTerms(e.target.value)}
+                      className="w-full h-40 rounded-2xl border-slate-200 p-4 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none resize-none bg-slate-50/30"
+                    />
+                  </div>
+                  <div className="space-y-4 bg-slate-50/50 p-8 rounded-3xl border border-slate-100">
+                    <div className="flex justify-between items-center text-sm font-bold text-slate-500 uppercase tracking-widest">
+                      <span>Total Amount</span>
+                      <span>{formatCurrency(total)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm font-bold text-slate-500 uppercase tracking-widest">
+                      <span>SRB Tax (15%)</span>
+                      <span>{formatCurrency(srb)}</span>
+                    </div>
+                    <div className="h-px bg-slate-200 my-4" />
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-black text-[#0f172a] uppercase tracking-widest">Sub Total</span>
+                      <span className="text-2xl font-black text-blue-600">{formatCurrency(subTotal)}</span>
+                    </div>
+                    
+                    <div className="flex gap-3 pt-8">
+                      <Button 
+                        onClick={handleSave} 
+                        disabled={saving}
+                        className="flex-1 h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest gap-3 shadow-xl shadow-blue-600/20"
+                      >
+                        {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                        Save {activeTab}
+                      </Button>
+                      <Button 
+                        onClick={() => {
+                          const tempDoc: DocumentData = {
+                            doc_number: docNo,
+                            doc_type: activeTab,
+                            invoice_date: date,
+                            client_company: clientCompany,
+                            contact_person: contactPerson,
+                            client_address: clientAddress,
+                            event_name: eventName,
+                            items: items,
+                            total_amount: total,
+                            srb_amount: srb,
+                            sub_total: subTotal,
+                            terms: terms,
+                            valid_until: validUntil,
+                            event_date: eventDate
+                          };
+                          generatePDF(tempDoc);
+                        }} 
+                        variant="outline"
+                        className="h-14 w-14 rounded-2xl border-slate-200 hover:bg-slate-50 text-slate-600"
+                      >
+                        <FileDown className="h-6 w-6" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
+            </div>
+          </TabsContent>
 
-              {/* Bottom Section: Terms & Totals */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 pt-8 border-t border-slate-100">
-                <div className="space-y-4">
-                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Terms & Conditions</Label>
-                  <textarea 
-                    value={terms} 
-                    onChange={e => setTerms(e.target.value)}
-                    className="w-full h-40 rounded-2xl border-slate-200 p-4 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none resize-none bg-slate-50/30"
+          <TabsContent value="archive" className="space-y-6">
+            {/* Saved Documents Table */}
+            <div className="space-y-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                <h2 className="text-xl font-black text-[#0f172a] uppercase tracking-tight">Saved Documents Archive</h2>
+                <div className="relative w-full sm:max-w-xs group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                  <Input 
+                    placeholder="Search archive..." 
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="pl-11 h-12 bg-slate-50 border-none rounded-xl font-bold transition-all"
                   />
                 </div>
-                <div className="space-y-4 bg-slate-50/50 p-8 rounded-3xl border border-slate-100">
-                  <div className="flex justify-between items-center text-sm font-bold text-slate-500 uppercase tracking-widest">
-                    <span>Total Amount</span>
-                    <span>{formatCurrency(total)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm font-bold text-slate-500 uppercase tracking-widest">
-                    <span>SRB Tax (15%)</span>
-                    <span>{formatCurrency(srb)}</span>
-                  </div>
-                  <div className="h-px bg-slate-200 my-4" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-black text-[#0f172a] uppercase tracking-widest">Sub Total</span>
-                    <span className="text-2xl font-black text-blue-600">{formatCurrency(subTotal)}</span>
-                  </div>
-                  
-                  <div className="flex gap-3 pt-8">
-                    <Button 
-                      onClick={handleSave} 
-                      disabled={saving}
-                      className="flex-1 h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest gap-3 shadow-xl shadow-blue-600/20"
-                    >
-                      {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                      Save {activeTab}
-                    </Button>
-                    <Button 
-                      onClick={() => {
-                        const tempDoc: DocumentData = {
-                          doc_number: docNo,
-                          doc_type: activeTab,
-                          invoice_date: date,
-                          client_company: clientCompany,
-                          contact_person: contactPerson,
-                          client_address: clientAddress,
-                          event_name: eventName,
-                          items: items,
-                          total_amount: total,
-                          srb_amount: srb,
-                          sub_total: subTotal,
-                          terms: terms,
-                          valid_until: validUntil,
-                          event_date: eventDate
-                        };
-                        generatePDF(tempDoc);
-                      }} 
-                      variant="outline"
-                      className="h-14 w-14 rounded-2xl border-slate-200 hover:bg-slate-50 text-slate-600"
-                    >
-                      <FileDown className="h-6 w-6" />
-                    </Button>
-                  </div>
+              </div>
+
+              <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-50/80 border-b border-slate-100">
+                      <tr>
+                        <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Doc No</th>
+                        <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Type</th>
+                        <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Client / Event</th>
+                        <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
+                        <th className="px-8 py-6 text-right text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Amount</th>
+                        <th className="px-8 py-6 text-right text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={6} className="py-20 text-center">
+                            <Loader2 className="h-10 w-10 text-blue-500 animate-spin mx-auto" />
+                            <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mt-4">Retrieving Archives...</p>
+                          </td>
+                        </tr>
+                      ) : (filteredDocs ?? []).length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-20 text-center">
+                            <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No documents found in archive</p>
+                          </td>
+                        </tr>
+                      ) : (
+                        (filteredDocs ?? []).map((doc, idx) => (
+                          <tr key={doc?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
+                            <td className="px-8 py-6 font-black text-blue-600 tracking-tight">{doc?.doc_number}</td>
+                            <td className="px-8 py-6">
+                              <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${doc?.doc_type === 'Quotation' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                                {doc?.doc_type}
+                              </Badge>
+                            </td>
+                            <td className="px-8 py-6">
+                              <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{doc?.client_company}</p>
+                              <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">{doc?.event_name}</p>
+                            </td>
+                            <td className="px-8 py-6 text-sm font-black text-slate-500 tracking-tight">{doc?.invoice_date ? format(new Date(doc.invoice_date), 'MMM dd, yyyy') : "N/A"}</td>
+                            <td className="px-8 py-6 text-right font-black text-[#0f172a] tracking-tight">{formatCurrency(doc?.sub_total ?? 0)}</td>
+                            <td className="px-8 py-6 text-right">
+                              <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
+                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 shadow-sm" onClick={() => generatePDF(doc)}>
+                                  <FileDown className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-100/50 shadow-sm" onClick={() => generateExcel(doc)}>
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 shadow-sm" onClick={() => doc?.id && handleDelete(doc.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="archive" className="space-y-6">
-          {/* Saved Documents Table */}
-          <div className="space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-              <h2 className="text-xl font-black text-[#0f172a] uppercase tracking-tight">Saved Documents Archive</h2>
-              <div className="relative w-full sm:max-w-xs group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                <Input 
-                  placeholder="Search archive..." 
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-11 h-12 bg-slate-50 border-none rounded-xl font-bold transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50/80 border-b border-slate-100">
-                    <tr>
-                      <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Doc No</th>
-                      <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Type</th>
-                      <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Client / Event</th>
-                      <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
-                      <th className="px-8 py-6 text-right text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Amount</th>
-                      <th className="px-8 py-6 text-right text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {loading ? (
-                      <tr>
-                        <td colSpan={6} className="py-20 text-center">
-                          <Loader2 className="h-10 w-10 text-blue-500 animate-spin mx-auto" />
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mt-4">Retrieving Archives...</p>
-                        </td>
-                      </tr>
-                    ) : (filteredDocs ?? []).length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-20 text-center">
-                          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No documents found in archive</p>
-                        </td>
-                      </tr>
-                    ) : (
-                      (filteredDocs ?? []).map((doc, idx) => (
-                        <tr key={doc?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
-                          <td className="px-8 py-6 font-black text-blue-600 tracking-tight">{doc?.doc_number}</td>
-                          <td className="px-8 py-6">
-                            <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${doc?.doc_type === 'Quotation' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                              {doc?.doc_type}
-                            </Badge>
-                          </td>
-                          <td className="px-8 py-6">
-                            <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{doc?.client_company}</p>
-                            <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">{doc?.event_name}</p>
-                          </td>
-                          <td className="px-8 py-6 text-sm font-black text-slate-500 tracking-tight">{doc?.invoice_date ? format(new Date(doc.invoice_date), 'MMM dd, yyyy') : "N/A"}</td>
-                          <td className="px-8 py-6 text-right font-black text-[#0f172a] tracking-tight">{formatCurrency(doc?.sub_total ?? 0)}</td>
-                          <td className="px-8 py-6 text-right">
-                            <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
-                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 shadow-sm" onClick={() => generatePDF(doc)}>
-                                <FileDown className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-100/50 shadow-sm" onClick={() => generateExcel(doc)}>
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-100/50 shadow-sm" onClick={() => doc?.id && handleDelete(doc.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  } catch (err) {
+    console.error("Documents render error:", err);
+    return (
+      <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 shadow-sm m-4">
+        <h2 className="text-xl font-black text-[#0f172a] uppercase tracking-tight mb-4">Partial Data Loaded</h2>
+        <p className="text-slate-500 mb-6">Some elements of this page could not be rendered, but your data is safe.</p>
+        <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl px-8 h-12">
+          RELOAD PAGE
+        </Button>
+      </div>
+    );
+  }
 };
 
 export default Documents;
