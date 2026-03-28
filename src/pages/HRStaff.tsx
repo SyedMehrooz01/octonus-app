@@ -771,33 +771,32 @@ const HRStaff = () => {
     );
   }
 
-  try {
-    return (
-      <div className="space-y-4 sm:space-y-6 pb-10 max-w-full overflow-hidden">
-        {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
-            <XCircle className="h-5 w-5" />
-            <p className="font-bold">{error}</p>
-            <Button variant="ghost" size="sm" onClick={() => fetchHRData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
-          </div>
-        )}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-foreground">Workforce Management</h2>
-            <p className="text-xs sm:text-sm text-muted-foreground text-balance">Comprehensive HR portal for staff, attendance, and payroll</p>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
-            <Button onClick={() => setShowTotalLedgerModal(true)} variant="outline" className="gap-2 flex-shrink-0 border-primary/20 hover:bg-primary/5 text-primary">
-              <BarChart3 className="h-4 w-4" /> Total Ledger
-            </Button>
-            <Button onClick={() => setShowAnnounceModal(true)} variant="outline" className="gap-2 flex-shrink-0">
-              <Bell className="h-4 w-4" /> Announce
-            </Button>
-            <Button onClick={() => setShowAddModal(true)} className="gap-2 flex-shrink-0">
-              <UserPlus className="h-4 w-4" /> Add Staff
-            </Button>
-          </div>
+  return (
+    <div className="space-y-4 sm:space-y-6 pb-10 max-w-full overflow-hidden">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <XCircle className="h-5 w-5" />
+          <p className="font-bold">{error}</p>
+          <Button variant="ghost" size="sm" onClick={() => fetchHRData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
         </div>
+      )}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">Workforce Management</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground text-balance">Comprehensive HR portal for staff, attendance, and payroll</p>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <Button onClick={() => setShowTotalLedgerModal(true)} variant="outline" className="gap-2 flex-shrink-0 border-primary/20 hover:bg-primary/5 text-primary">
+            <BarChart3 className="h-4 w-4" /> Total Ledger
+          </Button>
+          <Button onClick={() => setShowAnnounceModal(true)} variant="outline" className="gap-2 flex-shrink-0">
+            <Bell className="h-4 w-4" /> Announce
+          </Button>
+          <Button onClick={() => setShowAddModal(true)} className="gap-2 flex-shrink-0">
+            <UserPlus className="h-4 w-4" /> Add Staff
+          </Button>
+        </div>
+      </div>
 
         {(announcements ?? []).length > 0 && (
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 sm:p-4">
@@ -992,21 +991,6 @@ const HRStaff = () => {
         </Dialog>
       </div>
     );
-  } catch (err) {
-    console.error("HRStaff render error:", err);
-    return (
-      <div className="p-6 text-center bg-rose-50 border border-rose-200 rounded-3xl">
-        <h2 className="text-xl font-bold text-rose-600 mb-2">Something went wrong while rendering</h2>
-        <p className="text-sm text-rose-500 mb-4">We've loaded what we could. Please try refreshing.</p>
-        <Button onClick={() => fetchHRData(true)}>Retry Loading Data</Button>
-        <div className="mt-8 text-left">
-           <h3 className="font-bold text-sm mb-2">Partially Loaded Data:</h3>
-           <p className="text-xs">Staff: {staff.length}</p>
-           <p className="text-xs">Attendance: {attendance.length}</p>
-        </div>
-      </div>
-    );
-  }
 };
 
 export default memo(HRStaff);

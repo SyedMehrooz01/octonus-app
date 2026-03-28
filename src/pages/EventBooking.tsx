@@ -569,27 +569,26 @@ const EventBooking = () => {
     );
   }
 
-  try {
-    return (
-      <div className="space-y-8 pb-10 max-w-full overflow-hidden">
-        {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
-            <AlertTriangle className="h-5 w-5" />
-            <p className="font-bold">{error}</p>
-            <Button variant="ghost" size="sm" onClick={() => fetchBookingsData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
-          </div>
-        )}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <div className="animate-in fade-in slide-in-from-left duration-500">
-            <h1 className="text-3xl font-black text-[#0f172a] tracking-tight uppercase">Event Booking Hub</h1>
-            <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1 flex items-center gap-2">
-              <Clock className="h-3 w-3" /> Real-time Schedule Sync
-            </p>
-          </div>
-          <Button onClick={()=>setShowAdd(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-600/20 gap-2 h-12 px-8 transition-all hover:scale-[1.02] active:scale-95 animate-in fade-in slide-in-from-right duration-500">
-            <Plus className="h-5 w-5"/> NEW BOOKING
-          </Button>
+  return (
+    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <AlertTriangle className="h-5 w-5" />
+          <p className="font-bold">{error}</p>
+          <Button variant="ghost" size="sm" onClick={() => fetchBookingsData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
         </div>
+      )}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <div className="animate-in fade-in slide-in-from-left duration-500">
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight uppercase">Event Booking Hub</h1>
+          <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1 flex items-center gap-2">
+            <Clock className="h-3 w-3" /> Real-time Schedule Sync
+          </p>
+        </div>
+        <Button onClick={()=>setShowAdd(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-600/20 gap-2 h-12 px-8 transition-all hover:scale-[1.02] active:scale-95 animate-in fade-in slide-in-from-right duration-500">
+          <Plus className="h-5 w-5"/> NEW BOOKING
+        </Button>
+      </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
           {[
@@ -922,19 +921,7 @@ const EventBooking = () => {
         </TabsContent>
       </Tabs>
     </div>
-  );
-  } catch (err) {
-    console.error("EventBooking render error:", err);
-    return (
-      <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 shadow-sm m-4">
-        <h2 className="text-xl font-black text-[#0f172a] uppercase tracking-tight mb-4">Partial Data Loaded</h2>
-        <p className="text-slate-500 mb-6">Some elements of this page could not be rendered, but your data is safe.</p>
-        <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl px-8 h-12">
-          RELOAD PAGE
-        </Button>
-      </div>
     );
-  }
 };
 
 export default memo(EventBooking);
