@@ -34,7 +34,7 @@ interface StockMovement {
   date: string;
   item_id: string;
   item_name: string;
-  movement_type: "in" | "out" | "return" | "purchase" | "issue";
+  movement_type: "in" | "out" | "return" | "purchase" | "issue" | string;
   quantity: number;
   notes: string;
   event_id?: string;
@@ -317,7 +317,7 @@ const Inventory = () => {
           <Button 
             variant="outline" 
             size="icon" 
-            onClick={fetchData}
+            onClick={() => fetchData()}
             className="h-12 w-12 rounded-xl border-slate-200 hover:bg-slate-50 text-slate-500"
           >
             <RotateCcw className="h-5 w-5" />
@@ -486,7 +486,7 @@ const Inventory = () => {
                 <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-36 text-xs h-9" />
               </div>
               {canDo("export") && (
-                <Button variant="outline" size="sm" onClick={exportHistory} className="h-9">
+                <Button variant="outline" size="sm" onClick={() => exportHistory()} className="h-9">
                   <Download className="h-4 w-4 mr-2" /> Export Excel
                 </Button>
               )}
@@ -599,7 +599,7 @@ const Inventory = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
-            <Button onClick={handleAdd} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Item"}</Button>
+            <Button onClick={() => handleAdd()} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Item"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -631,7 +631,7 @@ const Inventory = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowStockModal(false)}>Cancel</Button>
-            <Button onClick={handleStockUpdate} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : stockAction.type === "purchase" ? "Add Stock" : "Issue Stock"}</Button>
+            <Button onClick={() => handleStockUpdate()} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : stockAction.type === "purchase" ? "Add Stock" : "Issue Stock"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -645,8 +645,8 @@ const Inventory = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4 rounded-lg bg-muted/40 p-3 text-sm">
-              <div><p className="text-xs text-muted-foreground uppercase">Issued Qty</p><p className="font-bold">{selectedMovement?.qty} {selectedItem?.unit}</p></div>
-              <div><p className="text-xs text-muted-foreground uppercase">Issued To</p><p className="font-bold">{selectedMovement?.issued_to}</p></div>
+              <div><p className="text-xs text-muted-foreground uppercase">Issued Qty</p><p className="font-bold">{selectedMovement?.quantity} {selectedItem?.unit}</p></div>
+              <div><p className="text-xs text-muted-foreground uppercase">Issued To</p><p className="font-bold">{selectedMovement?.notes}</p></div>
             </div>
             <div className="space-y-1.5">
               <Label>Return Quantity</Label>
@@ -663,7 +663,7 @@ const Inventory = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowReturnModal(false)}>Cancel</Button>
-            <Button onClick={handleReturn} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Process Return"}</Button>
+            <Button onClick={() => handleReturn()} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Process Return"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

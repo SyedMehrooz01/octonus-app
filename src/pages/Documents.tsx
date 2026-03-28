@@ -653,7 +653,7 @@ const Documents = () => {
                 <div className="space-y-4 mb-10">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-black text-[#0f172a] uppercase tracking-widest">Line Items</h3>
-                    <Button onClick={handleAddItem} variant="outline" className="rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 h-10 border-blue-200 text-blue-600 hover:bg-blue-50">
+                    <Button onClick={() => handleAddItem()} variant="outline" className="rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 h-10 border-blue-200 text-blue-600 hover:bg-blue-50">
                       <Plus className="h-4 w-4" /> Add Row
                     </Button>
                   </div>
@@ -744,7 +744,7 @@ const Documents = () => {
                     
                     <div className="flex gap-3 pt-8">
                       <Button 
-                        onClick={handleSave} 
+                        onClick={() => handleSave()} 
                         disabled={saving}
                         className="flex-1 h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest gap-3 shadow-xl shadow-blue-600/20"
                       >

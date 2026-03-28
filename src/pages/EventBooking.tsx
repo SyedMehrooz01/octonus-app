@@ -910,7 +910,7 @@ const EventBooking = () => {
 
                 {selected && (
                   <div className="flex gap-3 w-full lg:w-auto">
-                    <Button className="h-14 px-8 rounded-xl bg-primary text-white font-black shadow-xl shadow-primary/20 flex-1 lg:flex-none" onClick={handleSaveKitchen} disabled={isSaving}>
+                    <Button className="h-14 px-8 rounded-xl bg-primary text-white font-black shadow-xl shadow-primary/20 flex-1 lg:flex-none" onClick={() => handleSaveKitchen()} disabled={isSaving}>
                       {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Save className="h-5 w-5 mr-2"/>}
                       Commit Changes
                     </Button>

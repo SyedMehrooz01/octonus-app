@@ -23,7 +23,7 @@ interface LedgerEntry {
   date: string;
   description: string;
   account: string;
-  type: "debit" | "credit";
+  type: "debit" | "credit" | string;
   amount: number;
   balance: number;
 }
@@ -269,7 +269,7 @@ const Finance = () => {
     if (!confirm("Are you sure you want to delete this entry?")) return;
     setSaving(true);
     try {
-      await financeService.deleteLedgerEntry(id);
+      await financeService.deleteLedgerEntry(String(id));
       await fetchFinanceData();
       toast({ title: "Success", description: "Entry deleted successfully" });
       logAction(`Deleted ledger entry ID: ${id}`, "Finance");
@@ -659,7 +659,7 @@ const Finance = () => {
               <Button 
                 size="sm" 
                 variant="outline" 
-                onClick={handleRefreshVendors}
+                onClick={() => handleRefreshVendors()}
                 disabled={isRefreshing}
               >
                 {isRefreshing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <History className="h-4 w-4 mr-1"/>}
@@ -825,7 +825,7 @@ const Finance = () => {
             </div>
             <div className="space-y-1.5"><Label>Amount (₨)</Label><Input type="number" placeholder="e.g. 50000" value={newEntry.amount} onChange={e=>setNewEntry({...newEntry,amount:e.target.value})}/></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={()=>setShowAdd(false)}>Cancel</Button><Button onClick={handleAdd}>Save Entry</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={()=>setShowAdd(false)}>Cancel</Button><Button onClick={() => handleAdd()}>Save Entry</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -837,7 +837,7 @@ const Finance = () => {
             <div className="rounded-lg bg-muted/40 p-3 text-sm"><span className="text-muted-foreground">Outstanding Balance: </span><span className="font-bold text-destructive">₨{(selectedSupplier?.balance ?? 0).toLocaleString()}</span></div>
             <div className="space-y-1.5"><Label>Payment Amount (₨)</Label><Input type="number" placeholder="Enter amount" value={payAmount} onChange={e=>setPayAmount(e.target.value)}/></div>
           </div>}
-          <DialogFooter><Button variant="outline" onClick={()=>setShowPaySupplier(false)}>Cancel</Button><Button onClick={handlePaySupplier}>Record Payment</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={()=>setShowPaySupplier(false)}>Cancel</Button><Button onClick={() => handlePaySupplier()}>Record Payment</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -931,7 +931,7 @@ const Finance = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPayVendor(false)}>Cancel</Button>
-            <Button onClick={handlePayVendor} disabled={isSaving}>
+            <Button onClick={() => handlePayVendor()} disabled={isSaving}>
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
               Save Payment
             </Button>

@@ -104,7 +104,7 @@ const AppLayout = () => {
               <NavLink
                 key={item.to}
                 to={item.to}
-                onClick={onClose}
+                onClick={() => onClose && onClose()}
                 className={({ isActive: linkActive }) => `
                   group flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black transition-all duration-300
                   ${isActive || linkActive 
@@ -125,7 +125,7 @@ const AppLayout = () => {
 
       <div className="p-4 border-t border-white/5 mt-auto">
         <button
-          onClick={handleLogout}
+          onClick={() => handleLogout()}
           className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-xs font-black text-blue-100/30 transition-all hover:bg-rose-500/10 hover:text-rose-400 group"
         >
           <div className="p-2 rounded-lg bg-white/5 group-hover:bg-rose-500/20 transition-colors">

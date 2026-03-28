@@ -1061,7 +1061,7 @@ const Expenses = () => {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>Cancel</Button>
-              <Button onClick={handleAdd} disabled={isSubmitting}>
+              <Button onClick={() => handleAdd()} disabled={isSubmitting}>
                 {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding...</> : "Add Expense"}
               </Button>
             </DialogFooter>
@@ -1085,7 +1085,7 @@ const Expenses = () => {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setRejectionModal({ show: false, id: "", reason: "" })} disabled={isSubmitting}>Cancel</Button>
-              <Button onClick={handleReject} disabled={isSubmitting} className="bg-rose-500 hover:bg-rose-600 text-white">
+              <Button onClick={() => handleReject()} disabled={isSubmitting} className="bg-rose-500 hover:bg-rose-600 text-white">
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Confirm Reject
               </Button>

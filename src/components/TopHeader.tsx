@@ -149,7 +149,7 @@ const TopHeader = ({ onMenuClick, user, onLogout }: TopHeaderProps) => {
     <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-100 bg-white/80 backdrop-blur-md px-6 shadow-sm">
       <div className="flex items-center gap-6 flex-1">
         <button
-          onClick={onMenuClick}
+          onClick={() => onMenuClick()}
           className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50 border border-slate-100 md:hidden transition-colors shadow-sm"
         >
           <Menu className="h-6 w-6" />

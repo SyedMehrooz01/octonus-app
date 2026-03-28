@@ -956,7 +956,7 @@ const HRStaff = () => {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAnnounceModal(false)}>Cancel</Button>
-              <Button onClick={handleAddAnnouncement}>Post Announcement</Button>
+              <Button onClick={() => handleAddAnnouncement()}>Post Announcement</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -967,7 +967,7 @@ const HRStaff = () => {
             <DialogHeader>
               <div className="flex items-center justify-between pr-6">
                 <div><DialogTitle className="text-2xl font-bold flex items-center gap-2"><BarChart3 className="h-6 w-6 text-primary" /> Total Payroll Ledger Dashboard</DialogTitle></div>
-                <div className="flex gap-2"><Button variant="outline" size="sm" onClick={handleExportTotalLedgerExcel}><Download className="h-4 w-4" /> Excel</Button><Button variant="outline" size="sm" onClick={handleExportTotalLedgerPDF}><FileText className="h-4 w-4" /> PDF</Button></div>
+                <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => handleExportTotalLedgerExcel()}><Download className="h-4 w-4" /> Excel</Button><Button variant="outline" size="sm" onClick={() => handleExportTotalLedgerPDF()}><FileText className="h-4 w-4" /> PDF</Button></div>
               </div>
             </DialogHeader>
             <div className="py-6 space-y-8">

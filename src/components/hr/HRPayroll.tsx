@@ -38,7 +38,7 @@ const HRPayroll = memo(({
     <div className="mt-8 space-y-6">
       <div className="flex justify-end bg-white p-6 rounded-2xl border border-border shadow-sm">
         {canDo("export") && (
-          <Button variant="outline" className="rounded-xl font-bold border-border h-11 px-6 gap-2 hover:bg-muted" onClick={handleExportPayroll}>
+          <Button variant="outline" className="rounded-xl font-bold border-border h-11 px-6 gap-2 hover:bg-muted" onClick={() => handleExportPayroll()}>
             <Download className="h-4 w-4 text-emerald-500" /> Export Monthly Payroll
           </Button>
         )}
@@ -199,7 +199,7 @@ const HRPayroll = memo(({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPayrollModal(false)}>Cancel</Button>
-            <Button className="bg-success hover:bg-success/90" onClick={handleMarkAsPaid}>Mark as Paid</Button>
+            <Button className="bg-success hover:bg-success/90" onClick={() => handleMarkAsPaid()}>Mark as Paid</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

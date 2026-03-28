@@ -90,7 +90,7 @@ const AppSidebar = ({ onLogout }: AppSidebarProps) => {
       {/* Footer / Logout */}
       <div className="p-4 border-t border-white/5 bg-[#1e293b]/10">
         <button
-          onClick={handleLogout}
+          onClick={() => handleLogout()}
           className="flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-black text-white/40 transition-all hover:bg-rose-500/10 hover:text-rose-400 group"
         >
           <div className="p-2 rounded-lg bg-white/5 group-hover:bg-rose-500/20 transition-colors">

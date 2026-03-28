@@ -406,7 +406,7 @@ const SettingsPage = () => {
             <Clock className="h-3 w-3" /> Last sync: {format(new Date(), "hh:mm a")}
           </p>
         </div>
-        <Button onClick={fetchUsers} variant="outline" size="icon" className="h-12 w-12 rounded-xl border-slate-200 hover:bg-slate-50 text-slate-500">
+        <Button onClick={() => fetchUsers()} variant="outline" size="icon" className="h-12 w-12 rounded-xl border-slate-200 hover:bg-slate-50 text-slate-500">
           <History className="h-5 w-5" />
         </Button>
       </div>
@@ -477,7 +477,7 @@ const SettingsPage = () => {
           </div>
           <DialogFooter className="gap-3">
             <Button variant="outline" className="h-12 rounded-xl font-black px-6" onClick={() => setShowEditUserModal(false)} disabled={saving}>CANCEL</Button>
-            <Button className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-8" onClick={handleUpdateUser} disabled={saving}>
+            <Button className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-8" onClick={() => handleUpdateUser()} disabled={saving}>
               {saving ? "UPDATING..." : "UPDATE PERMISSIONS"}
             </Button>
           </DialogFooter>
@@ -499,7 +499,7 @@ const SettingsPage = () => {
           </div>
           <DialogFooter className="gap-3">
             <Button variant="outline" className="h-12 rounded-xl font-black px-6" onClick={() => setShowResetPasswordModal(false)} disabled={saving}>CANCEL</Button>
-            <Button className="h-12 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black px-8" onClick={handleResetPassword} disabled={saving}>
+            <Button className="h-12 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black px-8" onClick={() => handleResetPassword()} disabled={saving}>
               {saving ? "RESETTING..." : "CONFIRM RESET"}
             </Button>
           </DialogFooter>
@@ -605,8 +605,8 @@ const SettingsPage = () => {
                   </div>
                   <DialogFooter className="gap-3">
                     <Button variant="outline" className="h-12 rounded-xl font-black px-6" onClick={() => setShowAddUserModal(false)} disabled={saving}>CANCEL</Button>
-                    <Button className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-8" onClick={handleAddUser} disabled={saving}>
-                      {saving ? "CREATING..." : "CREATE ACCOUNT"}
+                    <Button className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black px-8" onClick={() => handleAddUser()} disabled={saving}>
+                      {saving ? "CREATING..." : "CONFIRM CREATE"}
                     </Button>
                   </DialogFooter>
                 </DialogContent>

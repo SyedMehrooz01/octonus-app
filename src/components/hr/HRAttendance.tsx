@@ -64,19 +64,19 @@ const HRAttendance = memo(({
             </Button>
           )}
           {canDo("edit") && (
-            <Button onClick={handleMarkAllPresent} variant="outline" className="rounded-xl font-bold border-border h-11 px-6 gap-2 flex-1 sm:flex-none hover:bg-muted">
+            <Button onClick={() => handleMarkAllPresent()} variant="outline" className="rounded-xl font-bold border-border h-11 px-6 gap-2 flex-1 sm:flex-none hover:bg-muted">
               <Users className="h-4 w-4 text-primary" /> Mark All Present
             </Button>
           )}
         </div>
         <div className="flex flex-wrap gap-3 w-full sm:w-auto">
           {canDo("edit") && (
-            <Button variant="outline" className="rounded-xl font-bold border-border h-11 px-6 gap-2 w-full sm:w-auto hover:bg-muted" onClick={handleAutoAbsent}>
+            <Button variant="outline" className="rounded-xl font-bold border-border h-11 px-6 gap-2 w-full sm:w-auto hover:bg-muted" onClick={() => handleAutoAbsent()}>
               <Clock className="h-4 w-4 text-amber-500" /> Auto Absent
             </Button>
           )}
           {canDo("export") && (
-            <Button variant="outline" className="rounded-xl font-bold border-border h-11 px-6 gap-2 w-full sm:w-auto hover:bg-muted" onClick={handleExportAttendance}>
+            <Button variant="outline" className="rounded-xl font-bold border-border h-11 px-6 gap-2 w-full sm:w-auto hover:bg-muted" onClick={() => handleExportAttendance()}>
               <Download className="h-4 w-4 text-blue-500" /> Export List
             </Button>
           )}
@@ -186,7 +186,7 @@ const HRAttendance = memo(({
               </div>
             </div>
           </div>
-          <DialogFooter><Button onClick={handleMarkAttendance} className="w-full">Save Attendance</Button></DialogFooter>
+          <DialogFooter><Button onClick={() => handleMarkAttendance()} className="w-full">Save Attendance</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -210,7 +210,7 @@ const HRAttendance = memo(({
                 </SelectContent>
               </Select>
             </div>
-            <Button className="w-full h-12 font-bold" onClick={handleBulkAttendance}>Mark All as {bulkStatus.charAt(0).toUpperCase() + bulkStatus.slice(1)}</Button>
+            <Button className="w-full h-12 font-bold" onClick={() => handleBulkAttendance()}>Mark All as {bulkStatus.charAt(0).toUpperCase() + bulkStatus.slice(1)}</Button>
           </div>
         </DialogContent>
       </Dialog>

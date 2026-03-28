@@ -326,7 +326,7 @@ const FileManager = () => {
                 </div>
 
                 <Button 
-                  onClick={handleFileUpload} 
+                  onClick={() => handleFileUpload()} 
                   disabled={saving || !uploadFile}
                   className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest gap-3 shadow-xl shadow-blue-600/20"
                 >
