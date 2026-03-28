@@ -483,10 +483,16 @@ const Expenses = () => {
       const matchSearch = (e?.description ?? "").toLowerCase().includes((ledgerSearch ?? "").toLowerCase());
       const matchCategory = ledgerHead === "all" || e?.category === ledgerHead;
       const matchMode = ledgerMode === "all" || e?.payment_mode === ledgerMode;
-      const matchDate = isWithinInterval(parseISO(e?.date ?? format(new Date(), "yyyy-MM-dd")), {
-        start: parseISO(fromDate),
-        end: parseISO(toDate)
-      });
+      const start = fromDate ? parseISO(fromDate) : null;
+      const end = toDate ? parseISO(toDate) : null;
+      
+      let matchDate = true;
+      if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        matchDate = isWithinInterval(parseISO(e?.date ?? format(new Date(), "yyyy-MM-dd")), {
+          start,
+          end
+        });
+      }
       return matchSearch && matchCategory && matchMode && matchDate;
     });
     return results;
