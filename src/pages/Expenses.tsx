@@ -109,8 +109,8 @@ const Expenses = () => {
         return;
       }
       if (isMounted) {
-        // setError(error.message || "Failed to fetch expenses."); // Don't show crash screen
         setExpenses([]);
+        setError(error.message || "Failed to load expenses");
       }
     } finally {
       if (isMounted) setLoading(false);
@@ -468,15 +468,9 @@ const Expenses = () => {
       results = results.filter(e => e?.category === filterHead);
     }
     
-    // Default to current month if no filter selected, but show all if filter cleared
+    // Only filter if month is explicitly selected
     if (selectedMonth) {
       results = results.filter(e => (e?.date ?? "").startsWith(selectedMonth));
-    } else {
-      // If no search/head filter, default to current month as requested
-      if (!search && filterHead === "all") {
-        const currentMonth = format(new Date(), "yyyy-MM");
-        results = results.filter(e => (e?.date ?? "").startsWith(currentMonth));
-      }
     }
     
     return results;
@@ -618,42 +612,46 @@ const Expenses = () => {
     );
   }
 
-  try {
+  if (error) {
     return (
-      <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <p className="font-bold">{error}</p>
-            <Button variant="ghost" size="sm" onClick={() => fetchExpenses(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
-          </div>
-        )}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <div className="animate-in fade-in slide-in-from-left duration-500">
-            <h1 className="text-3xl sm:text-4xl font-black text-[#0f172a] tracking-tight uppercase">Expense Management</h1>
-            <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1">
-              Total: {expenses?.length || 0} expenses found
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-right duration-500">
-            <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/60">
-              {(["monthly", "yearly"] as const).map(v => (
-                <button 
-                  key={v} 
-                  onClick={() => setPlViewType(v)} 
-                  className={`px-4 sm:px-6 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-[0.2em] ${viewType === v ? "bg-white text-blue-600 shadow-lg" : "text-slate-400 hover:text-slate-600"}`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-            {canDo("add") && (
-              <Button onClick={() => setShowAddModal(true)} className="bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl shadow-lg shadow-rose-500/20 h-12 px-6 sm:px-8 gap-2 transition-all hover:-translate-y-0.5">
-                <Plus className="h-5 w-5" /> ADD EXPENSE
-              </Button>
-            )}
-          </div>
+      <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 shadow-sm m-4">
+        <h2 className="text-xl font-black text-[#0f172a] uppercase tracking-tight mb-4">Error Loading Expenses</h2>
+        <p className="text-slate-500 mb-6 font-bold">{error}</p>
+        <Button onClick={() => fetchExpenses(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl px-8 h-12 gap-2 shadow-lg shadow-blue-600/20">
+          <Clock className="h-4 w-4" /> RETRY LOADING
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-hidden">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <div className="animate-in fade-in slide-in-from-left duration-500">
+          <h1 className="text-3xl sm:text-4xl font-black text-[#0f172a] tracking-tight uppercase">Expense Management</h1>
+          <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1">
+            Total: {expenses?.length || 0} expenses found
+          </p>
         </div>
+        <div className="flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-right duration-500">
+          <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/60">
+            {(["monthly", "yearly"] as const).map(v => (
+              <button 
+                key={v} 
+                onClick={() => setPlViewType(v)} 
+                className={`px-4 sm:px-6 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-[0.2em] ${viewType === v ? "bg-white text-blue-600 shadow-lg" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+          {canDo("add") && (
+            <Button onClick={() => setShowAddModal(true)} className="bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl shadow-lg shadow-rose-500/20 h-12 px-6 sm:px-8 gap-2 transition-all hover:-translate-y-0.5">
+              <Plus className="h-5 w-5" /> ADD EXPENSE
+            </Button>
+          )}
+        </div>
+      </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
@@ -742,7 +740,7 @@ const Expenses = () => {
                       </td></tr>
                     ) : (filtered ?? []).map((e, idx) => (
                       <tr key={e?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-rose-50/40 transition-all duration-200 group`}>
-                        <td className="px-6 py-6 text-sm font-black text-slate-500 whitespace-nowrap tracking-tight">{e?.date ? format(new Date(e.date), 'MMM d, yyyy') : "N/A"}</td>
+                        <td className="px-6 py-6 text-sm font-black text-slate-500 whitespace-nowrap tracking-tight">{e?.date ? format(new Date(e.date), 'MMM d, yyyy') : "No date"}</td>
                         <td className="px-6 py-6 truncate">
                           <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-rose-600 transition-colors truncate" title={e?.description}>{e?.description}</p>
                           {e?.linked_event && <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter mt-2 flex items-center gap-1.5 truncate"><span className="h-1 w-1 rounded-full bg-blue-300 flex-shrink-0" /> Event: {e?.linked_event}</p>}
@@ -1094,19 +1092,6 @@ const Expenses = () => {
         </Dialog>
       </div>
     );
-  } catch (err) {
-    console.error("Expenses render error:", err);
-    return (
-      <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 shadow-sm m-4">
-        <h2 className="text-xl font-black text-[#0f172a] uppercase tracking-tight mb-4">Partial Data Loaded</h2>
-        <p className="text-slate-500 mb-6">Some elements of this page could not be rendered, but your data is safe.</p>
-        <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl px-8 h-12">
-          RELOAD PAGE
-        </Button>
-      </div>
-    );
-  }
-
 };
 
 export default memo(Expenses);

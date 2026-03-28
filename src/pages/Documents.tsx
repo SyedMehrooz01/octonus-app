@@ -114,7 +114,7 @@ const Documents = () => {
         return;
       }
       if (isMounted) {
-        // setError(err.message || "An unexpected error occurred while fetching documents.");
+        setError(err.message || "An unexpected error occurred while fetching documents.");
         setDocuments([]);
       }
     } finally {
@@ -219,7 +219,7 @@ const Documents = () => {
 
       if (activeTab === "Quotation") {
         docData.valid_until = validUntil;
-      } else {
+      } else if (activeTab === "Invoice") {
         docData.event_date = eventDate;
       }
 
@@ -572,22 +572,26 @@ const Documents = () => {
     );
   }
 
-  try {
+  if (error) {
     return (
-      <div className="space-y-8 pb-10">
-        {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
-            <Receipt className="h-5 w-5" />
-            <p className="font-bold">{error}</p>
-            <Button variant="ghost" size="sm" onClick={() => fetchDocuments(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
-          </div>
-        )}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="animate-in fade-in slide-in-from-left duration-500">
-            <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Documents Generator</h1>
-            <p className="text-slate-500 font-bold mt-1">Create professional Quotations and Invoices instantly.</p>
-          </div>
+      <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 shadow-sm m-4">
+        <h2 className="text-xl font-black text-[#0f172a] uppercase tracking-tight mb-4">Error Loading Documents</h2>
+        <p className="text-slate-500 mb-6 font-bold">{error}</p>
+        <Button onClick={() => fetchDocuments(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl px-8 h-12 gap-2 shadow-lg shadow-blue-600/20">
+          <History className="h-4 w-4" /> RETRY LOADING
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8 pb-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="animate-in fade-in slide-in-from-left duration-500">
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Documents Generator</h1>
+          <p className="text-slate-500 font-bold mt-1">Create professional Quotations and Invoices instantly.</p>
         </div>
+      </div>
 
         <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
           <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
@@ -604,12 +608,12 @@ const Documents = () => {
 
           <TabsContent value={activeTab} className="space-y-6 animate-in fade-in duration-500">
             <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
-              <div className="bg-slate-50/50 border-b border-slate-100 p-6">
-                <h2 className="text-xl font-black text-[#0f172a] flex items-center gap-3">
-                  <PlusCircle className="h-6 w-6 text-blue-600" />
-                  New {activeTab} Setup
-                </h2>
-              </div>
+                  <DialogHeader>
+                    <h2 className="text-xl font-black text-[#0f172a] flex items-center gap-3">
+                      <PlusCircle className="h-6 w-6 text-blue-600" />
+                      New {activeTab} Setup
+                    </h2>
+                  </DialogHeader>
               <div className="p-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
                   <div className="space-y-2">
@@ -625,12 +629,12 @@ const Documents = () => {
                       <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Valid Until</Label>
                       <Input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} className="h-12 rounded-xl font-bold" />
                     </div>
-                  ) : (
+                  ) : activeTab === "Invoice" ? (
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Event Date</Label>
                       <Input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} className="h-12 rounded-xl font-bold" />
                     </div>
-                  )}
+                  ) : null}
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Client Company Name</Label>
                     <Input placeholder="Enter company name" value={clientCompany} onChange={e => setClientCompany(e.target.value)} className="h-12 rounded-xl font-bold" />
@@ -839,7 +843,7 @@ const Documents = () => {
                               <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{doc?.client_company}</p>
                               <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">{doc?.event_name}</p>
                             </td>
-                            <td className="px-8 py-6 text-sm font-black text-slate-500 tracking-tight">{doc?.invoice_date ? format(new Date(doc.invoice_date), 'MMM dd, yyyy') : "N/A"}</td>
+                            <td className="px-8 py-6 text-sm font-black text-slate-500 tracking-tight">{doc?.invoice_date ? format(new Date(doc.invoice_date), 'MMM dd, yyyy') : "No date"}</td>
                             <td className="px-8 py-6 text-right font-black text-[#0f172a] tracking-tight">{formatCurrency(doc?.sub_total ?? 0)}</td>
                             <td className="px-8 py-6 text-right">
                               <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
@@ -866,18 +870,6 @@ const Documents = () => {
         </Tabs>
       </div>
     );
-  } catch (err) {
-    console.error("Documents render error:", err);
-    return (
-      <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 shadow-sm m-4">
-        <h2 className="text-xl font-black text-[#0f172a] uppercase tracking-tight mb-4">Partial Data Loaded</h2>
-        <p className="text-slate-500 mb-6">Some elements of this page could not be rendered, but your data is safe.</p>
-        <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl px-8 h-12">
-          RELOAD PAGE
-        </Button>
-      </div>
-    );
-  }
 };
 
 export default Documents;
