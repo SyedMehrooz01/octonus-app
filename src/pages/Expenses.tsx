@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, memo } from "react";
+import { useState, useEffect, useMemo, memo, useCallback } from "react";
 import { Receipt, Plus, Search, TrendingDown, Calendar, Loader2, Download, FileText, Filter, ChevronLeft, ChevronRight, BarChart3, PieChart, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   Plus, 
   Trash2, 
@@ -124,6 +124,7 @@ const Documents = () => {
 
 
   const generateDocNo = useCallback(async (isMounted = true) => {
+    if (activeTab === "archive") return;
     try {
       const prefix = activeTab === "Quotation" ? "QT" : "INV";
       const currentYear = new Date().getFullYear();
@@ -365,7 +366,7 @@ const Documents = () => {
     
     pdf.setFont("helvetica", "normal");
     pdf.text("Date:", 115, infoY + 20);
-    pdf.text(format(new Date(doc.invoice_date), "PP"), 150, infoY + 20);
+    pdf.text(doc.invoice_date ? format(new Date(doc.invoice_date), "PP") : "N/A", 150, infoY + 20);
     
     pdf.text("Event:", 115, infoY + 26);
     const splitEvent = pdf.splitTextToSize(doc.event_name, 40);
