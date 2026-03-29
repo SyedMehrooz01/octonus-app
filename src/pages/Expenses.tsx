@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 const EXPENSE_HEADS = ["Utilities", "Staff", "Kitchen Supplies", "Decoration", "Marketing", "Maintenance", "Transport", "Miscellaneous"];
 
@@ -291,7 +293,59 @@ const Expenses = () => {
     doc.save(`Voucher_${expense.voucher_no}.pdf`); 
   }; 
  
-    // Filtering logic
+  // Export to Excel function
+  const handleExportExcel = () => { 
+    try { 
+      const exportData = (expenses ?? []).map((e, i) => ({ 
+        'S.No': i + 1, 
+        'Voucher No': e.voucher_no ?? '-', 
+        'Date': e.date ? format(new Date(e.date), 'dd MMM yyyy') : '-', 
+        'Description': e.description ?? '-', 
+        'Category': e.category ?? '-', 
+        'Payment Mode': e.payment_mode ?? '-', 
+        'Amount (Rs)': e.amount ?? 0, 
+        'Status': e.status ?? '-', 
+        'Created By': e.created_by_name ?? '-', 
+        'Approved By': e.approved_by ?? '-', 
+        'Rejection Reason': e.rejection_reason ?? '-' 
+      })); 
+  
+      const ws = XLSX.utils.json_to_sheet(exportData); 
+      const wb = XLSX.utils.book_new(); 
+      
+      ws['!cols'] = [ 
+        { wch: 5 }, 
+        { wch: 15 }, 
+        { wch: 15 }, 
+        { wch: 30 }, 
+        { wch: 15 }, 
+        { wch: 15 }, 
+        { wch: 12 }, 
+        { wch: 12 }, 
+        { wch: 20 }, 
+        { wch: 20 }, 
+        { wch: 25 } 
+      ]; 
+  
+      XLSX.utils.book_append_sheet(wb, ws, 'Expenses'); 
+      const buf = XLSX.write(wb, { 
+        bookType: 'xlsx', 
+        type: 'array' 
+      }); 
+      saveAs( 
+        new Blob([buf], { 
+          type: 'application/octet-stream' 
+        }), 
+        `Expenses_${format(new Date(), 'MMM_yyyy')}.xlsx` 
+      ); 
+      toast.success('Excel exported successfully'); 
+    } catch(e) { 
+      console.error(e);
+      toast.error('Failed to export Excel'); 
+    } 
+  }; 
+ 
+     // Filtering logic
   const filteredExpenses = useMemo(() => {
     return (expenses ?? []).filter(e => {
       const matchSearch = (e.description ?? "").toLowerCase().includes(search.toLowerCase());
@@ -323,8 +377,8 @@ const Expenses = () => {
   }, [user]); 
  
   if (loading) return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
     </div>
   );
 
@@ -359,6 +413,14 @@ const Expenses = () => {
               YEARLY
             </Button>
           </div>
+
+          <Button 
+            variant="outline"
+            onClick={handleExportExcel}
+            className="border-slate-200 hover:bg-slate-50 text-slate-600 font-black rounded-xl px-6 h-12 gap-2"
+          >
+            <Download className="h-5 w-5" /> EXPORT EXCEL
+          </Button>
           
           <Button 
             onClick={() => setShowAddModal(true)}
