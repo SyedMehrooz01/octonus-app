@@ -5,9 +5,11 @@ import { toast } from "sonner";
 import { Plus, TrendingDown, Calendar, Clock, BarChart3, Receipt, Search, Filter, PieChart, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format } from "date-fns";
 
 const EXPENSE_HEADS = ["Utilities", "Staff", "Kitchen Supplies", "Decoration", "Marketing", "Maintenance", "Transport", "Miscellaneous"];
@@ -23,6 +25,17 @@ const Expenses = () => {
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
   const [filterCategory, setFilterCategory] = useState("all");
   const [activeTab, setActiveTab] = useState("monthly");
+
+  // Add Expense modal states
+  const [showAddModal, setShowAddModal] = useState(false); 
+  const [newExpense, setNewExpense] = useState({ 
+    date: new Date().toISOString().split('T')[0], 
+    description: "", 
+    category: "Other", 
+    payment_mode: "Cash", 
+    amount: "", 
+    linked_event: "" 
+  }); 
  
   const today = new Date().toISOString().split('T')[0]; 
   const currentMonth = new Date().toISOString().slice(0, 7); 
@@ -38,6 +51,63 @@ const Expenses = () => {
   const allTimeTotal = (expenses ?? []) 
     .reduce((sum, e) => sum + (e.amount ?? 0), 0); 
 
+  // Voucher generator
+  const generateVoucherNo = async () => { 
+    const { count } = await supabase 
+      .from('expenses') 
+      .select('*', { count: 'exact', head: true }); 
+    const num = String((count ?? 0) + 1).padStart(3, '0'); 
+    return `EXP-${new Date().getFullYear()}-${num}`; 
+  }; 
+ 
+  // Add expense handler
+  const handleAddExpense = async () => { 
+    if (!newExpense.description || !newExpense.amount) { 
+      toast.error('Please fill all required fields'); 
+      return; 
+    } 
+    try { 
+      const voucher_no = await generateVoucherNo(); 
+      const { error } = await supabase 
+        .from('expenses') 
+        .insert({ 
+          voucher_no, 
+          date: newExpense.date, 
+          description: newExpense.description, 
+          category: newExpense.category, 
+          payment_mode: newExpense.payment_mode, 
+          amount: Number(newExpense.amount), 
+          linked_event: newExpense.linked_event, 
+          status: 'pending', 
+          created_by_name: user?.name, 
+          created_by_id: user?.id, 
+          created_by_role: user?.role, 
+          created_at: new Date().toISOString() 
+        }); 
+      if (error) throw error; 
+      toast.success('Expense added successfully'); 
+      setShowAddModal(false); 
+      setNewExpense({ 
+        date: new Date().toISOString().split('T')[0], 
+        description: "", 
+        category: "Other", 
+        payment_mode: "Cash", 
+        amount: "", 
+        linked_event: "" 
+      }); 
+      
+      // reload expenses 
+      const { data } = await supabase 
+        .from('expenses') 
+        .select('*') 
+        .order('created_at', { ascending: false }); 
+      setExpenses(data ?? []); 
+    } catch(e) { 
+      console.error(e);
+      toast.error('Failed to add expense'); 
+    } 
+  }; 
+ 
   // Filtering logic
   const filteredExpenses = useMemo(() => {
     return (expenses ?? []).filter(e => {
@@ -107,7 +177,10 @@ const Expenses = () => {
             </Button>
           </div>
           
-          <Button className="bg-red-600 hover:bg-red-700 text-white font-black rounded-xl px-6 h-12 shadow-lg shadow-red-600/20 gap-2">
+          <Button 
+            onClick={() => setShowAddModal(true)}
+            className="bg-red-600 hover:bg-red-700 text-white font-black rounded-xl px-6 h-12 shadow-lg shadow-red-600/20 gap-2"
+          >
             <Plus className="h-5 w-5" /> ADD EXPENSE
           </Button>
         </div>
@@ -296,6 +369,126 @@ const Expenses = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Add Expense Modal */}
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="sm:max-w-[500px] rounded-[2rem] border-slate-100 p-8">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
+              <div className="bg-red-50 p-2 rounded-xl">
+                <Plus className="h-6 w-6 text-red-600" />
+              </div>
+              Add New Expense
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Voucher No</Label>
+                <Input value="AUTO-GENERATED" disabled className="h-12 bg-slate-50 border-none rounded-2xl font-bold text-slate-400" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Date</Label>
+                <Input 
+                  type="date" 
+                  value={newExpense.date}
+                  onChange={(e) => setNewExpense({...newExpense, date: e.target.value})}
+                  className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 font-bold" 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Description *</Label>
+              <Input 
+                placeholder="What was this expense for?"
+                value={newExpense.description}
+                onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
+                className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 font-bold" 
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Category</Label>
+                <Select 
+                  value={newExpense.category} 
+                  onValueChange={(val) => setNewExpense({...newExpense, category: val})}
+                >
+                  <SelectTrigger className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 font-bold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-slate-100">
+                    {["Decoration", "Food", "Transport", "Utilities", "Maintenance", "Office", "Catering", "Other"].map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Payment Mode</Label>
+                <Select 
+                  value={newExpense.payment_mode} 
+                  onValueChange={(val) => setNewExpense({...newExpense, payment_mode: val})}
+                >
+                  <SelectTrigger className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 font-bold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-slate-100">
+                    {["Cash", "Bank Transfer", "Cheque", "EasyPaisa", "JazzCash"].map(mode => (
+                      <SelectItem key={mode} value={mode}>{mode}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Amount (Rs) *</Label>
+                <Input 
+                  type="number"
+                  placeholder="0.00"
+                  value={newExpense.amount}
+                  onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
+                  className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 font-black" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Created By</Label>
+                <Input value={user?.name || "System"} disabled className="h-12 bg-slate-50 border-none rounded-2xl font-bold text-slate-400" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Linked Event (Optional)</Label>
+              <Input 
+                placeholder="Event ID or Name"
+                value={newExpense.linked_event}
+                onChange={(e) => setNewExpense({...newExpense, linked_event: e.target.value})}
+                className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 font-bold" 
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-3 mt-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowAddModal(false)}
+              className="rounded-xl h-12 px-8 font-black text-xs uppercase tracking-widest"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddExpense}
+              className="bg-red-600 hover:bg-red-700 text-white font-black rounded-xl h-12 px-8 shadow-lg shadow-red-600/20 text-xs uppercase tracking-widest"
+            >
+              Add Expense
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
