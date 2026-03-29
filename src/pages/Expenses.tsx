@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client"; 
 import { useAuth } from "@/contexts/AuthContext"; 
 import { toast } from "sonner"; 
-import { Plus, TrendingDown, Calendar, Clock, BarChart3, Receipt, Search, Filter, PieChart, LayoutDashboard } from "lucide-react";
+import { Plus, TrendingDown, Calendar, Clock, BarChart3, Receipt, Search, Filter, PieChart, LayoutDashboard, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
+import jsPDF from "jspdf";
 
 const EXPENSE_HEADS = ["Utilities", "Staff", "Kitchen Supplies", "Decoration", "Marketing", "Maintenance", "Transport", "Miscellaneous"];
 
@@ -36,6 +38,11 @@ const Expenses = () => {
     amount: "", 
     linked_event: "" 
   }); 
+
+  // Reject modal states
+  const [showRejectModal, setShowRejectModal] = useState(false); 
+  const [selectedExpense, setSelectedExpense] = useState<any>(null); 
+  const [rejectionReason, setRejectionReason] = useState(""); 
  
   const today = new Date().toISOString().split('T')[0]; 
   const currentMonth = new Date().toISOString().slice(0, 7); 
@@ -108,7 +115,183 @@ const Expenses = () => {
     } 
   }; 
  
-  // Filtering logic
+  // Approval and rejection handlers
+  const handleApprove = async (expense: any) => { 
+    try { 
+      const { error } = await supabase 
+        .from('expenses') 
+        .update({ 
+          status: 'approved', 
+          approved_by: user?.name, 
+          approved_at: new Date().toISOString() 
+        }) 
+        .eq('id', expense.id); 
+      if (error) throw error; 
+      toast.success('Expense approved!'); 
+      const { data } = await supabase 
+        .from('expenses') 
+        .select('*') 
+        .order('created_at', { ascending: false }); 
+      setExpenses(data ?? []); 
+    } catch(e) { 
+      toast.error('Failed to approve expense'); 
+    } 
+  }; 
+ 
+  const handleReject = async () => { 
+    if (!rejectionReason) { 
+      toast.error('Please enter rejection reason'); 
+      return; 
+    } 
+    try { 
+      const { error } = await supabase 
+        .from('expenses') 
+        .update({ 
+          status: 'rejected', 
+          rejection_reason: rejectionReason 
+        }) 
+        .eq('id', selectedExpense.id); 
+      if (error) throw error; 
+      toast.success('Expense rejected'); 
+      setShowRejectModal(false); 
+      setRejectionReason(""); 
+      setSelectedExpense(null); 
+      const { data } = await supabase 
+        .from('expenses') 
+        .select('*') 
+        .order('created_at', { ascending: false }); 
+      setExpenses(data ?? []); 
+    } catch(e) { 
+      toast.error('Failed to reject expense'); 
+    } 
+  }; 
+
+  // Download voucher function
+  const handleDownloadVoucher = (expense: any) => { 
+    const doc = new jsPDF(); 
+    
+    // Green header bar 
+    doc.setFillColor(45, 106, 79); 
+    doc.rect(0, 0, 210, 35, 'F'); 
+    
+    // Company name 
+    doc.setTextColor(255, 255, 255); 
+    doc.setFontSize(18); 
+    doc.setFont('helvetica', 'bold'); 
+    doc.text('Octonus Solutions', 15, 15); 
+    
+    // Tagline 
+    doc.setFontSize(9); 
+    doc.setFont('helvetica', 'normal'); 
+    doc.text('A Spectacular Turn of Events', 15, 22); 
+    
+    // Address details 
+    doc.setFontSize(8); 
+    doc.text('Office No. 2, Crown Centre, Gulshan-e-Iqbal, Karachi', 15, 28); 
+    doc.text('+92-331-3195292 | octonussolutions@gmail.com', 15, 33); 
+    
+    // Reset color 
+    doc.setTextColor(0, 0, 0); 
+    
+    // Voucher title 
+    doc.setFontSize(20); 
+    doc.setFont('helvetica', 'bold'); 
+    doc.text('EXPENSE VOUCHER', 105, 50, { align: 'center' }); 
+    
+    // Voucher number 
+    doc.setFontSize(10); 
+    doc.setFont('helvetica', 'normal'); 
+    doc.text(`Voucher No: ${expense.voucher_no}`, 150, 50); 
+    
+    // Line 
+    doc.setDrawColor(45, 106, 79); 
+    doc.setLineWidth(0.5); 
+    doc.line(15, 55, 195, 55); 
+    
+    // Details section 
+    doc.setFontSize(10); 
+    doc.setFont('helvetica', 'bold'); 
+    doc.text('EXPENSE DETAILS', 15, 65); 
+    
+    doc.setFont('helvetica', 'normal'); 
+    doc.text(`Date: ${expense.date ? format(new Date(expense.date), 'dd MMM yyyy') : '-'}`, 15, 75); 
+    doc.text(`Category: ${expense.category ?? '-'}`, 15, 82); 
+    doc.text(`Payment Mode: ${expense.payment_mode ?? '-'}`, 15, 89); 
+    doc.text(`Linked Event: ${expense.linked_event ?? 'N/A'}`, 15, 96); 
+    
+    doc.text(`Created By: ${expense.created_by_name ?? '-'}`, 110, 75); 
+    doc.text(`Role: ${expense.created_by_role ?? '-'}`, 110, 82); 
+    doc.text(`Created At: ${expense.created_at ? format(new Date(expense.created_at), 'dd MMM yyyy HH:mm') : '-'}`, 110, 89); 
+    
+    // Description box 
+    doc.setDrawColor(200, 200, 200); 
+    doc.rect(15, 105, 180, 25); 
+    doc.setFont('helvetica', 'bold'); 
+    doc.text('DESCRIPTION:', 18, 113); 
+    doc.setFont('helvetica', 'normal'); 
+    doc.text(expense.description ?? '-', 18, 120, { maxWidth: 174 }); 
+    
+    // Amount section 
+    doc.setFillColor(240, 240, 240); 
+    doc.rect(120, 138, 75, 20, 'F'); 
+    doc.setFont('helvetica', 'bold'); 
+    doc.setFontSize(12); 
+    doc.setTextColor(180, 0, 0); 
+    doc.text(`Rs. ${(expense.amount ?? 0).toLocaleString()}/-`, 157, 151, { align: 'center' }); 
+    doc.setTextColor(0, 0, 0); 
+    
+    // Approval box 
+    doc.setDrawColor(45, 106, 79); 
+    doc.setLineWidth(1); 
+    doc.rect(15, 165, 180, 30); 
+    doc.setFillColor(240, 255, 240); 
+    doc.rect(15, 165, 180, 30, 'F'); 
+    doc.setTextColor(45, 106, 79); 
+    doc.setFont('helvetica', 'bold'); 
+    doc.setFontSize(11); 
+    doc.text('✓ APPROVED', 105, 175, { align: 'center' }); 
+    doc.setFontSize(9); 
+    doc.setFont('helvetica', 'normal'); 
+    doc.text(`Approved By: ${expense.approved_by ?? '-'}`, 20, 183); 
+    doc.text(`Approval Date: ${expense.approved_at ? format(new Date(expense.approved_at), 'dd MMM yyyy HH:mm') : '-'}`, 110, 183); 
+    doc.setTextColor(0, 0, 0); 
+    
+    // Signature boxes 
+    doc.setLineWidth(0.5); 
+    doc.setDrawColor(100, 100, 100); 
+    
+    // Left signature box 
+    doc.rect(15, 205, 85, 40); 
+    doc.setFont('helvetica', 'bold'); 
+    doc.setFontSize(9); 
+    doc.text('PREPARED BY', 57, 215, { align: 'center' }); 
+    doc.setFont('helvetica', 'normal'); 
+    doc.text('Name: ____________________', 20, 225); 
+    doc.text('Sign:  ____________________', 20, 233); 
+    doc.text('Date:  ____________________', 20, 241); 
+    
+    // Right signature box 
+    doc.rect(110, 205, 85, 40); 
+    doc.setFont('helvetica', 'bold'); 
+    doc.text('AUTHORIZED BY', 152, 215, { align: 'center' }); 
+    doc.setFont('helvetica', 'normal'); 
+    doc.text('Name: ____________________', 115, 225); 
+    doc.text('Sign:  ____________________', 115, 233); 
+    doc.text('Date:  ____________________', 115, 241); 
+    
+    // Green footer 
+    doc.setFillColor(45, 106, 79); 
+    doc.rect(0, 275, 210, 22, 'F'); 
+    doc.setTextColor(255, 255, 255); 
+    doc.setFontSize(8); 
+    doc.text('Office No. 2, Crown Centre, Gulshan-e-Iqbal, Karachi', 35, 283, { align: 'center' }); 
+    doc.text('octonussolutions@gmail.com', 105, 283, { align: 'center' }); 
+    doc.text('+92 331 3195292 | 021 34 977 797', 175, 283, { align: 'center' }); 
+    
+    doc.save(`Voucher_${expense.voucher_no}.pdf`); 
+  }; 
+ 
+    // Filtering logic
   const filteredExpenses = useMemo(() => {
     return (expenses ?? []).filter(e => {
       const matchSearch = (e.description ?? "").toLowerCase().includes(search.toLowerCase());
@@ -357,7 +540,43 @@ const Expenses = () => {
                         </td>
                         <td className="py-5 pr-8 text-right">
                           <div className="flex justify-end gap-2">
-                            {/* Action buttons will be added here */}
+                            {e.status === 'pending' && (user?.role === 'admin' || user?.role === 'manager') && (
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handleApprove(e)}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-lg h-8 px-3 text-[10px] uppercase tracking-widest"
+                                >
+                                  Approve
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setSelectedExpense(e);
+                                    setShowRejectModal(true);
+                                  }}
+                                  className="bg-rose-600 hover:bg-rose-700 text-white font-black rounded-lg h-8 px-3 text-[10px] uppercase tracking-widest"
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                            {e.status === 'approved' && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleDownloadVoucher(e)}
+                                className="border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg h-8 w-8 p-0"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {e.status === 'rejected' && e.rejection_reason && (
+                              <span className="text-[10px] font-bold text-rose-500 italic max-w-[150px] truncate">
+                                Reason: {e.rejection_reason}
+                              </span>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -485,6 +704,42 @@ const Expenses = () => {
               className="bg-red-600 hover:bg-red-700 text-white font-black rounded-xl h-12 px-8 shadow-lg shadow-red-600/20 text-xs uppercase tracking-widest"
             >
               Add Expense
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Expense Modal */}
+      <Dialog open={showRejectModal} onOpenChange={setShowRejectModal}>
+        <DialogContent className="sm:max-w-[425px] rounded-[2rem] border-slate-100 p-8">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-slate-900 uppercase tracking-tight">Reject Expense</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Reason for Rejection</Label>
+              <Textarea 
+                placeholder="Please explain why this expense is being rejected..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="min-h-[120px] bg-slate-50 border-none rounded-2xl focus-visible:ring-rose-500 font-bold p-4"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-3">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowRejectModal(false)}
+              className="rounded-xl h-12 px-8 font-black text-xs uppercase tracking-widest"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleReject}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl h-12 px-8 shadow-lg shadow-rose-600/20 text-xs uppercase tracking-widest"
+            >
+              Confirm Reject
             </Button>
           </DialogFooter>
         </DialogContent>
