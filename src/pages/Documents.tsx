@@ -10,14 +10,7 @@ import {
   Save, 
   FileDown,
   Receipt,
-  History,
-  FolderOpen,
-  MoreVertical,
-  Link,
-  Eye as EyeIcon,
-  X,
-  Grid,
-  List as ListIcon
+  History
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -33,7 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import * as documentService from "@/services/documentService";
 import { useAuth } from "@/contexts/AuthContext";
-import Logo from "@/components/Logo";
 
 // Company Details
 const COMPANY = {
@@ -194,6 +186,7 @@ const Documents = () => {
   const { total, srb, subTotal } = calculateTotals();
 
   const handleSave = async () => {
+    if (activeTab === "archive") return;
     if (!clientCompany || !eventName) {
       toast.error("Please fill in client company and event name");
       return;
@@ -203,7 +196,7 @@ const Documents = () => {
     try {
       const docData: Partial<DocumentData> = {
         doc_number: docNo,
-        doc_type: activeTab,
+        doc_type: activeTab as "Quotation" | "Invoice",
         invoice_date: date,
         client_company: clientCompany,
         contact_person: contactPerson,
@@ -609,12 +602,12 @@ const Documents = () => {
 
           <TabsContent value={activeTab} className="space-y-6 animate-in fade-in duration-500">
             <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
-                  <DialogHeader>
+                  <div className="px-8 pt-8 pb-4">
                     <h2 className="text-xl font-black text-[#0f172a] flex items-center gap-3">
                       <PlusCircle className="h-6 w-6 text-blue-600" />
                       New {activeTab} Setup
                     </h2>
-                  </DialogHeader>
+                  </div>
               <div className="p-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
                   <div className="space-y-2">
@@ -869,8 +862,8 @@ const Documents = () => {
             </div>
           </TabsContent>
         </Tabs>
-      </div>
-    );
+    </div>
+  );
 };
 
 export default Documents;
