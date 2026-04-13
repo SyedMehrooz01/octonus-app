@@ -59,13 +59,15 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-6">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center flex flex-col items-center">
-          <Logo size="lg" className="mb-2" />
-          <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
-            HRMS & Event Management
-          </p>
+        <div className="flex justify-center items-center w-full mb-4">
+          <div className="text-center flex flex-col items-center">
+            <Logo size="lg" className="mb-2" />
+            <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
+              HRMS & Event Management
+            </p>
+          </div>
         </div>
 
         <h2 className="mb-1 text-2xl font-bold text-foreground">Welcome back</h2>
