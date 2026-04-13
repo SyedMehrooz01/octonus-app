@@ -13,10 +13,10 @@ export const Logo = ({ className = "", size = "md" }: LogoProps) => {
   };
 
   return (
-    <div className={`relative flex items-center justify-center ${sizeClasses[size]} ${className}`}>
+    <div className={`relative flex items-center justify-center ${sizeClasses[size]} ${className} overflow-visible`}>
       <svg
-        viewBox="0 0 300 250"
-        className="h-full w-full"
+        viewBox="-50 0 400 250"
+        className="h-full w-full overflow-visible"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >

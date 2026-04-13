@@ -61,17 +61,15 @@ const Login = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6">
       <div className="w-full max-w-sm">
-        <div className="flex justify-center items-center w-full mb-4">
-          <div className="text-center flex flex-col items-center">
-            <Logo size="lg" className="mb-2" />
-            <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
-              HRMS & Event Management
-            </p>
-          </div>
+        <div className="flex flex-col items-center text-center w-full mb-6">
+          <Logo size="lg" className="w-48 h-auto object-contain mx-auto mb-2" />
+          <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
+            HRMS & EVENT MANAGEMENT
+          </p>
         </div>
 
-        <h2 className="mb-1 text-2xl font-bold text-foreground">Welcome back</h2>
-        <p className="mb-6 text-sm text-muted-foreground">Sign in to your account to continue</p>
+        <h2 className="mb-1 text-2xl font-bold text-foreground text-center">Welcome back</h2>
+        <p className="mb-6 text-sm text-muted-foreground text-center">Sign in to your account to continue</p>
 
 
         <form onSubmit={handleLogin} className="space-y-5">
