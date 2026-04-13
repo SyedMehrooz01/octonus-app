@@ -1,4 +1,5 @@
 import { useState, useEffect, memo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   Calendar, 
   TrendingUp, 
@@ -26,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import SkeletonLoading from "@/components/SkeletonLoading";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { user, canDo } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -388,13 +390,22 @@ const Dashboard = () => {
               <p className="text-xs font-bold text-slate-400 mt-1 opacity-70">COMMON TASKS AND TOOLS</p>
             </div>
             <div className="px-8 pb-8 space-y-3">
-              <Button className="w-full justify-between bg-white/10 hover:bg-white/20 border-none rounded-2xl h-14 font-bold group">
+              <Button 
+                onClick={() => navigate("/event-booking")}
+                className="w-full justify-between bg-white/10 hover:bg-white/20 border-none rounded-2xl h-14 font-bold group"
+              >
                 New Booking <ArrowUpRight className="h-5 w-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
               </Button>
-              <Button className="w-full justify-between bg-white/10 hover:bg-white/20 border-none rounded-2xl h-14 font-bold group">
+              <Button 
+                onClick={() => navigate("/finance")}
+                className="w-full justify-between bg-white/10 hover:bg-white/20 border-none rounded-2xl h-14 font-bold group"
+              >
                 Add Expense <ArrowDownRight className="h-5 w-5 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform" />
               </Button>
-              <Button className="w-full justify-between bg-white/10 hover:bg-white/20 border-none rounded-2xl h-14 font-bold group">
+              <Button 
+                onClick={() => navigate("/inventory")}
+                className="w-full justify-between bg-white/10 hover:bg-white/20 border-none rounded-2xl h-14 font-bold group"
+              >
                 Inventory Check <Package className="h-5 w-5 group-hover:scale-110 transition-transform" />
               </Button>
             </div>
