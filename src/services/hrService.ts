@@ -333,3 +333,14 @@ export const addWorkerPayment = async (paymentData: any) => {
   }
 };
 
+export const addPerformance = async (performanceData: any) => {
+  try {
+    const { data, error } = await supabase.from('performance').insert([performanceData]);
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error in addPerformance:", error);
+    throw error;
+  }
+};
+

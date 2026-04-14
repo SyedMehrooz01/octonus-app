@@ -185,6 +185,7 @@ const HRStaff = () => {
         ...p,
         workerId: p.worker_id
       })) ?? []);
+      setPayroll(payData ?? []);
       setError(null);
     } catch (err: any) {
       console.error("HRStaff fetchHRData unexpected error:", err);
@@ -480,14 +481,21 @@ const HRStaff = () => {
     if (!performanceForm.empId) return;
     setSaving(true);
     try {
-      toast.success("Performance rating saved");
+      await hrService.addPerformance({
+        employee_id: performanceForm.empId,
+        rating: performanceForm.rating,
+        notes: performanceForm.notes,
+        date: format(new Date(), 'yyyy-MM-dd')
+      });
+      await fetchHRData(true);
       setShowPerformanceModal(false);
+      toast.success("Performance rating saved");
     } catch (err: any) {
       toast.error("Failed to save performance");
     } finally {
       setSaving(false);
     }
-  }, [performanceForm]);
+  }, [performanceForm, fetchHRData]);
 
   const handleLogOvertime = useCallback(async () => {
     if (!overtimeForm.empId || !overtimeForm.hours) return;
@@ -680,8 +688,23 @@ const HRStaff = () => {
 
   const handleExportLedgerPDF = useCallback(() => {
     if (!ledgerStaff) return;
-    toast.success("Exporting ledger to PDF...");
-    // PDF generation logic here
+    const pdf = new jsPDF();
+    pdf.setFontSize(16);
+    pdf.text(`Staff Ledger - ${ledgerStaff.name}`, 14, 20);
+    pdf.setFontSize(10);
+    pdf.text(`Department: ${ledgerStaff.department} | Role: ${ledgerStaff.role}`, 14, 28);
+    const tableData = (ledgerStaff.payrollHistory || []).map((h: any) => [
+      h.date, h.month, `Rs. ${(h.netPay || 0).toLocaleString()}`
+    ]);
+    autoTable(pdf, {
+      startY: 35,
+      head: [['Date', 'Month', 'Net Paid']],
+      body: tableData.length > 0 ? tableData : [['No records', '', '']],
+      theme: 'grid',
+      headStyles: { fillColor: [45, 106, 79] }
+    });
+    pdf.save(`Ledger_${ledgerStaff.name}.pdf`);
+    toast.success("Ledger PDF exported");
   }, [ledgerStaff]);
 
   const handleGeneratePayslip = useCallback((staff: any, payroll: any) => {
@@ -689,13 +712,60 @@ const HRStaff = () => {
     setShowPayslipModal(true);
   }, []);
 
-  const handlePrintCard = useCallback((staff: any) => {
-    // ID Card printing logic here
-    toast.success(`Printing ID Card for ${staff.name}`);
+  const handlePrintCard = useCallback((staffMember: any) => {
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85, 54] });
+    pdf.setFillColor(45, 106, 79);
+    pdf.rect(0, 0, 85, 18, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('OCTONUS SOLUTIONS', 42.5, 7, { align: 'center' });
+    pdf.setFontSize(6);
+    pdf.text('EMPLOYEE ID CARD', 42.5, 12, { align: 'center' });
+    pdf.setTextColor(15, 23, 42);
+    pdf.setFontSize(11);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(staffMember.name || 'N/A', 42.5, 26, { align: 'center' });
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(staffMember.role || 'Staff', 42.5, 32, { align: 'center' });
+    pdf.text(`Dept: ${staffMember.department || 'N/A'}`, 42.5, 38, { align: 'center' });
+    pdf.text(`ID: ${staffMember.id?.slice(0, 8).toUpperCase() || 'N/A'}`, 42.5, 44, { align: 'center' });
+    pdf.setFillColor(45, 106, 79);
+    pdf.rect(0, 49, 85, 5, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(5);
+    pdf.text('octonussolutions.com.pk | +92-331-3195292', 42.5, 52, { align: 'center' });
+    pdf.save(`ID_Card_${staffMember.name?.replace(/\s+/g, '_')}.pdf`);
+    toast.success(`ID Card generated for ${staffMember.name}`);
   }, []);
 
   const handlePrintWorkerCard = useCallback((worker: any) => {
-    toast.success(`Printing ID Card for ${worker.name}`);
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85, 54] });
+    pdf.setFillColor(45, 106, 79);
+    pdf.rect(0, 0, 85, 18, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('OCTONUS SOLUTIONS', 42.5, 7, { align: 'center' });
+    pdf.setFontSize(6);
+    pdf.text('WORKER ID CARD', 42.5, 12, { align: 'center' });
+    pdf.setTextColor(15, 23, 42);
+    pdf.setFontSize(11);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(worker.name || 'N/A', 42.5, 26, { align: 'center' });
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(worker.skill || 'Worker', 42.5, 32, { align: 'center' });
+    pdf.text(`Type: ${worker.type || 'N/A'}`, 42.5, 38, { align: 'center' });
+    pdf.text(`ID: ${worker.id?.slice(0, 8).toUpperCase() || 'N/A'}`, 42.5, 44, { align: 'center' });
+    pdf.setFillColor(45, 106, 79);
+    pdf.rect(0, 49, 85, 5, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(5);
+    pdf.text('octonussolutions.com.pk | +92-331-3195292', 42.5, 52, { align: 'center' });
+    pdf.save(`ID_Card_Worker_${worker.name?.replace(/\s+/g, '_')}.pdf`);
+    toast.success(`ID Card generated for ${worker.name}`);
   }, []);
 
   const handleOvertimeAction = useCallback(async (id: string, status: string) => {
@@ -751,16 +821,58 @@ const HRStaff = () => {
   }, [staff]);
 
   const handleExportTotalLedgerPDF = useCallback(() => {
-    toast.success("Exporting total ledger to PDF...");
-  }, []);
+    const pdf = new jsPDF();
+    pdf.setFontSize(16);
+    pdf.text('Total Payroll Ledger - Octonus Solutions', 14, 20);
+    pdf.setFontSize(10);
+    pdf.text(`Generated: ${format(new Date(), 'PPP')}`, 14, 28);
+    const tableData = staff.map(s => [
+      s.name, s.department, s.role, `Rs. ${(s.salary || 0).toLocaleString()}`
+    ]);
+    autoTable(pdf, {
+      startY: 35,
+      head: [['Name', 'Department', 'Role', 'Monthly Salary']],
+      body: tableData.length > 0 ? tableData : [['No staff found', '', '', '']],
+      theme: 'grid',
+      headStyles: { fillColor: [45, 106, 79] },
+      foot: [['', '', 'TOTAL', `Rs. ${monthlyPayrollTotal.toLocaleString()}`]],
+      footStyles: { fontStyle: 'bold', fillColor: [241, 245, 249] }
+    });
+    pdf.save(`Total_Payroll_Ledger_${format(new Date(), 'MMM_yyyy')}.pdf`);
+    toast.success("Total Ledger PDF exported");
+  }, [staff, monthlyPayrollTotal]);
 
   const handleExportEOBIReport = useCallback(() => {
-    toast.success("EOBI Report exported successfully");
-  }, []);
+    const data = staff.map(s => ({
+      'Employee Name': s.name,
+      'CNIC': 'N/A',
+      'Department': s.department,
+      'Basic Salary': s.salary,
+      'EOBI Contribution (1%)': Math.round((s.salary || 0) * 0.01),
+      'Month': format(new Date(), 'MMMM yyyy')
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'EOBI Report');
+    XLSX.writeFile(workbook, `EOBI_Report_${format(new Date(), 'MMM_yyyy')}.xlsx`);
+    toast.success("EOBI Report exported");
+  }, [staff]);
 
   const handleExportTaxReport = useCallback(() => {
-    toast.success("Tax Report exported successfully");
-  }, []);
+    const data = staff.map(s => ({
+      'Employee Name': s.name,
+      'Department': s.department,
+      'Monthly Salary': s.salary,
+      'Annual Salary': (s.salary || 0) * 12,
+      'Monthly Tax': Math.round(calculateTax((s.salary || 0) * 12)),
+      'Month': format(new Date(), 'MMMM yyyy')
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tax Report');
+    XLSX.writeFile(workbook, `Tax_Report_${format(new Date(), 'MMM_yyyy')}.xlsx`);
+    toast.success("Tax Report exported");
+  }, [staff, calculateTax]);
 
   if (loading && staff.length === 0) {
     return (
@@ -989,8 +1101,8 @@ const HRStaff = () => {
             <DialogFooter><Button variant="outline" onClick={() => setShowTotalLedgerModal(false)} className="w-full sm:w-auto">Close Dashboard</Button></DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-    );
+    </div>
+  );
 };
 
 export default memo(HRStaff);
