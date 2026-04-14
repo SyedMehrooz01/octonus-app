@@ -103,7 +103,7 @@ const EventBooking = () => {
   const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null);
   const [proceedWithBooking, setProceedWithBooking] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
-
+  
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
