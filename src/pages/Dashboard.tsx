@@ -285,7 +285,7 @@ const Dashboard = () => {
                   <p className="text-xs font-bold text-slate-400 mt-1">LATEST BOOKINGS AND EVENTS</p>
                 </div>
                 <Button 
-                onClick={() => navigate("/event-booking")}
+                onClick={() => navigate("/events")}
                 variant="ghost" 
                 size="sm" 
                 className="rounded-xl font-bold text-primary hover:bg-primary/5 group"
@@ -397,7 +397,7 @@ const Dashboard = () => {
             </div>
             <div className="px-8 pb-8 space-y-3">
               <Button 
-                onClick={() => navigate("/event-booking")}
+                onClick={() => navigate("/events")}
                 className="w-full justify-between bg-white/10 hover:bg-white/20 border-none rounded-2xl h-14 font-bold group"
               >
                 New Booking <ArrowUpRight className="h-5 w-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
