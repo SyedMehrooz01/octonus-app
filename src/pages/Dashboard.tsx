@@ -284,9 +284,14 @@ const Dashboard = () => {
                   <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Upcoming Schedule</h2>
                   <p className="text-xs font-bold text-slate-400 mt-1">LATEST BOOKINGS AND EVENTS</p>
                 </div>
-                <Button variant="ghost" size="sm" className="rounded-xl font-bold text-primary hover:bg-primary/5 group">
-                  View Full Calendar <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
+                <Button 
+                onClick={() => navigate("/event-booking")}
+                variant="ghost" 
+                size="sm" 
+                className="rounded-xl font-bold text-primary hover:bg-primary/5 group"
+              >
+                View Full Calendar <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
               </div>
             </div>
             <div className="p-0">
@@ -318,8 +323,9 @@ const Dashboard = () => {
                           <td className="px-8 py-5 text-center">
                             <Badge variant="outline" className={`rounded-lg px-2 py-0 text-[10px] font-black uppercase tracking-tighter ${
                               event.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                              event.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                              'bg-slate-50 text-slate-600 border-slate-100'
+                              event.status === 'tentative' ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                              event.status === 'cancelled' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                              'bg-amber-50 text-amber-600 border-amber-100'
                             }`}>
                               {event.status ?? "N/A"}
                             </Badge>
@@ -397,7 +403,7 @@ const Dashboard = () => {
                 New Booking <ArrowUpRight className="h-5 w-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
               </Button>
               <Button 
-                onClick={() => navigate("/finance")}
+                onClick={() => navigate("/expenses")}
                 className="w-full justify-between bg-white/10 hover:bg-white/20 border-none rounded-2xl h-14 font-bold group"
               >
                 Add Expense <ArrowDownRight className="h-5 w-5 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform" />

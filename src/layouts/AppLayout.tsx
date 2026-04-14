@@ -152,7 +152,7 @@ const AppLayout = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TopHeader onOpenNav={() => setMobileNavOpen(true)} />
+        <TopHeader onMenuClick={() => setMobileNavOpen(true)} />
         
         <main className="flex-1 overflow-y-auto bg-slate-50/50 relative scroll-smooth p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto animate-in fade-in duration-700">
