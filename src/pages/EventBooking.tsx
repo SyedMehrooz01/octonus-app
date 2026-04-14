@@ -104,7 +104,7 @@ const EventBooking = () => {
   const [proceedWithBooking, setProceedWithBooking] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const [bookings, setBookings] = useState<Booking[]>(DUMMY_BOOKINGS);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
@@ -195,7 +195,7 @@ const EventBooking = () => {
         phone: b?.client_phone ?? "N/A",
         eventType: b?.event_type ?? "Event",
         eventDate: b?.event_date ?? "",
-        bookingDate: b?.created_at ?? "", 
+        bookingDate: b?.booking_date ?? b?.created_at?.split("T")[0] ?? new Date().toISOString().split("T")[0], 
         venue: b?.venue ?? "N/A",
         guests: Number(b?.pax ?? 0),
         totalAmount: Number(b?.total_amount ?? 0),
@@ -825,6 +825,19 @@ const EventBooking = () => {
                 })}
               </div>
             )}
+
+            {calView === "week" && (
+              <div className="flex flex-col items-center justify-center py-24 gap-4">
+                <CalendarDays className="h-12 w-12 text-slate-200" />
+                <p className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Week view coming soon</p>
+              </div>
+            )}
+            {calView === "day" && (
+              <div className="flex flex-col items-center justify-center py-24 gap-4">
+                <Clock className="h-12 w-12 text-slate-200" />
+                <p className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Day view coming soon</p>
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -917,6 +930,97 @@ const EventBooking = () => {
                 )}
               </div>
             </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="thirdparty" className="space-y-6 animate-in fade-in duration-500">
+          <div className="rounded-3xl border border-slate-100 bg-white shadow-sm p-8">
+            <h3 className="text-2xl font-black text-[#0f172a] tracking-tight mb-6 uppercase">Third-Party Bookings</h3>
+            {bookings.filter(b => b.thirdParty).length === 0 ? (
+              <div className="flex flex-col items-center gap-4 py-24">
+                <div className="h-16 w-16 rounded-3xl bg-slate-50 flex items-center justify-center border border-slate-100">
+                  <Package className="h-8 w-8 text-slate-200" />
+                </div>
+                <p className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">No third-party bookings found</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px]">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-100">
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Client</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Event</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Supplier Cost</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Selling Rate</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Profit</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {bookings.filter(b => b.thirdParty).map(b => (
+                      <tr key={b.id} className="hover:bg-blue-50/30 transition-colors">
+                        <td className="px-6 py-5 font-black text-[#0f172a]">{b.clientName}</td>
+                        <td className="px-6 py-5 font-bold text-slate-500">{b.eventType} — {b.eventDate ? format(new Date(b.eventDate), 'MMM dd, yyyy') : "N/A"}</td>
+                        <td className="px-6 py-5 text-right font-black text-rose-500">₨ {b.supplierCost.toLocaleString()}</td>
+                        <td className="px-6 py-5 text-right font-black text-blue-600">₨ {b.sellingRate.toLocaleString()}</td>
+                        <td className="px-6 py-5 text-right font-black text-emerald-600">₨ {(b.sellingRate - b.supplierCost).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="suppliers" className="space-y-6 animate-in fade-in duration-500">
+          <div className="rounded-3xl border border-slate-100 bg-white shadow-sm p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-black text-[#0f172a] tracking-tight uppercase">Suppliers</h3>
+              {canDo("add") && (
+                <Button onClick={() => setShowAddSupplierModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl gap-2 h-11 px-6">
+                  <Plus className="h-4 w-4"/> Add Supplier
+                </Button>
+              )}
+            </div>
+            {suppliers.length === 0 ? (
+              <div className="flex flex-col items-center gap-4 py-24">
+                <div className="h-16 w-16 rounded-3xl bg-slate-50 flex items-center justify-center border border-slate-100">
+                  <User className="h-8 w-8 text-slate-200" />
+                </div>
+                <p className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">No suppliers added yet</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {suppliers.map(s => (
+                  <div key={s.id} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-6 flex flex-col gap-4 hover:shadow-md transition-all">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-black text-[#0f172a] text-base">{s.name}</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{s.service_type}</p>
+                      </div>
+                      <Badge className="bg-indigo-100 text-indigo-700 border-none font-black text-[9px] uppercase tracking-widest rounded-lg">
+                        Active
+                      </Badge>
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      <p className="font-bold text-slate-500">{s.contact_number}</p>
+                      <p className="font-bold text-slate-400">{s.email}</p>
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Balance Due</p>
+                        <p className="font-black text-rose-500 text-base">₨ {(s.current_balance ?? 0).toLocaleString()}</p>
+                      </div>
+                      {canDo("edit") && (
+                        <Button size="sm" variant="outline" className="rounded-xl font-black text-[10px] h-9 px-4 border-slate-200" onClick={() => { setSelectedSupplier(s); setShowSupplierPaymentModal(true); }}>
+                          <Wallet className="h-3.5 w-3.5 mr-1.5"/> Pay
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
