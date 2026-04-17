@@ -42,6 +42,26 @@ export const deleteDocument = async (id: string) => {
   }
 };
 
+export const updateDocument = async (id: string, updates: any) => {
+  try {
+    const dataToSave = {
+      ...updates,
+      items: updates.items ? JSON.stringify(updates.items) : undefined
+    };
+    const { data, error } = await supabase
+      .from("documents")
+      .update(dataToSave)
+      .eq("id", id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error in updateDocument:", error);
+    throw error;
+  }
+};
+
 export const getLatestDocumentNumber = async (docType: string, prefix: string, year: number) => {
   try {
     const { data, error } = await supabase

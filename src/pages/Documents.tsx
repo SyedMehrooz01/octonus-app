@@ -252,7 +252,6 @@ const Documents = () => {
       img.src = "/logo.png";
       img.onload = () => {
         try {
-          // Since it's a square logo, we use size for both width and height
           pdf.addImage(img, 'PNG', x, y, size, size);
           resolve(true);
         } catch (e) {
@@ -265,222 +264,205 @@ const Documents = () => {
     });
   };
 
+  const generatePDFWithLetterhead = async (
+    drawContent: (doc: jsPDF, startY: number, pageWidth: number, margin: number) => void,
+    fileName: string
+  ) => {
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+
+    // ── TOP HEADER ──────────────────────────────────────────────
+    // Diagonal teal/cyan decorative stripes (top-left)
+    doc.setFillColor(51, 204, 255); // cyan (#33CCFF)
+    doc.triangle(0, 0, 38, 0, 0, 18, "F");
+    doc.setFillColor(154, 205, 50); // green (#9ACD32)
+    doc.triangle(0, 0, 28, 0, 0, 13, "F");
+
+    // Thin horizontal lines
+    doc.setDrawColor(51, 204, 255);
+    doc.setLineWidth(0.4);
+    doc.line(40, 6, pageWidth - margin, 6);
+    doc.setDrawColor(154, 205, 50);
+    doc.line(40, 9, pageWidth - margin, 9);
+
+    // Company name (top right, styled)
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(154, 205, 50); // green
+    doc.text("Octonus", pageWidth - margin - 28, 12, { align: "right" });
+    doc.setFontSize(14);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Solutions", pageWidth - margin, 18, { align: "right" });
+    doc.setFontSize(6);
+    doc.setTextColor(120, 120, 120);
+    doc.text("A SPECTACULAR TURN OF EVENTS", pageWidth - margin, 22, { align: "right" });
+
+    // ── CONTENT AREA ────────────────────────────────────────────
+    const contentStartY = 32;
+    drawContent(doc, contentStartY, pageWidth, margin);
+
+    // ── BOTTOM FOOTER ───────────────────────────────────────────
+    const footerY = pageHeight - 22;
+
+    // Olive green footer bar
+    doc.setFillColor(154, 205, 50); // #9ACD32
+    doc.rect(0, footerY, pageWidth, 22, "F");
+
+    // Decorative teal/cyan triangle (bottom right)
+    doc.setFillColor(51, 204, 255); // #33CCFF
+    doc.triangle(pageWidth, footerY + 8, pageWidth, pageHeight, pageWidth - 22, pageHeight, "F");
+    doc.setFillColor(154, 205, 50); // #9ACD32
+    doc.triangle(pageWidth, footerY + 14, pageWidth, pageHeight, pageWidth - 14, pageHeight, "F");
+
+    // Footer text — 3 columns
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+
+    // Left: Address
+    doc.text("Office No. 2, Crown Centre,", 18, footerY + 8);
+    doc.text("Gulshan-e-Iqbal, Karachi", 18, footerY + 14);
+
+    // Center: Email + Website
+    doc.text("octonussolutions@gmail.com", pageWidth / 2, footerY + 8, { align: "center" });
+    doc.text("www.octonussolutions.com.pk", pageWidth / 2, footerY + 14, { align: "center" });
+
+    // Right: Phone
+    doc.text("+92 331 3195 292", pageWidth - 18, footerY + 8, { align: "right" });
+    doc.text("021 34 977 797", pageWidth - 18, footerY + 14, { align: "right" });
+
+    doc.save(fileName);
+  };
+
   const generatePDF = async (doc: DocumentData) => {
     if (!doc.client_company || !doc.doc_number || (doc.items ?? []).length === 0) {
       toast.error("Required document fields are missing");
       return;
     }
 
-    const pdf = new jsPDF();
+    const isInvoice = doc.doc_type === "Invoice";
+    const title = isInvoice ? "INVOICE" : "QUOTATION";
 
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const companyGreen = "#2D6A4F";
-    const darkNavy = "#0f172a";
-
-    // --- HEADER SECTION: Professional Letterhead ---
-    // Top Green Accent Bar
-    pdf.setFillColor(45, 106, 79); // #2D6A4F
-    pdf.rect(0, 0, pageWidth, 40, "F");
-
-    // Company Name in Header
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(24);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(COMPANY.name.toUpperCase(), 15, 20);
-    
-    pdf.setFontSize(9);
-    pdf.setFont("helvetica", "italic");
-    pdf.text(COMPANY.tagline, 15, 27);
-
-    // Logo Handling - Positioned in the top right
-    const logoLoaded = await loadLogo(pdf, 160, 5, 30);
-    if (!logoLoaded) {
-      pdf.setDrawColor(255, 255, 255);
-      pdf.setLineWidth(0.5);
-      pdf.circle(175, 20, 12, 'S');
-      pdf.setFontSize(6);
+    await generatePDFWithLetterhead((pdf, startY, pageWidth, margin) => {
+      // Document title
       pdf.setFont("helvetica", "bold");
-      pdf.text("OCTONUS", 175, 19, { align: "center" });
-      pdf.text("SOLUTIONS", 175, 22, { align: "center" });
-    }
+      pdf.setFontSize(20);
+      pdf.setTextColor(40, 40, 40);
+      pdf.text(title, pageWidth / 2, startY + 6, { align: "center" });
 
-    // --- DOCUMENT TITLE ---
-    pdf.setTextColor(darkNavy);
-    pdf.setFontSize(20);
-    pdf.setFont("helvetica", "bold");
-    const title = doc.doc_type === "Quotation" ? "QUOTATION" : "SALES TAX INVOICE";
-    const titleWidth = pdf.getTextWidth(title);
-    pdf.text(title, (pageWidth - titleWidth) / 2, 55);
-    
-    // Decorative line under title
-    pdf.setDrawColor(companyGreen);
-    pdf.setLineWidth(0.8);
-    pdf.line(pageWidth/2 - 25, 58, pageWidth/2 + 25, 58);
+      // Horizontal rule below title
+      pdf.setDrawColor(180, 180, 180);
+      pdf.setLineWidth(0.3);
+      pdf.line(margin, startY + 10, pageWidth - margin, startY + 10);
 
-    // --- CLIENT & DOCUMENT INFO ---
-    const infoY = 70;
-    
-    // Bill To Section
-    pdf.setFillColor(248, 250, 252); 
-    pdf.rect(15, infoY, 85, 35, "F");
-    pdf.setDrawColor(226, 232, 240);
-    pdf.rect(15, infoY, 85, 35, "S");
-    
-    pdf.setFontSize(8);
-    pdf.setTextColor(100);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("BILL TO:", 20, infoY + 7);
-    
-    pdf.setTextColor(darkNavy);
-    pdf.setFontSize(10);
-    pdf.text(doc.client_company, 20, infoY + 14);
-    pdf.setFontSize(8);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`Attn: ${doc.contact_person}`, 20, infoY + 20);
-    const splitAddr = pdf.splitTextToSize(doc.client_address, 75);
-    pdf.text(splitAddr, 20, infoY + 26);
+      // Doc number + date (two columns)
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text(`${title} No: ${doc.doc_number ?? "N/A"}`, margin, startY + 18);
+      pdf.text(`Date: ${doc.invoice_date ? format(new Date(doc.invoice_date), "dd MMM yyyy") : "N/A"}`, pageWidth - margin, startY + 18, { align: "right" });
 
-    // Document Details Section
-    pdf.setFillColor(248, 250, 252);
-    pdf.rect(110, infoY, 85, 35, "F");
-    pdf.rect(110, infoY, 85, 35, "S");
-    
-    pdf.setFontSize(8);
-    pdf.setTextColor(100);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("DOCUMENT DETAILS:", 115, infoY + 7);
-    
-    pdf.setTextColor(darkNavy);
-    pdf.setFontSize(9);
-    pdf.text(`${doc.doc_type} #:`, 115, infoY + 14);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(doc.doc_number, 150, infoY + 14);
-    
-    pdf.setFont("helvetica", "normal");
-    pdf.text("Date:", 115, infoY + 20);
-    pdf.text(doc.invoice_date ? format(new Date(doc.invoice_date), "PP") : "N/A", 150, infoY + 20);
-    
-    pdf.text("Event:", 115, infoY + 26);
-    const splitEvent = pdf.splitTextToSize(doc.event_name, 40);
-    pdf.text(splitEvent, 150, infoY + 26);
-    
-    if (doc.doc_type === "Quotation" && doc.valid_until) {
-      pdf.text("Valid Until:", 115, infoY + 32);
-      pdf.text(format(new Date(doc.valid_until), "PP"), 150, infoY + 32);
-    } else if (doc.doc_type === "Invoice" && doc.event_date) {
-      pdf.text("Event Date:", 115, infoY + 32);
-      pdf.text(format(new Date(doc.event_date), "PP"), 150, infoY + 32);
-    }
+      // Valid until (for quotations)
+      if (!isInvoice && doc.valid_until) {
+        pdf.text(`Valid Until: ${format(new Date(doc.valid_until), "dd MMM yyyy")}`, margin, startY + 24);
+      }
 
-    // --- ITEMS TABLE ---
-    const tableData = (doc?.items ?? []).map((item, index) => [
-      (index + 1).toString().padStart(2, '0'),
-      item?.description ?? "N/A",
-      item?.qty ?? 0,
-      item?.rate?.toLocaleString() ?? "0",
-      item?.amount?.toLocaleString() ?? "0"
-    ]);
+      // Bill To section
+      const billY = startY + 32;
+      pdf.setFillColor(245, 245, 245);
+      pdf.roundedRect(margin, billY, (pageWidth - 2 * margin) / 2 - 4, 24, 2, 2, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text("BILL TO", margin + 4, billY + 7);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.setTextColor(30, 30, 30);
+      pdf.text(doc.client_company ?? "N/A", margin + 4, billY + 14);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text(doc.contact_person ?? "", margin + 4, billY + 20);
 
-    autoTable(pdf, {
-      startY: 115,
-      head: [["S.#", "DESCRIPTION", "QTY", "RATE (RS.)", "AMOUNT (RS.)"]],
-      body: tableData,
-      theme: "grid",
-      headStyles: { 
-        fillColor: [45, 106, 79], 
-        textColor: 255, 
-        fontStyle: "bold",
-        fontSize: 9,
-        halign: "center"
-      },
-      columnStyles: {
-        0: { cellWidth: 10, halign: "center" },
-        1: { cellWidth: "auto" },
-        2: { cellWidth: 15, halign: "center" },
-        3: { cellWidth: 30, halign: "right" },
-        4: { cellWidth: 35, halign: "right" }
-      },
-      styles: { fontSize: 8.5, cellPadding: 4 },
-      alternateRowStyles: { fillColor: [250, 252, 251] }
-    });
+      // Items Table
+      const tableStartY = billY + 32;
+      const colWidths = [10, 75, 25, 25, 35]; // #, Description, Qty, Rate, Amount
+      const colX = [margin, margin + 10, margin + 85, margin + 110, margin + 135];
+      const rowH = 8;
 
-    let finalY = (pdf as any).lastAutoTable.finalY + 10;
+      // Table header
+      pdf.setFillColor(100, 116, 55); // olive green matching footer
+      pdf.rect(margin, tableStartY, pageWidth - 2 * margin, rowH, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(255, 255, 255);
+      ["#", "DESCRIPTION", "QTY", "RATE", "AMOUNT"].forEach((h, i) => {
+        pdf.text(h, colX[i] + 2, tableStartY + 5.5);
+      });
 
-    // Check if we need a new page for totals
-    if (finalY > pageHeight - 100) {
-      pdf.addPage();
-      finalY = 20;
-    }
+      // Table rows
+      const items = doc.items ?? [];
+      items.forEach((item: any, idx: number) => {
+        const rowY = tableStartY + rowH + idx * rowH;
+        if (idx % 2 === 0) {
+          pdf.setFillColor(250, 250, 250);
+          pdf.rect(margin, rowY, pageWidth - 2 * margin, rowH, "F");
+        }
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(8);
+        pdf.setTextColor(50, 50, 50);
+        pdf.text(String(idx + 1), colX[0] + 2, rowY + 5.5);
+        pdf.text(String(item.description ?? item.name ?? ""), colX[1] + 2, rowY + 5.5, { maxWidth: 72 });
+        pdf.text(String(item.quantity ?? item.qty ?? 1), colX[2] + 2, rowY + 5.5);
+        pdf.text(`Rs ${Number(item.rate ?? item.unit_price ?? 0).toLocaleString()}`, colX[3] + 2, rowY + 5.5);
+        const amt = (item.quantity ?? item.qty ?? 1) * (item.rate ?? item.unit_price ?? 0);
+        pdf.text(`Rs ${Number(amt).toLocaleString()}`, colX[4] + 2, rowY + 5.5);
+      });
 
-    // --- TOTALS SECTION ---
-    const totalsX = 135;
-    pdf.setFontSize(9);
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(100);
-    pdf.text("Total Amount:", totalsX, finalY);
-    pdf.setTextColor(darkNavy);
-    pdf.text(doc.total_amount.toLocaleString(), 195, finalY, { align: "right" });
-    
-    pdf.setTextColor(100);
-    pdf.text("SRB Tax (15%):", totalsX, finalY + 7);
-    pdf.setTextColor(darkNavy);
-    pdf.text(doc.srb_amount.toLocaleString(), 195, finalY + 7, { align: "right" });
-    
-    pdf.setDrawColor(companyGreen);
-    pdf.setLineWidth(0.4);
-    pdf.line(totalsX, finalY + 10, 195, finalY + 10);
-    
-    pdf.setFontSize(11);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(companyGreen);
-    pdf.text("GRAND TOTAL:", totalsX, finalY + 17);
-    pdf.text(`RS. ${doc.sub_total.toLocaleString()}/-`, 195, finalY + 17, { align: "right" });
+      // Totals section
+      const totalsY = tableStartY + rowH + items.length * rowH + 6;
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(pageWidth - margin - 60, totalsY, pageWidth - margin, totalsY);
 
-    // --- TERMS & CONDITIONS ---
-    pdf.setTextColor(darkNavy);
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("TERMS & CONDITIONS:", 15, finalY + 30);
-    
-    pdf.setDrawColor(companyGreen);
-    pdf.setLineWidth(0.3);
-    pdf.line(15, finalY + 32, 60, finalY + 32);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.setTextColor(60, 60, 60);
+      pdf.text("Subtotal:", pageWidth - margin - 58, totalsY + 7);
+      pdf.text(`Rs ${Number(doc.total_amount ?? doc.sub_total ?? 0).toLocaleString()}`, pageWidth - margin, totalsY + 7, { align: "right" });
 
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8);
-    pdf.setTextColor(80);
-    const splitTerms = pdf.splitTextToSize(doc.terms, pageWidth - 30);
-    pdf.text(splitTerms, 15, finalY + 38);
+      if (doc.srb_amount) {
+        pdf.text("SRB (15%):", pageWidth - margin - 58, totalsY + 14);
+        pdf.setTextColor(220, 50, 50);
+        pdf.text(`Rs ${Number(doc.srb_amount).toLocaleString()}`, pageWidth - margin, totalsY + 14, { align: "right" });
+      }
 
-    // --- SIGNATURES ---
-    const sigY = pageHeight - 55;
-    pdf.setDrawColor(200);
-    pdf.setLineWidth(0.2);
-    
-    pdf.line(20, sigY, 70, sigY);
-    pdf.setFontSize(8);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(darkNavy);
-    pdf.text("PREPARED BY", 45, sigY + 5, { align: "center" });
-    
-    pdf.line(140, sigY, 190, sigY);
-    pdf.text("AUTHORIZED SIGNATORY", 165, sigY + 5, { align: "center" });
+      // Grand total box
+      pdf.setFillColor(100, 116, 55);
+      pdf.roundedRect(pageWidth - margin - 62, totalsY + 18, 62, 12, 2, 2, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text("TOTAL:", pageWidth - margin - 58, totalsY + 26);
+      pdf.text(`Rs ${Number(doc.sub_total ?? 0).toLocaleString()}`, pageWidth - margin - 2, totalsY + 26, { align: "right" });
 
-    // --- FOOTER ---
-    pdf.setFillColor(45, 106, 79);
-    pdf.rect(0, pageHeight - 20, pageWidth, 20, "F");
-    
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(7.5);
-    pdf.setFont("helvetica", "bold");
-    const footerText1 = `${COMPANY.address} | Phone: ${COMPANY.phone}`;
-    const footerText2 = `Email: ${COMPANY.email} | Web: ${COMPANY.website}`;
-    
-    pdf.text(footerText1, pageWidth / 2, pageHeight - 11, { align: "center" });
-    pdf.text(footerText2, pageWidth / 2, pageHeight - 6, { align: "center" });
+      // Notes
+      if (doc.terms) {
+        pdf.setFont("helvetica", "italic");
+        pdf.setFontSize(8);
+        pdf.setTextColor(120, 120, 120);
+        const splitTerms = pdf.splitTextToSize(doc.terms, pageWidth - 2 * margin);
+        pdf.text(splitTerms, margin, totalsY + 38);
+      }
 
-    pdf.save(`${doc.doc_number}_${doc.client_company.replace(/\s+/g, '_')}.pdf`);
+      // Thank you line
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(100, 116, 55);
+      pdf.text("Thank you for choosing Octonus Solutions!", pageWidth / 2, totalsY + 48 + (doc.terms ? (pdf.splitTextToSize(doc.terms, pageWidth - 2 * margin).length * 4) : 0), { align: "center" });
+
+    }, `${title}_${doc.doc_number ?? doc.id}.pdf`);
   };
 
   const generateExcel = (doc: DocumentData) => {
@@ -548,6 +530,25 @@ const Documents = () => {
       fetchDocuments();
     } catch (err: any) {
       toast.error(err.message || "Failed to delete document");
+    }
+  };
+
+  const handleConvertDocType = async (doc: DocumentData) => {
+    if (!doc.id) return;
+    const newType = doc.doc_type === "Quotation" ? "Invoice" : "Quotation";
+    const prefix = newType === "Invoice" ? "INV" : "QT";
+    const newDocNumber = doc.doc_number?.replace(/^(QT|INV)/, prefix) ?? `${prefix}-${Date.now()}`;
+    
+    try {
+      await documentService.updateDocument(doc.id, {
+        doc_type: newType,
+        doc_number: newDocNumber
+      });
+      
+      toast.success(`Converted to ${newType} successfully`);
+      fetchDocuments();
+    } catch (err: any) {
+      toast.error(err.message || "Conversion failed");
     }
   };
 
@@ -841,6 +842,14 @@ const Documents = () => {
                             <td className="px-8 py-6 text-right font-black text-[#0f172a] tracking-tight">{formatCurrency(doc?.sub_total ?? 0)}</td>
                             <td className="px-8 py-6 text-right">
                               <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => handleConvertDocType(doc)} 
+                                  className="rounded-lg h-8 px-3 text-[10px] font-black uppercase tracking-widest border-indigo-200 text-indigo-600 hover:bg-indigo-50" 
+                                > 
+                                  {doc.doc_type === "Quotation" ? "→ Invoice" : "→ Quotation"} 
+                                </Button> 
                                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 shadow-sm" onClick={() => generatePDF(doc)}>
                                   <FileDown className="h-4 w-4" />
                                 </Button>

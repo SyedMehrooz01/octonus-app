@@ -65,7 +65,6 @@ const Finance = () => {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -195,13 +194,19 @@ const Finance = () => {
   }, [fetchFinanceData, fetchVendors]);
 
   const filtered = useMemo(() => (ledger ?? []).filter(l => {
-    const matchesSearch = (l?.description ?? "").toLowerCase().includes((search ?? "").toLowerCase());
-    const matchesAccount = accountFilter === "all" || l?.account === accountFilter;
-    const matchesDate = isWithinInterval(parseISO(l?.date ?? format(new Date(), "yyyy-MM-dd")), { 
-      start: parseISO(fromDate), 
-      end: parseISO(toDate) 
-    });
-    return matchesSearch && matchesAccount && matchesDate;
+    try {
+      const matchesSearch = (l?.description ?? "").toLowerCase().includes((search ?? "").toLowerCase());
+      const matchesAccount = accountFilter === "all" || l?.account === accountFilter;
+      const entryDate = parseISO(l?.date ?? format(new Date(), "yyyy-MM-dd"));
+      const start = parseISO(fromDate);
+      const end = parseISO(toDate);
+      const matchesDate = !isNaN(entryDate.getTime()) && !isNaN(start.getTime()) && !isNaN(end.getTime())
+        ? isWithinInterval(entryDate, { start, end })
+        : true;
+      return matchesSearch && matchesAccount && matchesDate;
+    } catch {
+      return true;
+    }
   }), [ledger, search, accountFilter, fromDate, toDate]);
 
   const { totalDebit, totalCredit, netBalance } = useMemo(() => {
@@ -285,19 +290,26 @@ const Finance = () => {
     setIsSaving(true);
     try {
       const amt = Number(payAmount);
-      setSuppliers(prev => (prev ?? []).map(s => s?.id === selectedSupplier?.id 
-        ? { ...s, paid: (s?.paid ?? 0) + amt, balance: Math.max(0, (s?.balance ?? 0) - amt) } 
-        : s
-      ));
-      toast({ title: "Supplier payment recorded" });
+      await eventService.addSupplierPayment({
+        supplier_id: selectedSupplier.id,
+        amount: amt,
+        method: "Cash",
+        date: format(new Date(), "yyyy-MM-dd"),
+        notes: "Supplier payment"
+      });
+      await eventService.updateSupplier(selectedSupplier.id, {
+        current_balance: (selectedSupplier.balance ?? 0) - amt
+      });
+      toast({ title: "Success", description: "Supplier payment recorded" });
       setShowPaySupplier(false);
       setPayAmount("");
+      fetchVendors(true);
     } catch (err: any) {
       toast({ title: "Error", description: err?.message || "Payment failed", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
-  }, [payAmount, selectedSupplier, toast]);
+  }, [payAmount, selectedSupplier, fetchVendors, toast]);
 
   const handlePayVendor = useCallback(async () => {
     if (!vendorPayForm.amount || !selectedVendor) return;
@@ -347,7 +359,7 @@ const Finance = () => {
     doc.save(`${fileName}.pdf`);
   }, []);
 
-  const exportPL = useCallback((format: 'pdf' | 'excel') => {
+  const exportPL = useCallback(async (exportFormat: 'pdf' | 'excel') => {
     const data = (eventFinance ?? []).map(e => ({
       Event: e?.event ?? "N/A",
       Date: e?.date ?? "N/A",
@@ -357,7 +369,7 @@ const Finance = () => {
       Margin: `${Math.round(((e?.profit ?? 0)/(e?.totalAmount ?? 1))*100)}%`
     }));
 
-    if (format === 'excel') {
+    if (exportFormat === 'excel') {
       exportToExcel(data, `Profit_and_Loss_${selectedYear}`);
     } else {
       const headers = ["Event", "Date", "Revenue", "Expenses", "Profit", "Margin"];
@@ -367,7 +379,7 @@ const Finance = () => {
   }, [selectedYear, eventFinance, exportToExcel, exportToPDF]);
 
 
-  const exportStatement = useCallback((format: 'pdf' | 'excel') => {
+  const exportStatement = useCallback((exportFormat: 'pdf' | 'excel') => {
     const data = (filtered ?? []).map(l => ({
       Date: l?.date ?? "N/A",
       Description: l?.description ?? "N/A",
@@ -377,7 +389,7 @@ const Finance = () => {
       Balance: l?.balance ?? 0
     }));
 
-    if (format === 'excel') {
+    if (exportFormat === 'excel') {
       exportToExcel(data, `Account_Statement_${accountFilter}_${fromDate}_to_${toDate}`);
     } else {
       const headers = ["Date", "Description", "Account", "Type", "Amount", "Balance"];
@@ -492,30 +504,30 @@ const Finance = () => {
                 )}
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px]">
+            <div className="w-full">
+              <table className="w-full table-fixed">
                 <thead>
                   <tr className="bg-slate-50/80 text-left border-b border-slate-100">
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Description</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Account</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Type</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Amount</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Balance</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[100px]">Date</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-auto">Description</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[100px]">Account</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center w-[80px]">Type</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right w-[120px]">Amount</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right w-[120px]">Balance</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filtered.map((l, idx)=>(
                     <tr key={l.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
                       <td className="px-6 py-6 text-sm font-black text-slate-500 whitespace-nowrap tracking-tight">{format(new Date(l.date), 'MMM d, yyyy')}</td>
-                      <td className="px-6 py-6 text-sm font-black text-[#0f172a] leading-tight tracking-tight">{l.description}</td>
+                      <td className="px-6 py-6 text-sm font-black text-[#0f172a] leading-tight tracking-tight break-words whitespace-normal max-w-[200px]">{l.description}</td>
                       <td className="px-6 py-6">
                         <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm">
                           {l.account}
                         </Badge>
                       </td>
                       <td className="px-6 py-6 text-center">
-                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${l.type==="debit"?"bg-emerald-500 text-white":"bg-rose-500 text-white"}`}>
+                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${l?.type==="debit"?"bg-emerald-500 text-white":"bg-rose-500 text-white"}`}>
                           {l.type}
                         </Badge>
                       </td>
@@ -547,8 +559,8 @@ const Finance = () => {
               <h3 className="text-xl font-black text-foreground">Event-Based Financial Tracking</h3>
               <p className="text-sm text-muted-foreground font-medium mt-1">Detailed breakdown of revenue, costs and profit per event</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px]">
+            <div className="w-full">
+              <table className="w-full table-fixed">
                 <thead>
                   <tr className="bg-muted/30 text-left border-b border-border">
                     <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Event Detail</th>
@@ -563,7 +575,7 @@ const Finance = () => {
                 <tbody className="divide-y divide-border">
                   {(eventFinance ?? []).map((e, idx)=>(
                     <tr key={e?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/10'} hover:bg-primary/5 transition-colors`}>
-                      <td className="px-6 py-5 text-sm font-black text-foreground">{e?.event}</td>
+                      <td className="px-6 py-5 text-sm font-black text-foreground break-words whitespace-normal">{e?.event}</td>
                       <td className="px-6 py-5 text-xs font-bold text-muted-foreground uppercase tracking-tighter">{e?.date ? format(new Date(e.date), 'MMM d, yyyy') : "N/A"}</td>
                       <td className="px-6 py-5 text-sm font-black text-foreground">₨ {(e?.totalAmount ?? 0).toLocaleString()}</td>
                       <td className="px-6 py-5 text-sm font-bold text-emerald-600">₨ {(e?.advance ?? 0).toLocaleString()}</td>
@@ -591,23 +603,23 @@ const Finance = () => {
             <h3 className="mb-4 text-base font-semibold text-card-foreground">Advance Tracking — Live Summary</h3>
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Total Advances Received</p><p className="text-xl font-bold text-primary">₨{(totalAdvances ?? 0).toLocaleString()}</p></div>
-              <div className="rounded-lg bg-success/5 border border-success/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Total Revenue</p><p className="text-xl font-bold text-success">₨{(totalRevenue ?? 0).toLocaleString()}</p></div>
-              <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Pending Balance</p><p className="text-xl font-bold text-destructive">₨{(totalPending ?? 0).toLocaleString()}</p></div>
+              <div className="rounded-lg bg-emerald-50/5 border border-emerald-500/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Total Revenue</p><p className="text-xl font-bold text-emerald-600">₨{(totalRevenue ?? 0).toLocaleString()}</p></div>
+              <div className="rounded-lg bg-rose-50/5 border border-rose-500/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Pending Balance</p><p className="text-xl font-bold text-rose-600">₨{(totalPending ?? 0).toLocaleString()}</p></div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px]">
+            <div className="w-full">
+              <table className="w-full table-fixed">
               <thead><tr className="border-b border-border bg-muted/40">{["Event","Total","Advance","Balance","% Paid"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
               <tbody>
                 {(eventFinance ?? []).map(e=>{
                   const pct = Math.round(((e?.advance ?? 0)/(e?.totalAmount ?? 1))*100);
                   return <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="px-4 py-3 text-sm font-medium text-card-foreground">{e?.event}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-card-foreground break-words whitespace-normal">{e?.event}</td>
                     <td className="px-4 py-3 text-sm text-card-foreground">₨{(e?.totalAmount ?? 0).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-success">₨{(e?.advance ?? 0).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-destructive">₨{(e?.balance ?? 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm text-emerald-600">₨{(e?.advance ?? 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm text-rose-600">₨{(e?.balance ?? 0).toLocaleString()}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="h-2 w-24 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${pct>=100?"bg-success":pct>=50?"bg-primary":"bg-warning"}`} style={{width:`${pct}%`}}/></div>
+                        <div className="h-2 w-24 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${pct>=100?"bg-emerald-500":pct>=50?"bg-blue-500":"bg-amber-400"}`} style={{width:`${pct}%`}}/></div>
                         <span className="text-xs text-muted-foreground">{pct}%</span>
                       </div>
                     </td>
@@ -616,34 +628,6 @@ const Finance = () => {
               </tbody>
 
             </table>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* SUPPLIER LEDGER */}
-        <TabsContent value="suppliers">
-          <div className="rounded-lg border border-border bg-card">
-            <div className="border-b border-border p-4"><h3 className="text-sm font-semibold text-card-foreground">Supplier/Vendor Ledger — Auto profit calculation</h3></div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px]">
-                <thead><tr className="border-b border-border bg-muted/40">{["Supplier","Contact","Total Bills","Paid","Balance","Action"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
-                <tbody>
-                  {(suppliers ?? []).map(s=>(
-                    <tr key={s?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 text-sm font-medium text-card-foreground">{s?.name}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{s?.contact}</td>
-                      <td className="px-4 py-3 text-sm text-card-foreground">₨{(s?.totalBills ?? 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-success">₨{(s?.paid ?? 0).toLocaleString()}</td>
-                      <td className={`px-4 py-3 text-sm font-bold ${(s?.balance ?? 0)>0?"text-destructive":"text-success"}`}>₨{(s?.balance ?? 0).toLocaleString()}</td>
-                      <td className="px-4 py-3">{(s?.balance ?? 0)>0&&<button onClick={()=>{ setSelectedSupplier(s); setShowPaySupplier(true); }} className="rounded bg-primary/10 px-2 py-1 text-xs text-primary hover:bg-primary/20">Pay Now</button>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot><tr className="bg-muted/40">
-                  <td colSpan={3} className="px-4 py-3 text-sm font-semibold">Total Outstanding</td>
-                  <td colSpan={3} className="px-4 py-3 text-sm font-bold text-destructive">₨{(suppliers ?? []).reduce((s,x)=>s+(x?.balance ?? 0),0).toLocaleString()}</td>
-                </tr></tfoot>
-              </table>
             </div>
           </div>
         </TabsContent>
@@ -666,8 +650,8 @@ const Finance = () => {
                 Refresh
               </Button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px]">
+            <div className="w-full">
+              <table className="w-full table-fixed">
                 <thead><tr className="border-b border-border bg-muted/40">{["Vendor","Service","Opening Bal","Paid","Outstanding","Action"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                 <tbody>
                   {(vendors ?? []).map(v=>(
@@ -678,11 +662,11 @@ const Finance = () => {
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{v?.category}</td>
                       <td className="px-4 py-3 text-sm">₨{(v?.total_bills ?? 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-success">₨{(v?.paid ?? 0).toLocaleString()}</td>
-                      <td className={`px-4 py-3 text-sm font-bold ${(v?.balance ?? 0)>0?"text-destructive":"text-success"}`}>₨{(v?.balance ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-emerald-600">₨{(v?.paid ?? 0).toLocaleString()}</td>
+                      <td className={`px-4 py-3 text-sm font-bold ${(v?.balance ?? 0)>0?"text-destructive":"text-emerald-600"}`}>₨{(v?.balance ?? 0).toLocaleString()}</td>
                       <td className="px-4 py-3 flex gap-2">
                         <Button size="sm" variant="ghost" onClick={() => { setSelectedVendor(v); setShowVendorHistory(true); }} className="h-8 px-2"><FileText className="h-4 w-4"/></Button>
-                        {(v?.balance ?? 0) > 0 && <Button size="sm" onClick={() => { setSelectedVendor(v); setVendorPayForm({...vendorPayForm, amount: ""}); setShowPayVendor(true); }} className="h-8 px-2">Pay</Button>}
+                        {(v?.balance ?? 0) > 0 && <Button size="sm" onClick={() => { setSelectedVendor(v); setVendorPayForm({ amount: "", method: "Cash", date: format(new Date(), "yyyy-MM-dd"), notes: "" }); setShowPayVendor(true); }} className="h-8 px-2">Pay</Button>}
                       </td>
                     </tr>
                   ))}
@@ -728,33 +712,33 @@ const Finance = () => {
               </div>
 
               {plView === "monthly" ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[900px]">
+                <div className="w-full">
+                  <table className="w-full table-fixed">
                     <thead><tr className="border-b border-border bg-muted/40">{["Event","Revenue","Expenses","Net Profit","Margin"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                     <tbody>
                       {(eventFinance ?? []).map(e=>{
                         const margin = Math.round(((e?.profit ?? 0)/(e?.totalAmount ?? 1))*100);
                         return <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                          <td className="px-4 py-3 text-sm font-medium text-card-foreground">{e?.event}</td>
-                          <td className="px-4 py-3 text-sm text-success">₨{(e?.totalAmount ?? 0).toLocaleString()}</td>
-                          <td className="px-4 py-3 text-sm text-destructive">{(e?.expenses ?? 0)>0?`₨${(e?.expenses ?? 0).toLocaleString()}`:"-"}</td>
-                          <td className="px-4 py-3 text-sm font-bold text-success">₨{(e?.profit ?? 0).toLocaleString()}</td>
-                          <td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${margin>=50?"bg-success/10 text-success border-success/20":margin>=30?"bg-warning/10 text-warning border-warning/20":"bg-destructive/10 text-destructive border-destructive/20"}`}>{margin}%</span></td>
+                          <td className="px-4 py-3 text-sm font-medium text-card-foreground break-words whitespace-normal">{e?.event}</td>
+                          <td className="px-4 py-3 text-sm text-emerald-600">₨{(e?.totalAmount ?? 0).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sm text-rose-600">{(e?.expenses ?? 0)>0?`₨${(e?.expenses ?? 0).toLocaleString()}`:"-"}</td>
+                          <td className="px-4 py-3 text-sm font-bold text-emerald-600">₨{(e?.profit ?? 0).toLocaleString()}</td>
+                          <td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${margin>=50?"bg-emerald-500/10 text-emerald-600 border-emerald-500/20":margin>=30?"bg-amber-500/10 text-amber-600 border-amber-500/20":"bg-rose-500/10 text-rose-600 border-rose-500/20"}`}>{margin}%</span></td>
                         </tr>;
                       })}
                     </tbody>
                     <tfoot><tr className="bg-muted/40">
                       <td className="px-4 py-3 text-sm font-semibold">Monthly Total</td>
-                      <td className="px-4 py-3 text-sm font-bold text-success">₨{(totalRevenue ?? 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-destructive">₨{(eventFinance ?? []).reduce((s,e)=>s+(e?.expenses ?? 0),0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-success">₨{(totalProfit ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">₨{(totalRevenue ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-rose-600">₨{(eventFinance ?? []).reduce((s,e)=>s+(e?.expenses ?? 0),0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">₨{(totalProfit ?? 0).toLocaleString()}</td>
                       <td/>
                     </tr></tfoot>
                   </table>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[900px]">
+                <div className="w-full">
+                  <table className="w-full table-fixed">
                     <thead><tr className="border-b border-border bg-muted/40">{["Month","Total Income","Total Expenses","Net Profit/Loss"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                     <tbody>
                       {yearlyMonths.map(month => {
@@ -766,45 +750,48 @@ const Finance = () => {
                         return (
                           <tr key={month.toISOString()} className="border-b border-border last:border-0 hover:bg-muted/20">
                             <td className="px-4 py-3 text-sm font-medium text-card-foreground">{format(month, "MMMM")}</td>
-                            <td className="px-4 py-3 text-sm text-success font-bold">₨{(mIncome ?? 0).toLocaleString()}</td>
-                            <td className="px-4 py-3 text-sm text-destructive font-bold">₨{(mExpenses ?? 0).toLocaleString()}</td>
-                            <td className={`px-4 py-3 text-sm font-black ${mProfit >= 0 ? "text-primary" : "text-destructive"}`}>₨{(mProfit ?? 0).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-sm text-emerald-600 font-bold">₨{(mIncome ?? 0).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-sm text-rose-600 font-bold">₨{(mExpenses ?? 0).toLocaleString()}</td>
+                            <td className={`px-4 py-3 text-sm font-black ${mProfit >= 0 ? "text-primary" : "text-rose-600"}`}>₨{(mProfit ?? 0).toLocaleString()}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                     <tfoot><tr className="bg-muted/40">
-                      <td className="px-4 py-3 text-sm font-bold uppercase tracking-widest">Yearly Totals</td>
-                      <td className="px-4 py-3 text-lg font-black text-success">₨{(totalRevenue ?? 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-lg font-black text-destructive">₨{(eventFinance ?? []).reduce((s,e)=>s+(e?.expenses ?? 0),0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-lg font-bold uppercase tracking-widest">Yearly Totals</td>
+                      <td className="px-4 py-3 text-lg font-black text-emerald-600">₨{(totalRevenue ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-lg font-black text-rose-600">₨{(eventFinance ?? []).reduce((s,e)=>s+(e?.expenses ?? 0),0).toLocaleString()}</td>
                       <td className="px-4 py-3 text-xl font-black text-primary">₨{(totalProfit ?? 0).toLocaleString()}</td>
                     </tr></tfoot>
                   </table>
                 </div>
               )}
 
+
             </div>
 
             {/* Monthly P&L Summary */}
             <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
-              <h3 className="mb-4 text-base font-semibold text-card-foreground">Monthly P&L Summary — March 2024</h3>
+              <h3 className="mb-4 text-base font-semibold text-card-foreground">
+                Monthly P&L Summary — {format(new Date(), "MMMM yyyy")}
+              </h3>
               <div className="space-y-3">
-                <div className="rounded-lg bg-success/5 border border-success/20 p-4">
-                  <h4 className="mb-2 text-sm font-semibold text-success">Income</h4>
+                <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-4">
+                  <h4 className="mb-2 text-sm font-semibold text-emerald-600">Income</h4>
                   {(ledger ?? []).filter(l=>l?.type==="debit").map(l=>(
                     <div key={l?.id} className="flex justify-between py-1 text-sm"><span className="text-muted-foreground">{l?.description}</span><span className="font-medium text-card-foreground">₨{(l?.amount ?? 0).toLocaleString()}</span></div>
                   ))}
-                  <div className="mt-2 flex justify-between border-t border-success/20 pt-2 text-sm font-bold"><span>Total Income</span><span className="text-success">₨{(totalDebit ?? 0).toLocaleString()}</span></div>
+                  <div className="mt-2 flex justify-between border-t border-emerald-500/20 pt-2 text-sm font-bold"><span>Total Income</span><span className="text-emerald-600">₨{(totalDebit ?? 0).toLocaleString()}</span></div>
                 </div>
-                <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-4">
-                  <h4 className="mb-2 text-sm font-semibold text-destructive">Expenses</h4>
+                <div className="rounded-lg bg-rose-500/5 border border-rose-500/20 p-4">
+                  <h4 className="mb-2 text-sm font-semibold text-rose-600">Expenses</h4>
                   {(ledger ?? []).filter(l=>l?.type==="credit").map(l=>(
                     <div key={l?.id} className="flex justify-between py-1 text-sm"><span className="text-muted-foreground">{l?.description}</span><span className="font-medium text-card-foreground">₨{(l?.amount ?? 0).toLocaleString()}</span></div>
                   ))}
-                  <div className="mt-2 flex justify-between border-t border-destructive/20 pt-2 text-sm font-bold"><span>Total Expenses</span><span className="text-destructive">₨{(totalCredit ?? 0).toLocaleString()}</span></div>
+                  <div className="mt-2 flex justify-between border-t border-rose-500/20 pt-2 text-sm font-bold"><span>Total Expenses</span><span className="text-rose-600">₨{(totalCredit ?? 0).toLocaleString()}</span></div>
                 </div>
-                <div className={`rounded-lg p-4 ${(netBalance ?? 0)>=0?"bg-primary/10 border border-primary/20":"bg-destructive/10 border border-destructive/20"}`}>
-                  <div className="flex justify-between text-base font-bold"><span>Net Profit / Loss</span><span className={(netBalance ?? 0)>=0?"text-primary":"text-destructive"}>₨{(netBalance ?? 0).toLocaleString()}</span></div>
+                <div className={`rounded-lg p-4 ${(netBalance ?? 0)>=0?"bg-primary/10 border border-primary/20":"bg-rose-500/10 border border-rose-500/20"}`}>
+                  <div className="flex justify-between text-base font-bold"><span>Net Profit / Loss</span><span className={(netBalance ?? 0)>=0?"text-primary":"text-rose-600"}>₨{(netBalance ?? 0).toLocaleString()}</span></div>
                 </div>
               </div>
             </div>
@@ -834,7 +821,7 @@ const Finance = () => {
         <DialogContent>
           <DialogHeader><DialogTitle>Pay Supplier — {selectedSupplier?.name}</DialogTitle></DialogHeader>
           {selectedSupplier&&<div className="space-y-4">
-            <div className="rounded-lg bg-muted/40 p-3 text-sm"><span className="text-muted-foreground">Outstanding Balance: </span><span className="font-bold text-destructive">₨{(selectedSupplier?.balance ?? 0).toLocaleString()}</span></div>
+            <div className="rounded-lg bg-muted/40 p-3 text-sm"><span className="text-muted-foreground">Outstanding Balance: </span><span className="font-bold text-rose-600">₨{(selectedSupplier?.balance ?? 0).toLocaleString()}</span></div>
             <div className="space-y-1.5"><Label>Payment Amount (₨)</Label><Input type="number" placeholder="Enter amount" value={payAmount} onChange={e=>setPayAmount(e.target.value)}/></div>
           </div>}
           <DialogFooter><Button variant="outline" onClick={()=>setShowPaySupplier(false)}>Cancel</Button><Button onClick={() => handlePaySupplier()}>Record Payment</Button></DialogFooter>
@@ -854,13 +841,13 @@ const Finance = () => {
                 <p className="text-[10px] uppercase font-bold text-muted-foreground">Opening Bal</p>
                 <p className="text-sm font-bold">₨{(selectedVendor?.total_bills ?? 0).toLocaleString()}</p>
               </div>
-              <div className="rounded-lg bg-success/10 p-3 text-center">
+              <div className="rounded-lg bg-emerald-500/10 p-3 text-center">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Paid</p>
-                <p className="text-sm font-bold text-success">₨{(selectedVendor?.paid ?? 0).toLocaleString()}</p>
+                <p className="text-sm font-bold text-emerald-600">₨{(selectedVendor?.paid ?? 0).toLocaleString()}</p>
               </div>
-              <div className="rounded-lg bg-destructive/10 p-3 text-center">
+              <div className="rounded-lg bg-rose-500/10 p-3 text-center">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground">Outstanding</p>
-                <p className="text-sm font-bold text-destructive">₨{(selectedVendor?.balance ?? 0).toLocaleString()}</p>
+                <p className="text-sm font-bold text-rose-600">₨{(selectedVendor?.balance ?? 0).toLocaleString()}</p>
               </div>
             </div>
             <table className="w-full text-sm">
@@ -876,7 +863,7 @@ const Finance = () => {
                   <tr key={p?.id} className="border-b border-border last:border-0">
                     <td className="px-3 py-2 text-muted-foreground">{p?.date}</td>
                     <td className="px-3 py-2">Payment via {p?.method} {p?.notes ? `(${p.notes})` : ""}</td>
-                    <td className="px-3 py-2 text-right text-success font-medium">- ₨{(p?.amount ?? 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-emerald-600 font-medium">- ₨{(p?.amount ?? 0).toLocaleString()}</td>
                   </tr>
                 ))}
                 <tr className="bg-muted/20">
@@ -901,9 +888,9 @@ const Finance = () => {
             <DialogDescription>Record a new payment to this vendor</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="rounded-lg bg-destructive/10 p-3 flex justify-between items-center">
+            <div className="rounded-lg bg-rose-500/10 p-3 flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Outstanding Balance:</span>
-              <span className="text-lg font-bold text-destructive">₨{(selectedVendor?.balance ?? 0).toLocaleString()}</span>
+              <span className="text-lg font-bold text-rose-600">₨{(selectedVendor?.balance ?? 0).toLocaleString()}</span>
             </div>
             <div className="space-y-1.5">
               <Label>Payment Amount (₨)</Label>

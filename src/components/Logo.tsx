@@ -25,9 +25,9 @@ export const Logo = ({ className = "", size = "md" }: LogoProps) => {
 
         {/* Swooshes with shadows */}
         <g filter="url(#shadow)">
-          <path d="M100 50C130 50 200 65 240 70C200 68 130 58 100 55Z" fill="#FF4500" />
-          <path d="M100 75C130 75 200 90 240 95C200 93 130 83 100 80Z" fill="#00BFFF" />
-          <path d="M100 100C130 100 200 115 240 120C200 118 130 108 100 105Z" fill="#FFD700" />
+          <path d="M100 50C130 50 200 65 240 70C200 68 130 58 100 55Z" fill="#FF6600" />
+          <path d="M100 75C130 75 200 90 240 95C200 93 130 83 100 80Z" fill="#0099FF" />
+          <path d="M100 100C130 100 200 115 240 120C200 118 130 108 100 105Z" fill="#FFCC00" />
         </g>
 
         {/* Text "Octonus" in white script style with a subtle dark shadow for visibility */}
@@ -49,7 +49,7 @@ export const Logo = ({ className = "", size = "md" }: LogoProps) => {
           y="200"
           fontFamily="'Dancing Script', cursive, system-ui"
           fontSize="60"
-          fill="#00BFFF"
+          fill="#33CCFF"
           style={{ fontStyle: 'italic' }}
         >
           Solutions
