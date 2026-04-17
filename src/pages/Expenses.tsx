@@ -16,7 +16,7 @@ import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
-const EXPENSE_HEADS = ["Utilities", "Staff", "Kitchen Supplies", "Decoration", "Marketing", "Maintenance", "Transport", "Miscellaneous"];
+const EXPENSE_HEADS = ["Decoration", "Food", "Transport", "Utilities", "Maintenance", "Staff", "Kitchen Supplies", "Office", "Catering", "Marketing", "Miscellaneous", "Other"];
 
 const Expenses = () => {
   const { user } = useAuth();
@@ -45,20 +45,20 @@ const Expenses = () => {
   const [showRejectModal, setShowRejectModal] = useState(false); 
   const [selectedExpense, setSelectedExpense] = useState<any>(null); 
   const [rejectionReason, setRejectionReason] = useState(""); 
- 
+
   const today = new Date().toISOString().split('T')[0]; 
   const currentMonth = new Date().toISOString().slice(0, 7); 
- 
+
   const todayTotal = (expenses ?? []) 
     .filter(e => e.date === today) 
     .reduce((sum, e) => sum + (e.amount ?? 0), 0); 
- 
+
   const monthTotal = (expenses ?? []) 
     .filter(e => e.date?.startsWith(currentMonth)) 
     .reduce((sum, e) => sum + (e.amount ?? 0), 0); 
- 
+
   const allTimeTotal = (expenses ?? []) 
-    .reduce((sum, e) => sum + (e.amount ?? 0), 0); 
+    .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
   // Voucher generator
   const generateVoucherNo = async () => { 
@@ -68,7 +68,7 @@ const Expenses = () => {
     const num = String((count ?? 0) + 1).padStart(3, '0'); 
     return `EXP-${new Date().getFullYear()}-${num}`; 
   }; 
- 
+
   // Add expense handler
   const handleAddExpense = async () => { 
     if (!newExpense.description || !newExpense.amount) { 
@@ -116,7 +116,7 @@ const Expenses = () => {
       toast.error('Failed to add expense'); 
     } 
   }; 
- 
+
   // Approval and rejection handlers
   const handleApprove = async (expense: any) => { 
     try { 
@@ -139,7 +139,7 @@ const Expenses = () => {
       toast.error('Failed to approve expense'); 
     } 
   }; 
- 
+
   const handleReject = async () => { 
     if (!rejectionReason) { 
       toast.error('Please enter rejection reason'); 
@@ -166,7 +166,7 @@ const Expenses = () => {
     } catch(e) { 
       toast.error('Failed to reject expense'); 
     } 
-  }; 
+  };
 
   // Download voucher function
   const handleDownloadVoucher = (expense: any) => { 
@@ -292,7 +292,7 @@ const Expenses = () => {
     
     doc.save(`Voucher_${expense.voucher_no}.pdf`); 
   }; 
- 
+
   // Export to Excel function
   const handleExportExcel = () => { 
     try { 
@@ -344,17 +344,30 @@ const Expenses = () => {
       toast.error('Failed to export Excel'); 
     } 
   }; 
- 
-     // Filtering logic
+
+  // Filtering logic
   const filteredExpenses = useMemo(() => {
     return (expenses ?? []).filter(e => {
       const matchSearch = (e.description ?? "").toLowerCase().includes(search.toLowerCase());
-      const matchMonth = activeTab === "monthly" ? (e.date?.startsWith(filterMonth)) : true;
       const matchCategory = filterCategory === "all" || e.category === filterCategory;
-      return matchSearch && matchMonth && matchCategory;
+      let matchDate = true;
+      if (activeTab === "monthly") {
+        matchDate = viewType === "yearly"
+          ? (e.date?.startsWith(String(new Date().getFullYear())))
+          : (e.date?.startsWith(filterMonth));
+      }
+      return matchSearch && matchDate && matchCategory;
     });
-  }, [expenses, search, filterMonth, filterCategory, activeTab]);
- 
+  }, [expenses, search, filterMonth, filterCategory, activeTab, viewType]);
+
+  const allExpenses = useMemo(() => {
+    return (expenses ?? []).filter(e => {
+      const matchSearch = (e.description ?? "").toLowerCase().includes(search.toLowerCase());
+      const matchCategory = filterCategory === "all" || e.category === filterCategory;
+      return matchSearch && matchCategory;
+    });
+  }, [expenses, search, filterCategory]);
+
   useEffect(() => { 
     if (!user) return; 
     const load = async () => { 
@@ -375,7 +388,7 @@ const Expenses = () => {
     }; 
     load(); 
   }, [user]); 
- 
+
   if (loading) return (
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
@@ -499,7 +512,8 @@ const Expenses = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value={activeTab} className="space-y-6">
+        {/* MONTHLY LOG TAB */}
+        <TabsContent value="monthly" className="space-y-6">
           {/* Filter Bar */}
           <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex flex-col sm:flex-row items-center gap-4">
             <div className="relative flex-1 w-full">
@@ -513,14 +527,12 @@ const Expenses = () => {
             </div>
             
             <div className="flex items-center gap-3 w-full sm:w-auto">
-              {activeTab === "monthly" && (
-                <Input 
-                  type="month" 
-                  className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 w-full sm:w-44"
-                  value={filterMonth}
-                  onChange={(e) => setFilterMonth(e.target.value)}
-                />
-              )}
+              <Input 
+                type="month" 
+                className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 w-full sm:w-44"
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+              />
               
               <Select value={filterCategory} onValueChange={setFilterCategory}>
                 <SelectTrigger className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 w-full sm:w-48">
@@ -541,17 +553,17 @@ const Expenses = () => {
 
           {/* Expenses Table */}
           <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="w-full">
+              <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                   <tr className="bg-slate-50/50 border-none">
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pl-8">DATE</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6">DESCRIPTION</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6">CATEGORY</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6">PAYMENT MODE</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6">STATUS</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 text-right">AMOUNT</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pr-8 text-right">ACTIONS</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pl-8 w-[100px]">DATE</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-auto">DESCRIPTION</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[120px]">CATEGORY</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[120px]">PAYMENT MODE</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[100px]">STATUS</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[110px] text-right">AMOUNT</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pr-8 text-right w-[160px]">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -567,7 +579,7 @@ const Expenses = () => {
                         <td className="py-5 pl-8 font-bold text-slate-600">
                           {e.date ? format(new Date(e.date), 'MMM d, yyyy') : '-'}
                         </td>
-                        <td className="py-5">
+                        <td className="py-5 break-words whitespace-normal max-w-[200px]">
                           <div className="font-black text-slate-900">{e.description}</div>
                         </td>
                         <td className="py-5">
@@ -635,7 +647,7 @@ const Expenses = () => {
                               </Button>
                             )}
                             {e.status === 'rejected' && e.rejection_reason && (
-                              <span className="text-[10px] font-bold text-rose-500 italic max-w-[150px] truncate">
+                              <span className="text-[10px] font-bold text-rose-500 italic whitespace-normal break-words max-w-[160px] block">
                                 Reason: {e.rejection_reason}
                               </span>
                             )}
@@ -646,6 +658,192 @@ const Expenses = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* DETAILED LEDGER TAB */}
+        <TabsContent value="ledger" className="space-y-6">
+          {/* Filter Bar */}
+          <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex flex-col sm:flex-row items-center gap-4">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input 
+                placeholder="Search expenses..." 
+                className="pl-11 h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 w-full sm:w-48">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-slate-400" />
+                    <SelectValue placeholder="All Categories" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-slate-100">
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {EXPENSE_HEADS.map(h => (
+                    <SelectItem key={h} value={h}>{h}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Expenses Table */}
+          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+            <div className="w-full">
+              <table className="w-full text-left border-collapse table-fixed">
+                <thead>
+                  <tr className="bg-slate-50/50 border-none">
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pl-8 w-[100px]">DATE</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-auto">DESCRIPTION</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[120px]">CATEGORY</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[120px]">PAYMENT MODE</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[100px]">STATUS</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[110px] text-right">AMOUNT</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pr-8 text-right w-[160px]">ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {allExpenses.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="h-32 text-center text-slate-400 font-bold uppercase tracking-widest">
+                        No expenses found
+                      </td>
+                    </tr>
+                  ) : (
+                    allExpenses.map((e) => (
+                      <tr key={e.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-5 pl-8 font-bold text-slate-600">
+                          {e.date ? format(new Date(e.date), 'MMM d, yyyy') : '-'}
+                        </td>
+                        <td className="py-5 break-words whitespace-normal max-w-[200px]">
+                          <div className="font-black text-slate-900">{e.description}</div>
+                        </td>
+                        <td className="py-5">
+                          <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 border-none rounded-lg px-3 py-1 font-bold">
+                            {e.category}
+                          </Badge>
+                        </td>
+                        <td className="py-5 font-bold text-slate-600">
+                          {e.payment_mode}
+                        </td>
+                        <td className="py-5">
+                          {e.status === 'pending' && (
+                            <Badge className="bg-amber-50 text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg px-3 py-1 font-black text-[10px] tracking-widest uppercase">
+                              PENDING
+                            </Badge>
+                          )}
+                          {e.status === 'approved' && (
+                            <Badge className="bg-emerald-50 text-emerald-600 hover:bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1 font-black text-[10px] tracking-widest uppercase">
+                              APPROVED
+                            </Badge>
+                          )}
+                          {e.status === 'rejected' && (
+                            <Badge className="bg-rose-50 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg px-3 py-1 font-black text-[10px] tracking-widest uppercase">
+                              REJECTED
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="py-5 text-right">
+                          <div className="font-black text-slate-900">
+                            Rs {(e.amount ?? 0).toLocaleString()}
+                          </div>
+                        </td>
+                        <td className="py-5 pr-8 text-right">
+                          <div className="flex justify-end gap-2">
+                            {e.status === 'pending' && (user?.role === 'admin' || user?.role === 'manager') && (
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handleApprove(e)}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-lg h-8 px-3 text-[10px] uppercase tracking-widest"
+                                >
+                                  Approve
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setSelectedExpense(e);
+                                    setShowRejectModal(true);
+                                  }}
+                                  className="bg-rose-600 hover:bg-rose-700 text-white font-black rounded-lg h-8 px-3 text-[10px] uppercase tracking-widest"
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                            {e.status === 'approved' && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleDownloadVoucher(e)}
+                                className="border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg h-8 w-8 p-0"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {e.status === 'rejected' && e.rejection_reason && (
+                              <span className="text-[10px] font-bold text-rose-500 italic whitespace-normal break-words max-w-[160px] block">
+                                Reason: {e.rejection_reason}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* CATEGORY INSIGHTS TAB */}
+        <TabsContent value="insights" className="space-y-6">
+          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-8">
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6">Spending by Category</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {EXPENSE_HEADS.map(cat => {
+                const total = expenses.filter(e => e.category === cat).reduce((sum, e) => sum + (e.amount ?? 0), 0);
+                const count = expenses.filter(e => e.category === cat).length;
+                return (
+                  <div key={cat} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-6">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{cat}</p>
+                    <p className="text-2xl font-black text-slate-900">Rs {total.toLocaleString()}</p>
+                    <p className="text-xs font-bold text-slate-400 mt-1">{count} expense{count !== 1 ? 's' : ''}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ANNUAL ANALYTICS TAB */}
+        <TabsContent value="annual" className="space-y-6">
+          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-8">
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6">Annual Expense Breakdown</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 12 }, (_, i) => {
+                const month = String(i + 1).padStart(2, '0');
+                const year = new Date().getFullYear();
+                const key = `${year}-${month}`;
+                const total = expenses.filter(e => e.date?.startsWith(key)).reduce((sum, e) => sum + (e.amount ?? 0), 0);
+                return (
+                  <div key={key} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                      {new Date(year, i).toLocaleString('default', { month: 'long' })} {year}
+                    </p>
+                    <p className="text-xl font-black text-slate-900">Rs {total.toLocaleString()}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </TabsContent>
@@ -701,7 +899,7 @@ const Expenses = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-slate-100">
-                    {["Decoration", "Food", "Transport", "Utilities", "Maintenance", "Office", "Catering", "Other"].map(cat => (
+                    {EXPENSE_HEADS.map(cat => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
                   </SelectContent>
@@ -733,7 +931,7 @@ const Expenses = () => {
                   placeholder="0.00"
                   value={newExpense.amount}
                   onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
-                  className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 font-black" 
+                  className="h-12 bg-slate-50 border-none rounded-2xl focus-visible:ring-red-500 font-bold" 
                 />
               </div>
               <div className="space-y-2">
