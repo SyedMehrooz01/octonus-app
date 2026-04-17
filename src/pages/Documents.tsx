@@ -14,8 +14,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
@@ -264,205 +263,384 @@ const Documents = () => {
     });
   };
 
-  const generatePDFWithLetterhead = async (
-    drawContent: (doc: jsPDF, startY: number, pageWidth: number, margin: number) => void,
-    fileName: string
-  ) => {
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
-
-    // ── TOP HEADER ──────────────────────────────────────────────
-    // Diagonal teal/cyan decorative stripes (top-left)
-    doc.setFillColor(51, 204, 255); // cyan (#33CCFF)
-    doc.triangle(0, 0, 38, 0, 0, 18, "F");
-    doc.setFillColor(154, 205, 50); // green (#9ACD32)
-    doc.triangle(0, 0, 28, 0, 0, 13, "F");
-
-    // Thin horizontal lines
-    doc.setDrawColor(51, 204, 255);
-    doc.setLineWidth(0.4);
-    doc.line(40, 6, pageWidth - margin, 6);
-    doc.setDrawColor(154, 205, 50);
-    doc.line(40, 9, pageWidth - margin, 9);
-
-    // Company name (top right, styled)
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(154, 205, 50); // green
-    doc.text("Octonus", pageWidth - margin - 28, 12, { align: "right" });
-    doc.setFontSize(14);
-    doc.setTextColor(100, 100, 100);
-    doc.text("Solutions", pageWidth - margin, 18, { align: "right" });
-    doc.setFontSize(6);
-    doc.setTextColor(120, 120, 120);
-    doc.text("A SPECTACULAR TURN OF EVENTS", pageWidth - margin, 22, { align: "right" });
-
-    // ── CONTENT AREA ────────────────────────────────────────────
-    const contentStartY = 32;
-    drawContent(doc, contentStartY, pageWidth, margin);
-
-    // ── BOTTOM FOOTER ───────────────────────────────────────────
-    const footerY = pageHeight - 22;
-
-    // Olive green footer bar
-    doc.setFillColor(154, 205, 50); // #9ACD32
-    doc.rect(0, footerY, pageWidth, 22, "F");
-
-    // Decorative teal/cyan triangle (bottom right)
-    doc.setFillColor(51, 204, 255); // #33CCFF
-    doc.triangle(pageWidth, footerY + 8, pageWidth, pageHeight, pageWidth - 22, pageHeight, "F");
-    doc.setFillColor(154, 205, 50); // #9ACD32
-    doc.triangle(pageWidth, footerY + 14, pageWidth, pageHeight, pageWidth - 14, pageHeight, "F");
-
-    // Footer text — 3 columns
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-
-    // Left: Address
-    doc.text("Office No. 2, Crown Centre,", 18, footerY + 8);
-    doc.text("Gulshan-e-Iqbal, Karachi", 18, footerY + 14);
-
-    // Center: Email + Website
-    doc.text("octonussolutions@gmail.com", pageWidth / 2, footerY + 8, { align: "center" });
-    doc.text("www.octonussolutions.com.pk", pageWidth / 2, footerY + 14, { align: "center" });
-
-    // Right: Phone
-    doc.text("+92 331 3195 292", pageWidth - 18, footerY + 8, { align: "right" });
-    doc.text("021 34 977 797", pageWidth - 18, footerY + 14, { align: "right" });
-
-    doc.save(fileName);
+  const generatePDFWithLetterhead = ( 
+    doc: jsPDF, 
+    drawContent: (startY: number) => number 
+  ) => { 
+    const pageWidth = doc.internal.pageSize.getWidth();   // 210mm 
+    const pageHeight = doc.internal.pageSize.getHeight(); // 297mm 
+ 
+    const drawHeader = () => { 
+      // ── White background 
+      doc.setFillColor(255, 255, 255); 
+      doc.rect(0, 0, pageWidth, 30, "F"); 
+ 
+      // ── Top-left diagonal stripe decoration 
+      // Cyan large triangle 
+      doc.setFillColor(0, 188, 212); 
+      doc.triangle(0, 0, 32, 0, 0, 20, "F"); 
+      // Green overlay triangle 
+      doc.setFillColor(139, 195, 74); 
+      doc.triangle(0, 0, 22, 0, 0, 14, "F"); 
+      // Dark teal small corner 
+      doc.setFillColor(0, 150, 136); 
+      doc.triangle(0, 0, 12, 0, 0, 8, "F"); 
+ 
+      // ── Two thin horizontal lines extending right from stripe 
+      doc.setDrawColor(0, 188, 212); 
+      doc.setLineWidth(0.5); 
+      doc.line(34, 7, pageWidth - 5, 7); 
+      doc.setDrawColor(139, 195, 74); 
+      doc.setLineWidth(0.3); 
+      doc.line(34, 10, pageWidth - 5, 10); 
+ 
+      // ── Company branding (top-right) 
+      // Circle background for logo area 
+      doc.setFillColor(240, 248, 240); 
+      doc.circle(pageWidth - 22, 15, 13, "F"); 
+      doc.setDrawColor(139, 195, 74); 
+      doc.setLineWidth(0.5); 
+      doc.circle(pageWidth - 22, 15, 13, "S"); 
+ 
+      // "Octonus" in stylized green 
+      doc.setFont("helvetica", "bolditalic"); 
+      doc.setFontSize(9); 
+      doc.setTextColor(76, 153, 0); 
+      doc.text("Octonus", pageWidth - 28, 13); 
+ 
+      // "Solutions" in gray 
+      doc.setFont("helvetica", "bold"); 
+      doc.setFontSize(7); 
+      doc.setTextColor(100, 100, 100); 
+      doc.text("Solutions", pageWidth - 27, 18); 
+ 
+      // Tagline 
+      doc.setFont("helvetica", "normal"); 
+      doc.setFontSize(5); 
+      doc.setTextColor(150, 150, 150); 
+      doc.text("A SPECTACULAR TURN OF EVENTS", pageWidth - 35, 23); 
+    }; 
+ 
+    const drawFooter = (pageNum: number, totalPages: number) => { 
+      // ── Olive green footer bar 
+      doc.setFillColor(101, 114, 57); 
+      doc.rect(0, pageHeight - 22, pageWidth, 22, "F"); 
+ 
+      // ── Decorative triangles bottom-right 
+      doc.setFillColor(0, 188, 212); 
+      doc.triangle(pageWidth, pageHeight - 14, pageWidth, pageHeight, pageWidth - 20, pageHeight, "F"); 
+      doc.setFillColor(139, 195, 74); 
+      doc.triangle(pageWidth, pageHeight - 8, pageWidth, pageHeight, pageWidth - 12, pageHeight, "F"); 
+ 
+      // ── Three footer columns 
+      doc.setFont("helvetica", "normal"); 
+      doc.setFontSize(7); 
+      doc.setTextColor(255, 255, 255); 
+ 
+      // Left: address with pin icon circle 
+      doc.setFillColor(210, 105, 30); 
+      doc.circle(14, pageHeight - 14, 3, "F"); 
+      doc.setTextColor(255, 255, 255); 
+      doc.setFontSize(6); 
+      doc.text("o", 13.2, pageHeight - 13.5); // pin icon substitute 
+      doc.setFontSize(7); 
+      doc.text("Office No. 2, Crown Centre,", 19, pageHeight - 15); 
+      doc.text("Gulshan-e-Iqbal, Karachi", 19, pageHeight - 10); 
+ 
+      // Center: email + website with globe icon circle 
+      doc.setFillColor(210, 105, 30); 
+      doc.circle(pageWidth / 2 - 18, pageHeight - 14, 3, "F"); 
+      doc.setFontSize(7); 
+      doc.text("octonussolutions@gmail.com", pageWidth / 2 - 12, pageHeight - 15); 
+      doc.text("www.octonussolutions.com.pk", pageWidth / 2 - 12, pageHeight - 10); 
+ 
+      // Right: phones with phone icon circle 
+      doc.setFillColor(210, 105, 30); 
+      doc.circle(pageWidth - 42, pageHeight - 14, 3, "F"); 
+      doc.text("+92 331 3195 292", pageWidth - 37, pageHeight - 15); 
+      doc.text("021 34 977 797", pageWidth - 37, pageHeight - 10); 
+ 
+      // Page number center bottom 
+      doc.setFontSize(6.5); 
+      doc.setTextColor(200, 220, 180); 
+      doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth / 2, pageHeight - 4, { align: "center" }); 
+    }; 
+ 
+    // Draw header on page 1 
+    drawHeader(); 
+    const contentStartY = 32; 
+    const endY = drawContent(contentStartY); 
+    const totalPages = doc.getNumberOfPages(); 
+ 
+    // Draw header + footer on every page 
+    for (let i = 1; i <= totalPages; i++) { 
+      doc.setPage(i); 
+      drawHeader(); 
+      drawFooter(i, totalPages); 
+    } 
   };
 
-  const generatePDF = async (doc: DocumentData) => {
-    if (!doc.client_company || !doc.doc_number || (doc.items ?? []).length === 0) {
-      toast.error("Required document fields are missing");
-      return;
-    }
-
-    const isInvoice = doc.doc_type === "Invoice";
-    const title = isInvoice ? "INVOICE" : "QUOTATION";
-
-    await generatePDFWithLetterhead((pdf, startY, pageWidth, margin) => {
-      // Document title
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(20);
-      pdf.setTextColor(40, 40, 40);
-      pdf.text(title, pageWidth / 2, startY + 6, { align: "center" });
-
-      // Horizontal rule below title
-      pdf.setDrawColor(180, 180, 180);
-      pdf.setLineWidth(0.3);
-      pdf.line(margin, startY + 10, pageWidth - margin, startY + 10);
-
-      // Doc number + date (two columns)
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
-      pdf.setTextColor(80, 80, 80);
-      pdf.text(`${title} No: ${doc.doc_number ?? "N/A"}`, margin, startY + 18);
-      pdf.text(`Date: ${doc.invoice_date ? format(new Date(doc.invoice_date), "dd MMM yyyy") : "N/A"}`, pageWidth - margin, startY + 18, { align: "right" });
-
-      // Valid until (for quotations)
-      if (!isInvoice && doc.valid_until) {
-        pdf.text(`Valid Until: ${format(new Date(doc.valid_until), "dd MMM yyyy")}`, margin, startY + 24);
-      }
-
-      // Bill To section
-      const billY = startY + 32;
-      pdf.setFillColor(245, 245, 245);
-      pdf.roundedRect(margin, billY, (pageWidth - 2 * margin) / 2 - 4, 24, 2, 2, "F");
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(8);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text("BILL TO", margin + 4, billY + 7);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(10);
-      pdf.setTextColor(30, 30, 30);
-      pdf.text(doc.client_company ?? "N/A", margin + 4, billY + 14);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(80, 80, 80);
-      pdf.text(doc.contact_person ?? "", margin + 4, billY + 20);
-
-      // Items Table
-      const tableStartY = billY + 32;
-      const colWidths = [10, 75, 25, 25, 35]; // #, Description, Qty, Rate, Amount
-      const colX = [margin, margin + 10, margin + 85, margin + 110, margin + 135];
-      const rowH = 8;
-
-      // Table header
-      pdf.setFillColor(100, 116, 55); // olive green matching footer
-      pdf.rect(margin, tableStartY, pageWidth - 2 * margin, rowH, "F");
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(8);
-      pdf.setTextColor(255, 255, 255);
-      ["#", "DESCRIPTION", "QTY", "RATE", "AMOUNT"].forEach((h, i) => {
-        pdf.text(h, colX[i] + 2, tableStartY + 5.5);
-      });
-
-      // Table rows
-      const items = doc.items ?? [];
-      items.forEach((item: any, idx: number) => {
-        const rowY = tableStartY + rowH + idx * rowH;
-        if (idx % 2 === 0) {
-          pdf.setFillColor(250, 250, 250);
-          pdf.rect(margin, rowY, pageWidth - 2 * margin, rowH, "F");
-        }
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(8);
-        pdf.setTextColor(50, 50, 50);
-        pdf.text(String(idx + 1), colX[0] + 2, rowY + 5.5);
-        pdf.text(String(item.description ?? item.name ?? ""), colX[1] + 2, rowY + 5.5, { maxWidth: 72 });
-        pdf.text(String(item.quantity ?? item.qty ?? 1), colX[2] + 2, rowY + 5.5);
-        pdf.text(`Rs ${Number(item.rate ?? item.unit_price ?? 0).toLocaleString()}`, colX[3] + 2, rowY + 5.5);
-        const amt = (item.quantity ?? item.qty ?? 1) * (item.rate ?? item.unit_price ?? 0);
-        pdf.text(`Rs ${Number(amt).toLocaleString()}`, colX[4] + 2, rowY + 5.5);
-      });
-
-      // Totals section
-      const totalsY = tableStartY + rowH + items.length * rowH + 6;
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(pageWidth - margin - 60, totalsY, pageWidth - margin, totalsY);
-
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
-      pdf.setTextColor(60, 60, 60);
-      pdf.text("Subtotal:", pageWidth - margin - 58, totalsY + 7);
-      pdf.text(`Rs ${Number(doc.total_amount ?? doc.sub_total ?? 0).toLocaleString()}`, pageWidth - margin, totalsY + 7, { align: "right" });
-
-      if (doc.srb_amount) {
-        pdf.text("SRB (15%):", pageWidth - margin - 58, totalsY + 14);
-        pdf.setTextColor(220, 50, 50);
-        pdf.text(`Rs ${Number(doc.srb_amount).toLocaleString()}`, pageWidth - margin, totalsY + 14, { align: "right" });
-      }
-
-      // Grand total box
-      pdf.setFillColor(100, 116, 55);
-      pdf.roundedRect(pageWidth - margin - 62, totalsY + 18, 62, 12, 2, 2, "F");
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(10);
-      pdf.setTextColor(255, 255, 255);
-      pdf.text("TOTAL:", pageWidth - margin - 58, totalsY + 26);
-      pdf.text(`Rs ${Number(doc.sub_total ?? 0).toLocaleString()}`, pageWidth - margin - 2, totalsY + 26, { align: "right" });
-
-      // Notes
-      if (doc.terms) {
-        pdf.setFont("helvetica", "italic");
-        pdf.setFontSize(8);
-        pdf.setTextColor(120, 120, 120);
-        const splitTerms = pdf.splitTextToSize(doc.terms, pageWidth - 2 * margin);
-        pdf.text(splitTerms, margin, totalsY + 38);
-      }
-
-      // Thank you line
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(100, 116, 55);
-      pdf.text("Thank you for choosing Octonus Solutions!", pageWidth / 2, totalsY + 48 + (doc.terms ? (pdf.splitTextToSize(doc.terms, pageWidth - 2 * margin).length * 4) : 0), { align: "center" });
-
-    }, `${title}_${doc.doc_number ?? doc.id}.pdf`);
+  const handleDownloadPDF = (document: any) => { 
+    const isInvoice = document.doc_type === "Invoice"; 
+    const docTitle = isInvoice ? "INVOICE" : "QUOTATION"; 
+    const docLabel = isInvoice ? "INVOICE No:" : "QUOTATION No:"; 
+ 
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" }); 
+    const pageWidth = pdf.internal.pageSize.getWidth(); 
+    const pageHeight = pdf.internal.pageSize.getHeight(); 
+    const margin = 14; 
+    const contentMaxY = pageHeight - 28; // leave room for footer 
+ 
+    generatePDFWithLetterhead(pdf, (startY: number) => { 
+      let y = startY; 
+ 
+      // ── DOCUMENT TITLE BAR 
+      pdf.setFillColor(101, 114, 57); 
+      pdf.rect(margin, y, pageWidth - margin * 2, 10, "F"); 
+      pdf.setFont("helvetica", "bold"); 
+      pdf.setFontSize(13); 
+      pdf.setTextColor(255, 255, 255); 
+      pdf.text(docTitle, pageWidth / 2, y + 7, { align: "center" }); 
+      y += 14; 
+ 
+      // ── DOC NUMBER + DATE ROW 
+      pdf.setFont("helvetica", "normal"); 
+      pdf.setFontSize(8.5); 
+      pdf.setTextColor(50, 50, 50); 
+      pdf.text(`${docLabel} ${document.doc_number ?? "N/A"}`, margin, y); 
+      pdf.text( 
+        `Date: ${document.invoice_date ? format(new Date(document.invoice_date), "dd MMM yyyy") : "N/A"}`, 
+        pageWidth - margin, 
+        y, 
+        { align: "right" } 
+      ); 
+      y += 5; 
+ 
+      if (!isInvoice && document.valid_until) { 
+        pdf.setTextColor(180, 60, 60); 
+        pdf.setFont("helvetica", "italic"); 
+        pdf.setFontSize(8); 
+        pdf.text( 
+          `Valid Until: ${format(new Date(document.valid_until), "dd MMM yyyy")}`, 
+          margin, 
+          y 
+        ); 
+        pdf.setTextColor(50, 50, 50); 
+        pdf.setFont("helvetica", "normal"); 
+      } 
+      y += 7; 
+ 
+      // ── BILL TO BOX 
+      pdf.setFillColor(245, 248, 240); 
+      pdf.setDrawColor(180, 200, 120); 
+      pdf.setLineWidth(0.3); 
+      pdf.roundedRect(margin, y, 85, 20, 2, 2, "FD"); 
+ 
+      pdf.setFont("helvetica", "bold"); 
+      pdf.setFontSize(7); 
+      pdf.setTextColor(101, 114, 57); 
+      pdf.text("BILL TO", margin + 3, y + 6); 
+ 
+      pdf.setFont("helvetica", "bold"); 
+      pdf.setFontSize(10); 
+      pdf.setTextColor(20, 20, 20); 
+      pdf.text(document.client_company ?? "N/A", margin + 3, y + 12); 
+ 
+      pdf.setFont("helvetica", "normal"); 
+      pdf.setFontSize(8.5); 
+      pdf.setTextColor(80, 80, 80); 
+      pdf.text(document.contact_person ?? "", margin + 3, y + 18); 
+ 
+      y += 26; 
+ 
+      // ── ITEMS TABLE 
+      const colX    = [margin, margin + 9, margin + 100, margin + 117, margin + 137, margin + 158]; 
+      const colW    = [9,       91,          17,           20,           21,           23]; 
+      const headers = ["#",    "DESCRIPTION", "QTY",      "UNIT",      "RATE",       "AMOUNT"]; 
+      const rowH    = 7; 
+      const headerH = 8; 
+ 
+      const drawTableHeader = (yPos: number) => { 
+        pdf.setFillColor(101, 114, 57); 
+        pdf.rect(margin, yPos, pageWidth - margin * 2, headerH, "F"); 
+        pdf.setFont("helvetica", "bold"); 
+        pdf.setFontSize(7.5); 
+        pdf.setTextColor(255, 255, 255); 
+        headers.forEach((h, i) => { 
+          pdf.text(h, colX[i] + 2, yPos + 5.5); 
+        }); 
+        return yPos + headerH; 
+      }; 
+ 
+      y = drawTableHeader(y); 
+ 
+      const items = document.items ?? []; 
+      let grandTotal = 0; 
+ 
+      items.forEach((item: any, idx: number) => { 
+        const qty    = Number(item.quantity ?? item.qty ?? 1); 
+        const rate   = Number(item.rate ?? item.unit_price ?? 0); 
+        const unit   = item.unit ?? "N/A"; 
+        const amount = qty * rate; 
+        grandTotal  += amount; 
+        const desc   = String(item.description ?? item.name ?? ""); 
+ 
+        // Calculate how many lines the description needs 
+        const maxDescWidth = colW[1] - 4; 
+        const descLines    = pdf.splitTextToSize(desc, maxDescWidth); 
+        const cellH        = Math.max(rowH, descLines.length * 4.5 + 3); 
+ 
+        // Page break if needed 
+        if (y + cellH > contentMaxY) { 
+          pdf.addPage(); 
+          y = 32; 
+          y = drawTableHeader(y); 
+        } 
+ 
+        // Alternating row background 
+        if (idx % 2 === 0) { 
+          pdf.setFillColor(250, 252, 245); 
+        } else { 
+          pdf.setFillColor(255, 255, 255); 
+        } 
+        pdf.rect(margin, y, pageWidth - margin * 2, cellH, "F"); 
+ 
+        // Row border 
+        pdf.setDrawColor(220, 228, 200); 
+        pdf.setLineWidth(0.2); 
+        pdf.rect(margin, y, pageWidth - margin * 2, cellH, "S"); 
+ 
+        // Cell content 
+        pdf.setFont("helvetica", "normal"); 
+        pdf.setFontSize(7.5); 
+        pdf.setTextColor(40, 40, 40); 
+ 
+        // # column 
+        pdf.text(String(idx + 1), colX[0] + 2, y + 5); 
+ 
+        // Description — wrapped 
+        pdf.text(descLines, colX[1] + 2, y + 5); 
+ 
+        // QTY 
+        pdf.text(String(qty), colX[2] + 2, y + 5); 
+ 
+        // Unit 
+        pdf.text(unit, colX[3] + 2, y + 5); 
+ 
+        // Rate — right-aligned in cell 
+        pdf.setFont("helvetica", "normal"); 
+        pdf.text( 
+          `Rs ${rate.toLocaleString()}`, 
+          colX[4] + colW[4] - 2, 
+          y + 5, 
+          { align: "right" } 
+        ); 
+ 
+        // Amount — right-aligned, bold 
+        pdf.setFont("helvetica", "bold"); 
+        pdf.setTextColor(101, 114, 57); 
+        pdf.text( 
+          `Rs ${amount.toLocaleString()}`, 
+          colX[5] + colW[5] - 2, 
+          y + 5, 
+          { align: "right" } 
+        ); 
+ 
+        y += cellH; 
+      }); 
+ 
+      // ── TOTALS SECTION 
+      if (y + 30 > contentMaxY) { 
+        pdf.addPage(); 
+        y = 32; 
+      } 
+ 
+      y += 4; 
+ 
+      // Subtotal row 
+      pdf.setFillColor(240, 244, 230); 
+      pdf.rect(pageWidth - margin - 70, y, 70, 7, "F"); 
+      pdf.setFont("helvetica", "normal"); 
+      pdf.setFontSize(8.5); 
+      pdf.setTextColor(60, 60, 60); 
+      pdf.text("Subtotal:", pageWidth - margin - 68, y + 5); 
+      pdf.setFont("helvetica", "bold"); 
+      pdf.setTextColor(20, 20, 20); 
+      pdf.text( 
+        `Rs ${grandTotal.toLocaleString()}`, 
+        pageWidth - margin - 2, 
+        y + 5, 
+        { align: "right" } 
+      ); 
+      y += 9; 
+ 
+      // Discount row (if any) 
+      const discount = Number(document.discount ?? 0); 
+      if (discount > 0) { 
+        pdf.setFillColor(255, 245, 245); 
+        pdf.rect(pageWidth - margin - 70, y, 70, 7, "F"); 
+        pdf.setFont("helvetica", "normal"); 
+        pdf.setFontSize(8.5); 
+        pdf.setTextColor(180, 50, 50); 
+        pdf.text("Discount:", pageWidth - margin - 68, y + 5); 
+        pdf.setFont("helvetica", "bold"); 
+        pdf.text( 
+          `- Rs ${discount.toLocaleString()}`, 
+          pageWidth - margin - 2, 
+          y + 5, 
+          { align: "right" } 
+        ); 
+        y += 9; 
+      } 
+ 
+      const finalTotal = grandTotal - discount; 
+ 
+      // Grand total bar 
+      pdf.setFillColor(101, 114, 57); 
+      pdf.roundedRect(pageWidth - margin - 72, y, 72, 11, 2, 2, "F"); 
+      pdf.setFont("helvetica", "bold"); 
+      pdf.setFontSize(10); 
+      pdf.setTextColor(255, 255, 255); 
+      pdf.text("GRAND TOTAL:", pageWidth - margin - 70, y + 7.5); 
+      pdf.text( 
+        `Rs ${finalTotal.toLocaleString()}`, 
+        pageWidth - margin - 2, 
+        y + 7.5, 
+        { align: "right" } 
+      ); 
+      y += 15; 
+ 
+      // ── NOTES 
+      if (document.terms) { 
+        pdf.setFillColor(248, 250, 244); 
+        pdf.setDrawColor(180, 200, 120); 
+        pdf.setLineWidth(0.3); 
+        const noteLines = pdf.splitTextToSize(`Note: ${document.terms}`, pageWidth - margin * 2 - 6); 
+        const noteH = noteLines.length * 4.5 + 6; 
+        pdf.roundedRect(margin, y, pageWidth - margin * 2, noteH, 2, 2, "FD"); 
+        pdf.setFont("helvetica", "italic"); 
+        pdf.setFontSize(8); 
+        pdf.setTextColor(80, 80, 80); 
+        pdf.text(noteLines, margin + 3, y + 5); 
+        y += noteH + 4; 
+      } 
+ 
+      // ── THANK YOU LINE 
+      y += 4; 
+      pdf.setFont("helvetica", "bolditalic"); 
+      pdf.setFontSize(9); 
+      pdf.setTextColor(101, 114, 57); 
+      pdf.text( 
+        "Thank you for choosing Octonus Solutions!", 
+        pageWidth / 2, 
+        y, 
+        { align: "center" } 
+      ); 
+ 
+      return y; 
+    }); 
+ 
+    pdf.save(`${docTitle}_${document.doc_number ?? document.id}.pdf`); 
   };
 
   const generateExcel = (doc: DocumentData) => {
@@ -750,31 +928,6 @@ const Documents = () => {
                         {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                         Save {activeTab}
                       </Button>
-                      <Button 
-                        onClick={() => {
-                          const tempDoc: DocumentData = {
-                            doc_number: docNo,
-                            doc_type: activeTab,
-                            invoice_date: date,
-                            client_company: clientCompany,
-                            contact_person: contactPerson,
-                            client_address: clientAddress,
-                            event_name: eventName,
-                            items: items,
-                            total_amount: total,
-                            srb_amount: srb,
-                            sub_total: subTotal,
-                            terms: terms,
-                            valid_until: validUntil,
-                            event_date: eventDate
-                          };
-                          generatePDF(tempDoc);
-                        }} 
-                        variant="outline"
-                        className="h-14 w-14 rounded-2xl border-slate-200 hover:bg-slate-50 text-slate-600"
-                      >
-                        <FileDown className="h-6 w-6" />
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -850,7 +1003,7 @@ const Documents = () => {
                                 > 
                                   {doc.doc_type === "Quotation" ? "→ Invoice" : "→ Quotation"} 
                                 </Button> 
-                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 shadow-sm" onClick={() => generatePDF(doc)}>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-100/50 shadow-sm" onClick={() => handleDownloadPDF(doc)}>
                                   <FileDown className="h-4 w-4" />
                                 </Button>
                                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-100/50 shadow-sm" onClick={() => generateExcel(doc)}>
