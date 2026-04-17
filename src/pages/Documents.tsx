@@ -10,7 +10,8 @@ import {
   Save, 
   FileDown,
   Receipt,
-  History
+  History,
+  Edit
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -73,6 +74,9 @@ const Documents = () => {
   const [documents, setDocuments] = useState<DocumentData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Edit state
+  const [editingDoc, setEditingDoc] = useState<DocumentData | null>(null);
+
   // Form State
   const [docNo, setDocNo] = useState("");
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -115,6 +119,7 @@ const Documents = () => {
 
 
   const generateDocNo = useCallback(async (isMounted = true) => {
+    if (editingDoc) return; // don't generate doc no when editing
     if (activeTab === "archive") return;
     try {
       const prefix = activeTab === "Quotation" ? "QT" : "INV";
@@ -136,7 +141,7 @@ const Documents = () => {
     } catch (err: any) {
       if (isMounted) toast.error("Failed to generate document number");
     }
-  }, [activeTab]);
+  }, [activeTab, editingDoc]);
 
   useEffect(() => {
     let isMounted = true;
@@ -146,8 +151,10 @@ const Documents = () => {
   }, [fetchDocuments, generateDocNo]);
 
   useEffect(() => {
-    setTerms(activeTab === "Quotation" ? quotationTerms : invoiceTerms);
-  }, [activeTab]);
+    if (!editingDoc) {
+      setTerms(activeTab === "Quotation" ? quotationTerms : invoiceTerms);
+    }
+  }, [activeTab, editingDoc]);
 
   const handleAddItem = () => {
     setItems([...items, { description: "", qty: 1, rate: 0, amount: 0 }]);
@@ -184,51 +191,27 @@ const Documents = () => {
 
   const { total, srb, subTotal } = calculateTotals();
 
-  const handleSave = async () => {
-    if (activeTab === "archive") return;
-    if (!clientCompany || !eventName) {
-      toast.error("Please fill in client company and event name");
-      return;
+  const handleEditClick = (doc: DocumentData) => {
+    setEditingDoc(doc);
+    
+    if (doc.doc_type) {
+      setActiveTab(doc.doc_type);
     }
-
-    setSaving(true);
-    try {
-      const docData: Partial<DocumentData> = {
-        doc_number: docNo,
-        doc_type: activeTab as "Quotation" | "Invoice",
-        invoice_date: date,
-        client_company: clientCompany,
-        contact_person: contactPerson,
-        client_address: clientAddress,
-        event_name: eventName,
-        items: items,
-        total_amount: total,
-        srb_amount: srb,
-        sub_total: subTotal,
-        terms: terms,
-        status: "Active",
-        created_by: user?.name || user?.email || "System"
-      };
-
-      if (activeTab === "Quotation") {
-        docData.valid_until = validUntil;
-      } else if (activeTab === "Invoice") {
-        docData.event_date = eventDate;
-      }
-
-      await documentService.addDocument(docData);
-
-      toast.success(`${activeTab} saved successfully`);
-      fetchDocuments();
-      resetForm();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save document");
-    } finally {
-      setSaving(false);
-    }
+    
+    setDocNo(doc.doc_number);
+    setDate(doc.invoice_date);
+    setValidUntil(doc.valid_until ?? "");
+    setEventDate(doc.event_date ?? "");
+    setClientCompany(doc.client_company);
+    setContactPerson(doc.contact_person);
+    setClientAddress(doc.client_address);
+    setEventName(doc.event_name);
+    setItems(doc.items);
+    setTerms(doc.terms);
   };
 
   const resetForm = () => {
+    setEditingDoc(null);
     generateDocNo();
     setDate(format(new Date(), "yyyy-MM-dd"));
     setValidUntil("");
@@ -239,6 +222,89 @@ const Documents = () => {
     setEventName("");
     setItems([{ description: "", qty: 1, rate: 0, amount: 0 }]);
     setTerms(activeTab === "Quotation" ? quotationTerms : invoiceTerms);
+  };
+
+  const handleSave = async () => {
+    if (activeTab === "archive") return;
+
+    if (!clientCompany || !eventName) {
+      toast.error("Please fill in client company and event name");
+      return;
+    }
+
+    if (editingDoc && editingDoc.id) {
+      // SAVE EDIT
+      setSaving(true);
+      try {
+        const docData: Partial<DocumentData> = {
+          doc_number: docNo,
+          doc_type: activeTab as "Quotation" | "Invoice",
+          invoice_date: date,
+          client_company: clientCompany,
+          contact_person: contactPerson,
+          client_address: clientAddress,
+          event_name: eventName,
+          items: items,
+          total_amount: total,
+          srb_amount: srb,
+          sub_total: subTotal,
+          terms: terms
+        };
+
+        if (activeTab === "Quotation") {
+          docData.valid_until = validUntil;
+        } else if (activeTab === "Invoice") {
+          docData.event_date = eventDate;
+        }
+
+        await documentService.updateDocument(editingDoc.id, docData);
+
+        toast.success("Document updated successfully!");
+        fetchDocuments();
+        resetForm();
+      } catch (err: any) {
+        toast.error(err.message || "Failed to update document");
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      // CREATE NEW
+      setSaving(true);
+      try {
+        const docData: Partial<DocumentData> = {
+          doc_number: docNo,
+          doc_type: activeTab as "Quotation" | "Invoice",
+          invoice_date: date,
+          client_company: clientCompany,
+          contact_person: contactPerson,
+          client_address: clientAddress,
+          event_name: eventName,
+          items: items,
+          total_amount: total,
+          srb_amount: srb,
+          sub_total: subTotal,
+          terms: terms,
+          status: "Active",
+          created_by: user?.name || user?.email || "System"
+        };
+
+        if (activeTab === "Quotation") {
+          docData.valid_until = validUntil;
+        } else if (activeTab === "Invoice") {
+          docData.event_date = eventDate;
+        }
+
+        await documentService.addDocument(docData);
+
+        toast.success(`${activeTab} saved successfully`);
+        fetchDocuments();
+        resetForm();
+      } catch (err: any) {
+        toast.error(err.message || "Failed to save document");
+      } finally {
+        setSaving(false);
+      }
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -764,9 +830,22 @@ const Documents = () => {
           <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Documents Generator</h1>
           <p className="text-slate-500 font-bold mt-1">Create professional Quotations and Invoices instantly.</p>
         </div>
+        {editingDoc && (
+          <Button 
+            variant="destructive" 
+            onClick={resetForm} 
+            className="h-12 rounded-xl gap-2 font-black"
+          >
+            Cancel Edit
+          </Button>
+        )}
       </div>
 
-        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v: any) => {
+          if (!editingDoc) {
+            setActiveTab(v);
+          }
+        }} className="w-full">
           <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
             <TabsTrigger value="Quotation" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
               <FileText className="h-4 w-4" /> Quotation
@@ -781,10 +860,10 @@ const Documents = () => {
 
           <TabsContent value={activeTab} className="space-y-6 animate-in fade-in duration-500">
             <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
-                  <div className="px-8 pt-8 pb-4">
+                  <div className="px-8 pt-8 pb-4 flex items-center justify-between">
                     <h2 className="text-xl font-black text-[#0f172a] flex items-center gap-3">
                       <PlusCircle className="h-6 w-6 text-blue-600" />
-                      New {activeTab} Setup
+                      {editingDoc ? `Edit ${editingDoc.doc_type} — ${docNo}` : `New ${activeTab} Setup`}
                     </h2>
                   </div>
               <div className="p-8">
@@ -926,7 +1005,7 @@ const Documents = () => {
                         className="flex-1 h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest gap-3 shadow-xl shadow-blue-600/20"
                       >
                         {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                        Save {activeTab}
+                        {editingDoc ? "Save Changes" : `Save ${activeTab}`}
                       </Button>
                     </div>
                   </div>
@@ -995,6 +1074,14 @@ const Documents = () => {
                             <td className="px-8 py-6 text-right font-black text-[#0f172a] tracking-tight">{formatCurrency(doc?.sub_total ?? 0)}</td>
                             <td className="px-8 py-6 text-right">
                               <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => handleEditClick(doc)} 
+                                  className="rounded-lg h-8 px-3 text-[10px] font-black uppercase tracking-widest border-amber-200 text-amber-600 hover:bg-amber-50 gap-1" 
+                                > 
+                                  <Edit className="h-3 w-3" /> Edit
+                                </Button>
                                 <Button 
                                   size="sm" 
                                   variant="outline" 
