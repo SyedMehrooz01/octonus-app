@@ -17,6 +17,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import SkeletonLoading from "@/components/SkeletonLoading";
+import { generatePDFWithLetterhead } from "@/lib/pdfLetterhead";
 
 interface LedgerEntry {
   id: string;
@@ -73,7 +74,7 @@ const Finance = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [showPaySupplier, setShowPaySupplier] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
-  const [newEntry, setNewEntry] = useState({ date: format(new Date(), "yyyy-MM-dd"), description:"", account:"Cash", type:"debit" as const, amount:"" });
+  const [newEntry, setNewEntry] = useState({ date: format(new Date(), "yyyy-MM-dd"), description:"", account:"Cash", type:"debit" as "debit" | "credit", amount:"" });
   const [payAmount, setPayAmount] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   
@@ -349,12 +350,18 @@ const Finance = () => {
   }, []);
 
   const exportToPDF = useCallback((headers: string[], data: any[][], title: string, fileName: string) => {
-    const doc = new jsPDF();
-    doc.text(title, 14, 15);
-    autoTable(doc, {
-      head: [headers],
-      body: data,
-      startY: 20,
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    generatePDFWithLetterhead(doc, (startY: number) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text(title, doc.internal.pageSize.getWidth() / 2, startY, { align: "center" });
+      
+      autoTable(doc, {
+        head: [headers],
+        body: data,
+        startY: startY + 10,
+      });
+      return (doc as any).lastAutoTable.finalY;
     });
     doc.save(`${fileName}.pdf`);
   }, []);

@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import { generatePDFWithLetterhead } from "@/lib/pdfLetterhead";
 
 const EXPENSE_HEADS = ["Decoration", "Food", "Transport", "Utilities", "Maintenance", "Staff", "Kitchen Supplies", "Office", "Catering", "Marketing", "Miscellaneous", "Other"];
 
@@ -169,128 +170,114 @@ const Expenses = () => {
   };
 
   // Download voucher function
-  const handleDownloadVoucher = (expense: any) => { 
-    const doc = new jsPDF(); 
-    
-    // Green header bar 
-    doc.setFillColor(45, 106, 79); 
-    doc.rect(0, 0, 210, 35, 'F'); 
-    
-    // Company name 
-    doc.setTextColor(255, 255, 255); 
-    doc.setFontSize(18); 
-    doc.setFont('helvetica', 'bold'); 
-    doc.text('Octonus Solutions', 15, 15); 
-    
-    // Tagline 
-    doc.setFontSize(9); 
-    doc.setFont('helvetica', 'normal'); 
-    doc.text('A Spectacular Turn of Events', 15, 22); 
-    
-    // Address details 
-    doc.setFontSize(8); 
-    doc.text('Office No. 2, Crown Centre, Gulshan-e-Iqbal, Karachi', 15, 28); 
-    doc.text('+92-331-3195292 | octonussolutions@gmail.com', 15, 33); 
-    
-    // Reset color 
-    doc.setTextColor(0, 0, 0); 
-    
-    // Voucher title 
-    doc.setFontSize(20); 
-    doc.setFont('helvetica', 'bold'); 
-    doc.text('EXPENSE VOUCHER', 105, 50, { align: 'center' }); 
-    
-    // Voucher number 
-    doc.setFontSize(10); 
-    doc.setFont('helvetica', 'normal'); 
-    doc.text(`Voucher No: ${expense.voucher_no}`, 150, 50); 
-    
-    // Line 
-    doc.setDrawColor(45, 106, 79); 
-    doc.setLineWidth(0.5); 
-    doc.line(15, 55, 195, 55); 
-    
-    // Details section 
-    doc.setFontSize(10); 
-    doc.setFont('helvetica', 'bold'); 
-    doc.text('EXPENSE DETAILS', 15, 65); 
-    
-    doc.setFont('helvetica', 'normal'); 
-    doc.text(`Date: ${expense.date ? format(new Date(expense.date), 'dd MMM yyyy') : '-'}`, 15, 75); 
-    doc.text(`Category: ${expense.category ?? '-'}`, 15, 82); 
-    doc.text(`Payment Mode: ${expense.payment_mode ?? '-'}`, 15, 89); 
-    doc.text(`Linked Event: ${expense.linked_event ?? 'N/A'}`, 15, 96); 
-    
-    doc.text(`Created By: ${expense.created_by_name ?? '-'}`, 110, 75); 
-    doc.text(`Role: ${expense.created_by_role ?? '-'}`, 110, 82); 
-    doc.text(`Created At: ${expense.created_at ? format(new Date(expense.created_at), 'dd MMM yyyy HH:mm') : '-'}`, 110, 89); 
-    
-    // Description box 
-    doc.setDrawColor(200, 200, 200); 
-    doc.rect(15, 105, 180, 25); 
-    doc.setFont('helvetica', 'bold'); 
-    doc.text('DESCRIPTION:', 18, 113); 
-    doc.setFont('helvetica', 'normal'); 
-    doc.text(expense.description ?? '-', 18, 120, { maxWidth: 174 }); 
-    
-    // Amount section 
-    doc.setFillColor(240, 240, 240); 
-    doc.rect(120, 138, 75, 20, 'F'); 
-    doc.setFont('helvetica', 'bold'); 
-    doc.setFontSize(12); 
-    doc.setTextColor(180, 0, 0); 
-    doc.text(`Rs. ${(expense.amount ?? 0).toLocaleString()}/-`, 157, 151, { align: 'center' }); 
-    doc.setTextColor(0, 0, 0); 
-    
-    // Approval box 
-    doc.setDrawColor(45, 106, 79); 
-    doc.setLineWidth(1); 
-    doc.rect(15, 165, 180, 30); 
-    doc.setFillColor(240, 255, 240); 
-    doc.rect(15, 165, 180, 30, 'F'); 
-    doc.setTextColor(45, 106, 79); 
-    doc.setFont('helvetica', 'bold'); 
-    doc.setFontSize(11); 
-    doc.text('✓ APPROVED', 105, 175, { align: 'center' }); 
-    doc.setFontSize(9); 
-    doc.setFont('helvetica', 'normal'); 
-    doc.text(`Approved By: ${expense.approved_by ?? '-'}`, 20, 183); 
-    doc.text(`Approval Date: ${expense.approved_at ? format(new Date(expense.approved_at), 'dd MMM yyyy HH:mm') : '-'}`, 110, 183); 
-    doc.setTextColor(0, 0, 0); 
-    
-    // Signature boxes 
-    doc.setLineWidth(0.5); 
-    doc.setDrawColor(100, 100, 100); 
-    
-    // Left signature box 
-    doc.rect(15, 205, 85, 40); 
-    doc.setFont('helvetica', 'bold'); 
-    doc.setFontSize(9); 
-    doc.text('PREPARED BY', 57, 215, { align: 'center' }); 
-    doc.setFont('helvetica', 'normal'); 
-    doc.text('Name: ____________________', 20, 225); 
-    doc.text('Sign:  ____________________', 20, 233); 
-    doc.text('Date:  ____________________', 20, 241); 
-    
-    // Right signature box 
-    doc.rect(110, 205, 85, 40); 
-    doc.setFont('helvetica', 'bold'); 
-    doc.text('AUTHORIZED BY', 152, 215, { align: 'center' }); 
-    doc.setFont('helvetica', 'normal'); 
-    doc.text('Name: ____________________', 115, 225); 
-    doc.text('Sign:  ____________________', 115, 233); 
-    doc.text('Date:  ____________________', 115, 241); 
-    
-    // Green footer 
-    doc.setFillColor(45, 106, 79); 
-    doc.rect(0, 275, 210, 22, 'F'); 
-    doc.setTextColor(255, 255, 255); 
-    doc.setFontSize(8); 
-    doc.text('Office No. 2, Crown Centre, Gulshan-e-Iqbal, Karachi', 35, 283, { align: 'center' }); 
-    doc.text('octonussolutions@gmail.com', 105, 283, { align: 'center' }); 
-    doc.text('+92 331 3195292 | 021 34 977 797', 175, 283, { align: 'center' }); 
-    
-    doc.save(`Voucher_${expense.voucher_no}.pdf`); 
+  const handleDownloadVoucher = (expense: any) => {
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 14;
+    const contentMaxY = pdf.internal.pageSize.getHeight() - 28;
+
+    generatePDFWithLetterhead(pdf, (startY: number) => {
+      let y = startY;
+
+      // Voucher title
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(20);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text("EXPENSE VOUCHER", 105, y, { align: "center" });
+
+      // Voucher number
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Voucher No: ${expense.voucher_no}`, 150, y);
+      y += 5;
+
+      // Line
+      pdf.setDrawColor(101, 114, 57);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 10;
+
+      // Details section
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(0, 0, 0);
+      pdf.text("EXPENSE DETAILS", margin, y);
+      y += 10;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Date: ${expense.date ? format(new Date(expense.date), 'dd MMM yyyy') : '-'}`, margin, y);
+      pdf.text(`Category: ${expense.category ?? '-'}`, margin, y + 7);
+      pdf.text(`Payment Mode: ${expense.payment_mode ?? '-'}`, margin, y + 14);
+      pdf.text(`Linked Event: ${expense.linked_event ?? 'N/A'}`, margin, y + 21);
+
+      pdf.text(`Created By: ${expense.created_by_name ?? '-'}`, 110, y);
+      pdf.text(`Role: ${expense.created_by_role ?? '-'}`, 110, y + 7);
+      pdf.text(`Created At: ${expense.created_at ? format(new Date(expense.created_at), 'dd MMM yyyy HH:mm') : '-'}`, 110, y + 14);
+      y += 28;
+
+      // Description box
+      pdf.setDrawColor(200, 200, 200);
+      pdf.rect(margin, y, pageWidth - margin * 2, 25);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("DESCRIPTION:", margin + 3, y + 8);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(expense.description ?? '-', margin + 3, y + 15, { maxWidth: pageWidth - margin * 2 - 6 });
+      y += 33;
+
+      // Amount section
+      pdf.setFillColor(240, 240, 240);
+      pdf.rect(120, y, 75, 20, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.setTextColor(180, 0, 0);
+      pdf.text(`Rs. ${(expense.amount ?? 0).toLocaleString()}/-`, 157, y + 13, { align: "center" });
+      pdf.setTextColor(0, 0, 0);
+      y += 28;
+
+      // Approval box
+      pdf.setDrawColor(101, 114, 57);
+      pdf.setLineWidth(1);
+      pdf.rect(margin, y, pageWidth - margin * 2, 30);
+      pdf.setFillColor(240, 255, 240);
+      pdf.rect(margin, y, pageWidth - margin * 2, 30, "F");
+      pdf.setTextColor(101, 114, 57);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.text("✓ APPROVED", pageWidth / 2, y + 10, { align: "center" });
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Approved By: ${expense.approved_by ?? '-'}`, margin + 5, y + 18);
+      pdf.text(`Approval Date: ${expense.approved_at ? format(new Date(expense.approved_at), 'dd MMM yyyy HH:mm') : '-'}`, pageWidth / 2, y + 18);
+      pdf.setTextColor(0, 0, 0);
+      y += 40;
+
+      // Signature boxes
+      pdf.setLineWidth(0.5);
+      pdf.setDrawColor(100, 100, 100);
+
+      // Left signature box
+      pdf.rect(margin, y, 85, 40);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.text("PREPARED BY", margin + 42, y + 10, { align: "center" });
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Name: ____________________", margin + 5, y + 20);
+      pdf.text("Sign:  ____________________", margin + 5, y + 28);
+      pdf.text("Date:  ____________________", margin + 5, y + 36);
+
+      // Right signature box
+      pdf.rect(pageWidth - margin - 85, y, 85, 40);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("AUTHORIZED BY", pageWidth - margin - 42, y + 10, { align: "center" });
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Name: ____________________", pageWidth - margin - 80, y + 20);
+      pdf.text("Sign:  ____________________", pageWidth - margin - 80, y + 28);
+      pdf.text("Date:  ____________________", pageWidth - margin - 80, y + 36);
+
+      return y + 45;
+    });
+
+    pdf.save(`Voucher_${expense.voucher_no}.pdf`);
   }; 
 
   // Export to Excel function

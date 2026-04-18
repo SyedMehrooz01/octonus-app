@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import * as documentService from "@/services/documentService";
 import { useAuth } from "@/contexts/AuthContext";
+import { generatePDFWithLetterhead } from "@/lib/pdfLetterhead";
 
 // Company Details
 const COMPANY = {
@@ -309,141 +310,6 @@ const Documents = () => {
 
   const formatCurrency = (amount: number) => {
     return `Rs. ${amount.toLocaleString()}/-`;
-  };
-
-  const loadLogo = async (pdf: jsPDF, x: number, y: number, size: number) => {
-    return new Promise<boolean>((resolve) => {
-      const img = new Image();
-      img.src = "/logo.png";
-      img.onload = () => {
-        try {
-          pdf.addImage(img, 'PNG', x, y, size, size);
-          resolve(true);
-        } catch (e) {
-          resolve(false);
-        }
-      };
-      img.onerror = () => {
-        resolve(false);
-      };
-    });
-  };
-
-  const generatePDFWithLetterhead = ( 
-    doc: jsPDF, 
-    drawContent: (startY: number) => number 
-  ) => { 
-    const pageWidth = doc.internal.pageSize.getWidth();   // 210mm 
-    const pageHeight = doc.internal.pageSize.getHeight(); // 297mm 
- 
-    const drawHeader = () => { 
-      // ── White background 
-      doc.setFillColor(255, 255, 255); 
-      doc.rect(0, 0, pageWidth, 30, "F"); 
- 
-      // ── Top-left diagonal stripe decoration 
-      // Cyan large triangle 
-      doc.setFillColor(0, 188, 212); 
-      doc.triangle(0, 0, 32, 0, 0, 20, "F"); 
-      // Green overlay triangle 
-      doc.setFillColor(139, 195, 74); 
-      doc.triangle(0, 0, 22, 0, 0, 14, "F"); 
-      // Dark teal small corner 
-      doc.setFillColor(0, 150, 136); 
-      doc.triangle(0, 0, 12, 0, 0, 8, "F"); 
- 
-      // ── Two thin horizontal lines extending right from stripe 
-      doc.setDrawColor(0, 188, 212); 
-      doc.setLineWidth(0.5); 
-      doc.line(34, 7, pageWidth - 5, 7); 
-      doc.setDrawColor(139, 195, 74); 
-      doc.setLineWidth(0.3); 
-      doc.line(34, 10, pageWidth - 5, 10); 
- 
-      // ── Company branding (top-right) 
-      // Circle background for logo area 
-      doc.setFillColor(240, 248, 240); 
-      doc.circle(pageWidth - 22, 15, 13, "F"); 
-      doc.setDrawColor(139, 195, 74); 
-      doc.setLineWidth(0.5); 
-      doc.circle(pageWidth - 22, 15, 13, "S"); 
- 
-      // "Octonus" in stylized green 
-      doc.setFont("helvetica", "bolditalic"); 
-      doc.setFontSize(9); 
-      doc.setTextColor(76, 153, 0); 
-      doc.text("Octonus", pageWidth - 28, 13); 
- 
-      // "Solutions" in gray 
-      doc.setFont("helvetica", "bold"); 
-      doc.setFontSize(7); 
-      doc.setTextColor(100, 100, 100); 
-      doc.text("Solutions", pageWidth - 27, 18); 
- 
-      // Tagline 
-      doc.setFont("helvetica", "normal"); 
-      doc.setFontSize(5); 
-      doc.setTextColor(150, 150, 150); 
-      doc.text("A SPECTACULAR TURN OF EVENTS", pageWidth - 35, 23); 
-    }; 
- 
-    const drawFooter = (pageNum: number, totalPages: number) => { 
-      // ── Olive green footer bar 
-      doc.setFillColor(101, 114, 57); 
-      doc.rect(0, pageHeight - 22, pageWidth, 22, "F"); 
- 
-      // ── Decorative triangles bottom-right 
-      doc.setFillColor(0, 188, 212); 
-      doc.triangle(pageWidth, pageHeight - 14, pageWidth, pageHeight, pageWidth - 20, pageHeight, "F"); 
-      doc.setFillColor(139, 195, 74); 
-      doc.triangle(pageWidth, pageHeight - 8, pageWidth, pageHeight, pageWidth - 12, pageHeight, "F"); 
- 
-      // ── Three footer columns 
-      doc.setFont("helvetica", "normal"); 
-      doc.setFontSize(7); 
-      doc.setTextColor(255, 255, 255); 
- 
-      // Left: address with pin icon circle 
-      doc.setFillColor(210, 105, 30); 
-      doc.circle(14, pageHeight - 14, 3, "F"); 
-      doc.setTextColor(255, 255, 255); 
-      doc.setFontSize(6); 
-      doc.text("o", 13.2, pageHeight - 13.5); // pin icon substitute 
-      doc.setFontSize(7); 
-      doc.text("Office No. 2, Crown Centre,", 19, pageHeight - 15); 
-      doc.text("Gulshan-e-Iqbal, Karachi", 19, pageHeight - 10); 
- 
-      // Center: email + website with globe icon circle 
-      doc.setFillColor(210, 105, 30); 
-      doc.circle(pageWidth / 2 - 18, pageHeight - 14, 3, "F"); 
-      doc.setFontSize(7); 
-      doc.text("octonussolutions@gmail.com", pageWidth / 2 - 12, pageHeight - 15); 
-      doc.text("www.octonussolutions.com.pk", pageWidth / 2 - 12, pageHeight - 10); 
- 
-      // Right: phones with phone icon circle 
-      doc.setFillColor(210, 105, 30); 
-      doc.circle(pageWidth - 42, pageHeight - 14, 3, "F"); 
-      doc.text("+92 331 3195 292", pageWidth - 37, pageHeight - 15); 
-      doc.text("021 34 977 797", pageWidth - 37, pageHeight - 10); 
- 
-      // Page number center bottom 
-      doc.setFontSize(6.5); 
-      doc.setTextColor(200, 220, 180); 
-      doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth / 2, pageHeight - 4, { align: "center" }); 
-    }; 
- 
-    // Draw header on page 1 
-    drawHeader(); 
-    const contentStartY = 32; 
-    const endY = drawContent(contentStartY); 
-    const totalPages = doc.getNumberOfPages(); 
- 
-    // Draw header + footer on every page 
-    for (let i = 1; i <= totalPages; i++) { 
-      doc.setPage(i); 
-      drawHeader(); 
-      drawFooter(i, totalPages); 
-    } 
   };
 
   const handleDownloadPDF = (document: any) => { 
