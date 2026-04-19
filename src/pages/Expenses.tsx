@@ -174,10 +174,10 @@ const Expenses = () => {
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 14;
-    const contentMaxY = pdf.internal.pageSize.getHeight() - 28;
 
-    generatePDFWithLetterhead(pdf, (startY: number) => {
+    generatePDFWithLetterhead(pdf, (startY: number, endY: number) => {
       let y = startY;
+      const contentMaxY = endY;
 
       // Voucher title
       pdf.setFont("helvetica", "bold");

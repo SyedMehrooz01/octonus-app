@@ -484,7 +484,7 @@ const Documents = () => {
       // ── TOTALS SECTION 
       if (y + 30 > contentMaxY) { 
         pdf.addPage(); 
-        y = 32; 
+        y = 38; 
       } 
  
       y += 4; 
