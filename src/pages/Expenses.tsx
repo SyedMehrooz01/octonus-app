@@ -274,10 +274,7 @@ const Expenses = () => {
       pdf.text("Sign:  ____________________", pageWidth - margin - 80, y + 28);
       pdf.text("Date:  ____________________", pageWidth - margin - 80, y + 36);
 
-      return y + 45;
-    });
-
-    pdf.save(`Voucher_${expense.voucher_no}.pdf`);
+    }, `Voucher_${expense.voucher_no}.pdf`);
   }; 
 
   // Export to Excel function

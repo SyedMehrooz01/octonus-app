@@ -569,10 +569,7 @@ const Documents = () => {
         { align: "center" } 
       ); 
  
-      return y; 
-    }); 
- 
-    pdf.save(`${docTitle}_${document.doc_number ?? document.id}.pdf`); 
+    }, `${docTitle}_${document.doc_number ?? document.id}.pdf`); 
   };
 
   const generateExcel = (doc: DocumentData) => {
