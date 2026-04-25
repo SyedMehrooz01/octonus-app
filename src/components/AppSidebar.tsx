@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Users, CalendarDays, Landmark, Package, Receipt, FileText, FolderOpen, Settings, LogOut, ChevronRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Logo from "@/components/Logo";
 
 export const navItems = [
   { id: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -37,9 +38,7 @@ const AppSidebar = ({ onLogout }: AppSidebarProps) => {
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-[#0f172a] text-white z-30 shadow-2xl">
       {/* Brand Logo */}
       <div className="flex h-20 items-center gap-3 px-6 border-b border-white/5 bg-[#1e293b]/20 backdrop-blur-md">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-400 shadow-lg shadow-blue-500/20 flex-shrink-0 border border-white/10">
-          <span className="text-lg font-black text-white italic">O</span>
-        </div>
+        <Logo size="sm" />
         <div className="min-w-0">
           <h1 className="text-lg font-black tracking-tighter text-white leading-tight">Octonus Solutions</h1>
           <p className="text-[10px] font-bold text-blue-400/80 uppercase tracking-widest">Enterprise HRMS</p>

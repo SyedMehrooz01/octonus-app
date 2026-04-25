@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Mail, User, Eye, EyeOff, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
-import { Logo } from "@/components/Logo";
+import Logo from "@/components/Logo";
 import * as authService from "@/services/authService";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -73,11 +73,8 @@ const Signup = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center flex flex-col items-center">
-          <Logo size="lg" className="mb-2" />
-          <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
-            HRMS & Event Management
-          </p>
+        <div className="flex justify-center items-center w-full mb-6"> 
+          <Logo size="lg" /> 
         </div>
 
         <div className="mb-6">
