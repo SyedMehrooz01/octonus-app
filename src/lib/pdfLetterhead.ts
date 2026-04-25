@@ -45,12 +45,7 @@ export const generatePDFWithLetterhead = async (
       } 
       doc.setFontSize(7); 
       doc.setTextColor(120, 120, 120); 
-      doc.text( 
-        `Page ${i} of ${totalPages}`, 
-        pageWidth / 2, 
-        pageHeight - 6, 
-        { align: "center" } 
-      ); 
+      doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 6, { align: "center" }); 
     } 
  
     doc.save(fileName); 

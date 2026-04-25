@@ -429,7 +429,9 @@ const Documents = () => {
       y += cellH; 
     }); 
  
-    if (y + 35 > contentMaxY) { 
+    // Only add page if totals + terms won't fit 
+    const estimatedRemainingHeight = 60 + (document.terms ? 40 : 0); 
+    if (y + estimatedRemainingHeight > contentMaxY) { 
       pdf.addPage(); 
       y = startY; 
     } 
@@ -453,14 +455,15 @@ const Documents = () => {
     pdf.line(margin, y, pageWidth - margin, y); 
     y += 15; 
  
+    // Only add page if terms won't fit 
+    if (document.terms && y + 35 > contentMaxY) { 
+      pdf.addPage(); 
+      y = startY; 
+    } 
     if (document.terms) { 
       const noteLines = pdf.splitTextToSize(`Note: ${document.terms}`, pageWidth - margin * 2 - 6); 
       const noteH = noteLines.length * 4.5 + 6; 
  
-      if (y + noteH + 10 > contentMaxY) { 
-        pdf.addPage(); 
-        y = startY; 
-      } 
       pdf.setFillColor(255, 255, 255); 
       pdf.setDrawColor(200, 200, 200); 
       pdf.setLineWidth(0.3); 
