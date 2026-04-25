@@ -7,7 +7,7 @@ export const generatePDFWithLetterhead = async (
 ) => { 
   const pageWidth = 210; 
   const pageHeight = 297; 
-  const endY = pageHeight - 28; 
+  const endY = pageHeight - 32; 
  
   // Load letterhead from public folder 
   const loadImage = (): Promise<string> => { 
@@ -34,7 +34,7 @@ export const generatePDFWithLetterhead = async (
     doc.addImage(letterheadData, "JPEG", 0, 0, pageWidth, pageHeight); 
  
     // Draw content 
-    drawContent(38, endY); 
+    drawContent(48, endY); 
  
     // Apply letterhead to all pages and add page numbers 
     const totalPages = doc.getNumberOfPages(); 
@@ -56,7 +56,7 @@ export const generatePDFWithLetterhead = async (
     doc.save(fileName); 
   } catch (error) { 
     console.error("Letterhead load failed, saving without it:", error); 
-    drawContent(38, endY); 
+    drawContent(48, endY); 
     doc.save(fileName); 
   } 
 }; 

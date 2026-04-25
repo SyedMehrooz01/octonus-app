@@ -181,15 +181,16 @@ const Expenses = () => {
 
       // Voucher title
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(20);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text("EXPENSE VOUCHER", 105, y, { align: "center" });
+      pdf.setFontSize(16);
+      pdf.setTextColor(101, 114, 57);
+      pdf.text("EXPENSE VOUCHER", 105, y + 6, { align: "center" });
 
       // Voucher number
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
-      pdf.text(`Voucher No: ${expense.voucher_no}`, 150, y);
-      y += 5;
+      pdf.setTextColor(50, 50, 50);
+      pdf.text(`Voucher No: ${expense.voucher_no}`, 150, y + 6);
+      y += 12;
 
       // Line
       pdf.setDrawColor(101, 114, 57);

@@ -324,13 +324,11 @@ const Documents = () => {
     await generatePDFWithLetterhead(pdf, (startY, contentMaxY) => {
       let y = startY; 
  
-    pdf.setFillColor(101, 114, 57); 
-    pdf.rect(margin, y, pageWidth - margin * 2, 10, "F"); 
     pdf.setFont("helvetica", "bold"); 
-    pdf.setFontSize(13); 
-    pdf.setTextColor(255, 255, 255); 
-    pdf.text(docTitle, pageWidth / 2, y + 7, { align: "center" }); 
-    y += 14; 
+    pdf.setFontSize(16); 
+    pdf.setTextColor(101, 114, 57); 
+    pdf.text(docTitle, pageWidth / 2, y + 6, { align: "center" }); 
+    y += 12; 
  
     pdf.setFont("helvetica", "normal"); 
     pdf.setFontSize(8.5); 
@@ -377,11 +375,11 @@ const Documents = () => {
     const headerH = 8; 
  
     const drawTableHeader = (yPos: number) => { 
-      pdf.setFillColor(101, 114, 57); 
+      pdf.setFillColor(235, 245, 235); // light green 
       pdf.rect(margin, yPos, pageWidth - margin * 2, headerH, "F"); 
       pdf.setFont("helvetica", "bold"); 
       pdf.setFontSize(7.5); 
-      pdf.setTextColor(255, 255, 255); 
+      pdf.setTextColor(60, 100, 60); // dark green text 
       headers.forEach((h, i) => { pdf.text(h, colX[i] + 2, yPos + 5.5); }); 
       return yPos + headerH; 
     }; 
@@ -403,7 +401,7 @@ const Documents = () => {
  
       if (y + cellH > contentMaxY) { 
         pdf.addPage(); 
-        y = 38; 
+        y = startY; 
         y = drawTableHeader(y); 
       } 
  
@@ -428,9 +426,9 @@ const Documents = () => {
       y += cellH; 
     }); 
  
-    if (y + 40 > contentMaxY) { 
+    if (y + 55 > contentMaxY) { 
       pdf.addPage(); 
-      y = 38; 
+      y = startY; 
     } 
     y += 4; 
  
@@ -455,15 +453,16 @@ const Documents = () => {
     y += 15; 
  
     if (document.terms) { 
-      if (y + 30 > contentMaxY) { 
+      const noteLines = pdf.splitTextToSize(`Note: ${document.terms}`, pageWidth - margin * 2 - 6); 
+      const noteH = noteLines.length * 4.5 + 6; 
+ 
+      if (y + noteH + 10 > contentMaxY) { 
         pdf.addPage(); 
-        y = 38; 
+        y = startY; 
       } 
       pdf.setFillColor(248, 250, 244); 
       pdf.setDrawColor(180, 200, 120); 
       pdf.setLineWidth(0.3); 
-      const noteLines = pdf.splitTextToSize(`Note: ${document.terms}`, pageWidth - margin * 2 - 6); 
-      const noteH = noteLines.length * 4.5 + 6; 
       pdf.roundedRect(margin, y, pageWidth - margin * 2, noteH, 2, 2, "FD"); 
       pdf.setFont("helvetica", "italic"); 
       pdf.setFontSize(8); 
