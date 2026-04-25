@@ -182,18 +182,18 @@ const Expenses = () => {
       // Voucher title
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(16);
-      pdf.setTextColor(101, 114, 57);
+      pdf.setTextColor(30, 30, 30);
       pdf.text("EXPENSE VOUCHER", 105, y + 6, { align: "center" });
 
       // Voucher number
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(50, 50, 50);
+      pdf.setTextColor(30, 30, 30);
       pdf.text(`Voucher No: ${expense.voucher_no}`, 150, y + 6);
       y += 12;
 
       // Line
-      pdf.setDrawColor(101, 114, 57);
+      pdf.setDrawColor(0, 0, 0);
       pdf.setLineWidth(0.5);
       pdf.line(margin, y, pageWidth - margin, y);
       y += 10;
@@ -236,12 +236,12 @@ const Expenses = () => {
       y += 28;
 
       // Approval box
-      pdf.setDrawColor(101, 114, 57);
+      pdf.setDrawColor(200, 200, 200);
       pdf.setLineWidth(1);
       pdf.rect(margin, y, pageWidth - margin * 2, 30);
-      pdf.setFillColor(240, 255, 240);
+      pdf.setFillColor(255, 255, 255);
       pdf.rect(margin, y, pageWidth - margin * 2, 30, "F");
-      pdf.setTextColor(101, 114, 57);
+      pdf.setTextColor(30, 30, 30);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(11);
       pdf.text("✓ APPROVED", pageWidth / 2, y + 10, { align: "center" });

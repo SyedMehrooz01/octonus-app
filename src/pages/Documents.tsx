@@ -326,13 +326,13 @@ const Documents = () => {
  
     pdf.setFont("helvetica", "bold"); 
     pdf.setFontSize(16); 
-    pdf.setTextColor(101, 114, 57); 
+    pdf.setTextColor(30, 30, 30); 
     pdf.text(docTitle, pageWidth / 2, y + 6, { align: "center" }); 
     y += 12; 
  
     pdf.setFont("helvetica", "normal"); 
     pdf.setFontSize(8.5); 
-    pdf.setTextColor(50, 50, 50); 
+    pdf.setTextColor(30, 30, 30); 
     pdf.text(`${docLabel} ${document.doc_number ?? "N/A"}`, margin, y); 
     pdf.text( 
       `Date: ${document.invoice_date ? format(new Date(document.invoice_date), "dd MMM yyyy") : "N/A"}`, 
@@ -345,26 +345,26 @@ const Documents = () => {
       pdf.setFont("helvetica", "italic"); 
       pdf.setFontSize(8); 
       pdf.text(`Valid Until: ${format(new Date(document.valid_until), "dd MMM yyyy")}`, margin, y); 
-      pdf.setTextColor(50, 50, 50); 
+      pdf.setTextColor(30, 30, 30); 
       pdf.setFont("helvetica", "normal"); 
     } 
     y += 7; 
  
-    pdf.setFillColor(245, 248, 240); 
-    pdf.setDrawColor(180, 200, 120); 
+    pdf.setFillColor(255, 255, 255); 
+    pdf.setDrawColor(200, 200, 200); 
     pdf.setLineWidth(0.3); 
     pdf.roundedRect(margin, y, 85, 20, 2, 2, "FD"); 
     pdf.setFont("helvetica", "bold"); 
     pdf.setFontSize(7); 
-    pdf.setTextColor(101, 114, 57); 
+    pdf.setTextColor(30, 30, 30); 
     pdf.text("BILL TO", margin + 3, y + 6); 
     pdf.setFont("helvetica", "bold"); 
     pdf.setFontSize(10); 
-    pdf.setTextColor(20, 20, 20); 
+    pdf.setTextColor(0, 0, 0); 
     pdf.text(document.client_company ?? "N/A", margin + 3, y + 12); 
     pdf.setFont("helvetica", "normal"); 
     pdf.setFontSize(8.5); 
-    pdf.setTextColor(80, 80, 80); 
+    pdf.setTextColor(30, 30, 30); 
     pdf.text(document.contact_person ?? "", margin + 3, y + 18); 
     y += 26; 
  
@@ -375,11 +375,14 @@ const Documents = () => {
     const headerH = 8; 
  
     const drawTableHeader = (yPos: number) => { 
-      pdf.setFillColor(235, 245, 235); // light green 
+      pdf.setFillColor(255, 255, 255); 
       pdf.rect(margin, yPos, pageWidth - margin * 2, headerH, "F"); 
+      pdf.setDrawColor(0, 0, 0); 
+      pdf.setLineWidth(0.3); 
+      pdf.line(margin, yPos + headerH, pageWidth - margin, yPos + headerH); 
       pdf.setFont("helvetica", "bold"); 
       pdf.setFontSize(7.5); 
-      pdf.setTextColor(60, 100, 60); // dark green text 
+      pdf.setTextColor(0, 0, 0); 
       headers.forEach((h, i) => { pdf.text(h, colX[i] + 2, yPos + 5.5); }); 
       return yPos + headerH; 
     }; 
@@ -405,15 +408,15 @@ const Documents = () => {
         y = drawTableHeader(y); 
       } 
  
-      if (idx % 2 === 0) { pdf.setFillColor(250, 252, 245); } 
+      if (idx % 2 === 0) { pdf.setFillColor(255, 255, 255); } 
       else { pdf.setFillColor(255, 255, 255); } 
       pdf.rect(margin, y, pageWidth - margin * 2, cellH, "F"); 
-      pdf.setDrawColor(220, 228, 200); 
-      pdf.setLineWidth(0.2); 
+      pdf.setDrawColor(240, 240, 240); 
+      pdf.setLineWidth(0.1); 
       pdf.rect(margin, y, pageWidth - margin * 2, cellH, "S"); 
       pdf.setFont("helvetica", "normal"); 
       pdf.setFontSize(7.5); 
-      pdf.setTextColor(40, 40, 40); 
+      pdf.setTextColor(30, 30, 30); 
       pdf.text(String(idx + 1), colX[0] + 2, y + 5); 
       pdf.text(descLines, colX[1] + 2, y + 5); 
       pdf.text(String(qty), colX[2] + 2, y + 5); 
@@ -421,35 +424,33 @@ const Documents = () => {
       pdf.setFont("helvetica", "normal"); 
       pdf.text(`Rs ${rate.toLocaleString()}`, colX[4] + colW[4] - 2, y + 5, { align: "right" }); 
       pdf.setFont("helvetica", "bold"); 
-      pdf.setTextColor(101, 114, 57); 
+      pdf.setTextColor(30, 30, 30); 
       pdf.text(`Rs ${amount.toLocaleString()}`, colX[5] + colW[5] - 2, y + 5, { align: "right" }); 
       y += cellH; 
     }); 
  
-    if (y + 55 > contentMaxY) { 
+    if (y + 35 > contentMaxY) { 
       pdf.addPage(); 
       y = startY; 
     } 
-    y += 4; 
- 
-    pdf.setFillColor(240, 244, 230); 
-    pdf.rect(pageWidth - margin - 70, y, 70, 7, "F"); 
+    y += 6; 
+    pdf.setDrawColor(0, 0, 0); 
+    pdf.setLineWidth(0.5); 
+    pdf.line(margin, y, pageWidth - margin, y); 
+    y += 6; 
     pdf.setFont("helvetica", "normal"); 
-    pdf.setFontSize(8.5); 
-    pdf.setTextColor(60, 60, 60); 
-    pdf.text("Subtotal:", pageWidth - margin - 68, y + 5); 
+    pdf.setFontSize(9); 
+    pdf.setTextColor(30, 30, 30); 
+    pdf.text("Subtotal:", pageWidth - margin - 60, y); 
+    pdf.text(`Rs ${grandTotal.toLocaleString()}`, pageWidth - margin, y, { align: "right" }); 
+    y += 7; 
     pdf.setFont("helvetica", "bold"); 
-    pdf.setTextColor(20, 20, 20); 
-    pdf.text(`Rs ${grandTotal.toLocaleString()}`, pageWidth - margin - 2, y + 5, { align: "right" }); 
-    y += 9; 
- 
-    pdf.setFillColor(101, 114, 57); 
-    pdf.roundedRect(pageWidth - margin - 72, y, 72, 11, 2, 2, "F"); 
-    pdf.setFont("helvetica", "bold"); 
-    pdf.setFontSize(10); 
-    pdf.setTextColor(255, 255, 255); 
-    pdf.text("GRAND TOTAL:", pageWidth - margin - 70, y + 7.5); 
-    pdf.text(`Rs ${grandTotal.toLocaleString()}`, pageWidth - margin - 2, y + 7.5, { align: "right" }); 
+    pdf.setFontSize(11); 
+    pdf.setTextColor(0, 0, 0); 
+    pdf.text("GRAND TOTAL:", pageWidth - margin - 60, y); 
+    pdf.text(`Rs ${grandTotal.toLocaleString()}/-`, pageWidth - margin, y, { align: "right" }); 
+    y += 4; 
+    pdf.line(margin, y, pageWidth - margin, y); 
     y += 15; 
  
     if (document.terms) { 
@@ -460,13 +461,13 @@ const Documents = () => {
         pdf.addPage(); 
         y = startY; 
       } 
-      pdf.setFillColor(248, 250, 244); 
-      pdf.setDrawColor(180, 200, 120); 
+      pdf.setFillColor(255, 255, 255); 
+      pdf.setDrawColor(200, 200, 200); 
       pdf.setLineWidth(0.3); 
       pdf.roundedRect(margin, y, pageWidth - margin * 2, noteH, 2, 2, "FD"); 
       pdf.setFont("helvetica", "italic"); 
       pdf.setFontSize(8); 
-      pdf.setTextColor(80, 80, 80); 
+      pdf.setTextColor(30, 30, 30); 
       pdf.text(noteLines, margin + 3, y + 5); 
       y += noteH + 4; 
     } 
@@ -474,7 +475,7 @@ const Documents = () => {
     y += 4; 
     pdf.setFont("helvetica", "bolditalic"); 
     pdf.setFontSize(9); 
-    pdf.setTextColor(101, 114, 57); 
+    pdf.setTextColor(30, 30, 30); 
     pdf.text("Thank you for choosing Octonus Solutions!", pageWidth / 2, y, { align: "center" }); 
   }, `${docTitle}_${document.doc_number ?? document.id}.pdf`); 
 };
@@ -782,6 +783,81 @@ const Documents = () => {
                 </div>
               </div>
             </div>
+
+            {/* Previous Documents Archive for Quotation/Invoice Tab */}
+            <div className="mt-10 rounded-3xl border border-slate-100 bg-white shadow-lg overflow-hidden"> 
+              <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between"> 
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-700"> 
+                  Previous {activeTab}s 
+                </h3> 
+              </div> 
+              <div className="overflow-x-auto"> 
+                <table className="w-full"> 
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="px-8 py-5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Doc No</th>
+                      <th className="px-8 py-5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Client / Event</th>
+                      <th className="px-8 py-5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                      <th className="px-8 py-5 text-right text-[11px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
+                      <th className="px-8 py-5 text-right text-[11px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {(documents ?? [])
+                      .filter(doc => doc.doc_type === activeTab)
+                      .map((doc) => (
+                        <tr key={doc.id} className="hover:bg-slate-50/50 transition-colors group">
+                          <td className="px-8 py-5 font-black text-blue-600 tracking-tight">{doc.doc_number}</td>
+                          <td className="px-8 py-5">
+                            <p className="text-sm font-black text-slate-900 leading-none">{doc.client_company}</p>
+                            <p className="text-[11px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{doc.event_name}</p>
+                          </td>
+                          <td className="px-8 py-5 text-sm font-black text-slate-500">{doc.invoice_date ? format(new Date(doc.invoice_date), 'MMM dd, yyyy') : "-"}</td>
+                          <td className="px-8 py-5 text-right font-black text-slate-900">{formatCurrency(doc.sub_total)}</td>
+                          <td className="px-8 py-5 text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleDownloadPDF(doc)}
+                                className="h-9 w-9 rounded-xl text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                                title="Download PDF"
+                              >
+                                <FileDown className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => generateExcel(doc)}
+                                className="h-9 w-9 rounded-xl text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50"
+                                title="Download Excel"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => doc.id && handleDelete(doc.id)}
+                                className="h-9 w-9 rounded-xl text-rose-400 hover:text-rose-600 hover:bg-rose-50"
+                                title="Delete Document"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                    ))}
+                    {(documents ?? []).filter(doc => doc.doc_type === activeTab).length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-10 text-center">
+                          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No {activeTab}s saved yet</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table> 
+              </div> 
+            </div> 
           </TabsContent>
 
           <TabsContent value="archive" className="space-y-6">

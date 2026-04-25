@@ -84,9 +84,9 @@ export const searchExpenses = async (query: string) => {
   try {
     const { data, error } = await supabase
       .from('expenses')
-      .select('id, description, amount')
-      .ilike('description', `%${query}%`)
-      .limit(3);
+      .select('id, description, category, amount')
+      .or(`description.ilike.%${query}%,category.ilike.%${query}%`)
+      .limit(5);
     if (error) throw error;
     return data || [];
   } catch (error) {

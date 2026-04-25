@@ -31,9 +31,9 @@ export const searchBookings = async (query: string) => {
   try {
     const { data, error } = await supabase
       .from('bookings')
-      .select('id, client_name, event_type')
-      .ilike('client_name', `%${query}%`)
-      .limit(3);
+      .select('id, client_name, event_type, venue')
+      .or(`client_name.ilike.%${query}%,event_type.ilike.%${query}%,venue.ilike.%${query}%`)
+      .limit(5);
     if (error) throw error;
     return data || [];
   } catch (error) {

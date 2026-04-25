@@ -31,9 +31,9 @@ export const searchStaff = async (query: string) => {
   try {
     const { data, error } = await supabase
       .from('staff')
-      .select('id, name, role')
-      .ilike('name', `%${query}%`)
-      .limit(3);
+      .select('id, name, email, department, role')
+      .or(`name.ilike.%${query}%,email.ilike.%${query}%,department.ilike.%${query}%`)
+      .limit(5);
     if (error) throw error;
     return data || [];
   } catch (error) {

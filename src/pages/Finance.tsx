@@ -354,13 +354,22 @@ const Finance = () => {
     await generatePDFWithLetterhead(doc, (startY: number) => {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
-      doc.setTextColor(101, 114, 57);
+      doc.setTextColor(30, 30, 30);
       doc.text(title, doc.internal.pageSize.getWidth() / 2, startY + 6, { align: "center" });
       
       autoTable(doc, {
         head: [headers],
         body: data,
         startY: startY + 16,
+        headStyles: { 
+          fillColor: [255, 255, 255], 
+          textColor: [0, 0, 0],
+          lineWidth: { bottom: 0.3 },
+          lineColor: [0, 0, 0]
+        },
+        styles: {
+          textColor: [30, 30, 30]
+        }
       });
       return (doc as any).lastAutoTable.finalY;
     }, `${fileName}.pdf`);

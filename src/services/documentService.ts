@@ -79,3 +79,18 @@ export const getLatestDocumentNumber = async (docType: string, prefix: string, y
   }
 };
 
+export const searchDocuments = async (query: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("documents")
+      .select("id, doc_number, client_company, event_name")
+      .or(`doc_number.ilike.%${query}%,client_company.ilike.%${query}%,event_name.ilike.%${query}%`)
+      .limit(5);
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Error in searchDocuments:", error);
+    throw error;
+  }
+};
+

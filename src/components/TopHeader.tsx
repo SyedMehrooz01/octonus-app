@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Menu, Bell, Search, ChevronDown, User, Settings as SettingsIcon, LogOut, CalendarDays, Receipt, Package, CheckCircle, X, Loader2 } from "lucide-react";
+import { Menu, Bell, Search, ChevronDown, User, Settings as SettingsIcon, LogOut, CalendarDays, Receipt, Package, CheckCircle, X, Loader2, FileText } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navItems } from "@/components/navigation";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import * as eventService from "@/services/eventService";
 import * as financeService from "@/services/financeService";
 import * as inventoryService from "@/services/inventoryService";
 import * as hrService from "@/services/hrService";
+import * as documentService from "@/services/documentService";
 import { format } from "date-fns";
 
 interface TopHeaderProps {
@@ -116,15 +117,17 @@ const TopHeader = ({ onMenuClick, user, onLogout }: TopHeaderProps) => {
     const results: any[] = [];
 
     try {
-      const [bookings, staff, expenses] = await Promise.all([
+      const [bookings, staff, expenses, docs] = await Promise.all([
         eventService.searchBookings(val),
         hrService.searchStaff(val),
-        financeService.searchExpenses(val)
+        financeService.searchExpenses(val),
+        documentService.searchDocuments(val)
       ]);
 
-      bookings?.forEach(b => results.push({ type: 'Booking', title: b?.client_name ?? 'Unnamed', sub: b?.event_type ?? 'Event', path: '/events', icon: CalendarDays }));
-      staff?.forEach(s => results.push({ type: 'Staff', title: s?.name ?? 'Unnamed', sub: s?.role ?? 'Staff', path: '/hr', icon: User }));
-      expenses?.forEach(e => results.push({ type: 'Expense', title: e?.description ?? 'Unnamed', sub: `₨ ${(Number(e?.amount ?? 0)).toLocaleString()}`, path: '/expenses', icon: Receipt }));
+      bookings?.forEach(b => results.push({ type: 'Booking', title: b?.client_name ?? 'Unnamed', sub: `${b?.event_type ?? 'Event'} @ ${b?.venue ?? '-'}`, path: '/events', icon: CalendarDays }));
+      staff?.forEach(s => results.push({ type: 'Staff', title: s?.name ?? 'Unnamed', sub: `${s?.role ?? 'Staff'} | ${s?.department ?? '-'}`, path: '/hr-staff', icon: User }));
+      expenses?.forEach(e => results.push({ type: 'Expense', title: e?.description ?? 'Unnamed', sub: `${e?.category ?? '-'} | ₨ ${(Number(e?.amount ?? 0)).toLocaleString()}`, path: '/expenses', icon: Receipt }));
+      docs?.forEach(d => results.push({ type: 'Document', title: d?.doc_number ?? 'Unnamed', sub: `${d?.client_company ?? '-'} | ${d?.event_name ?? '-'}`, path: '/documents', icon: FileText }));
 
 
       setSearchResults(results);
