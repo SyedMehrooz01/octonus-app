@@ -74,7 +74,7 @@ const Signup = () => {
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm">
         <div className="flex justify-center items-center w-full mb-6"> 
-          <Logo size="lg" /> 
+          <Logo size="xl" /> 
         </div>
 
         <div className="mb-6">

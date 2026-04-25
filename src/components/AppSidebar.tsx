@@ -38,7 +38,7 @@ const AppSidebar = ({ onLogout }: AppSidebarProps) => {
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-[#0f172a] text-white z-30 shadow-2xl">
       {/* Brand Logo */}
       <div className="flex h-20 items-center gap-3 px-6 border-b border-white/5 bg-[#1e293b]/20 backdrop-blur-md">
-        <Logo size="sm" />
+        <Logo size="md" />
         <div className="min-w-0">
           <h1 className="text-lg font-black tracking-tighter text-white leading-tight">Octonus Solutions</h1>
           <p className="text-[10px] font-bold text-blue-400/80 uppercase tracking-widest">Enterprise HRMS</p>
