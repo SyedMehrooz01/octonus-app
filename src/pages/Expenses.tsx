@@ -170,12 +170,12 @@ const Expenses = () => {
   };
 
   // Download voucher function
-  const handleDownloadVoucher = (expense: any) => {
+  const handleDownloadVoucher = async (expense: any) => {
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 14;
 
-    generatePDFWithLetterhead(pdf, (startY: number, endY: number) => {
+    await generatePDFWithLetterhead(pdf, (startY: number, endY: number) => {
       let y = startY;
       const contentMaxY = endY;
 

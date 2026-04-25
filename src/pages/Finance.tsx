@@ -349,9 +349,9 @@ const Finance = () => {
     saveAs(blob, `${fileName}.xlsx`);
   }, []);
 
-  const exportToPDF = useCallback((headers: string[], data: any[][], title: string, fileName: string) => {
+  const exportToPDF = useCallback(async (headers: string[], data: any[][], title: string, fileName: string) => {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    generatePDFWithLetterhead(doc, (startY: number) => {
+    await generatePDFWithLetterhead(doc, (startY: number) => {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
       doc.text(title, doc.internal.pageSize.getWidth() / 2, startY, { align: "center" });
@@ -362,8 +362,7 @@ const Finance = () => {
         startY: startY + 10,
       });
       return (doc as any).lastAutoTable.finalY;
-    });
-    doc.save(`${fileName}.pdf`);
+    }, `${fileName}.pdf`);
   }, []);
 
   const exportPL = useCallback(async (exportFormat: 'pdf' | 'excel') => {

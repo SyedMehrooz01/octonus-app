@@ -26,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import * as documentService from "@/services/documentService";
 import { useAuth } from "@/contexts/AuthContext";
-import { LETTERHEAD_BASE64 } from "@/lib/letterheadBase64";
+import { generatePDFWithLetterhead } from "@/lib/pdfLetterhead";
 
 // Company Details
 const COMPANY = {
@@ -312,20 +312,17 @@ const Documents = () => {
     return `Rs. ${amount.toLocaleString()}/-`;
   };
 
-  const handleDownloadPDF = (document: any) => { 
+  const handleDownloadPDF = async (document: any) => { 
     const isInvoice = document.doc_type === "Invoice"; 
     const docTitle = isInvoice ? "INVOICE" : "QUOTATION"; 
     const docLabel = isInvoice ? "INVOICE No:" : "QUOTATION No:"; 
  
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" }); 
     const pageWidth = pdf.internal.pageSize.getWidth(); 
-    const pageHeight = pdf.internal.pageSize.getHeight(); 
     const margin = 14; 
-    const contentMaxY = pageHeight - 28; 
  
-    pdf.addImage(LETTERHEAD_BASE64, "JPEG", 0, 0, pageWidth, pageHeight); 
- 
-    let y = 38; 
+    await generatePDFWithLetterhead(pdf, (startY, contentMaxY) => {
+      let y = startY; 
  
     pdf.setFillColor(101, 114, 57); 
     pdf.rect(margin, y, pageWidth - margin * 2, 10, "F"); 
@@ -406,7 +403,6 @@ const Documents = () => {
  
       if (y + cellH > contentMaxY) { 
         pdf.addPage(); 
-        pdf.addImage(LETTERHEAD_BASE64, "JPEG", 0, 0, pageWidth, pageHeight); 
         y = 38; 
         y = drawTableHeader(y); 
       } 
@@ -434,7 +430,6 @@ const Documents = () => {
  
     if (y + 40 > contentMaxY) { 
       pdf.addPage(); 
-      pdf.addImage(LETTERHEAD_BASE64, "JPEG", 0, 0, pageWidth, pageHeight); 
       y = 38; 
     } 
     y += 4; 
@@ -462,7 +457,6 @@ const Documents = () => {
     if (document.terms) { 
       if (y + 30 > contentMaxY) { 
         pdf.addPage(); 
-        pdf.addImage(LETTERHEAD_BASE64, "JPEG", 0, 0, pageWidth, pageHeight); 
         y = 38; 
       } 
       pdf.setFillColor(248, 250, 244); 
@@ -483,17 +477,8 @@ const Documents = () => {
     pdf.setFontSize(9); 
     pdf.setTextColor(101, 114, 57); 
     pdf.text("Thank you for choosing Octonus Solutions!", pageWidth / 2, y, { align: "center" }); 
- 
-    const totalPages = pdf.getNumberOfPages(); 
-    for (let i = 1; i <= totalPages; i++) { 
-      pdf.setPage(i); 
-      pdf.setFontSize(7); 
-      pdf.setTextColor(120, 120, 120); 
-      pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 6, { align: "center" }); 
-    } 
- 
-    pdf.save(`${docTitle}_${document.doc_number ?? document.id}.pdf`); 
-  };
+  }, `${docTitle}_${document.doc_number ?? document.id}.pdf`); 
+};
 
   const generateExcel = (doc: DocumentData) => {
     const wb = XLSX.utils.book_new();
