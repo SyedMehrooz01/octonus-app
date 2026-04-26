@@ -29,37 +29,36 @@ export const generatePDFWithLetterhead = async (
  
    try { 
      const letterheadData = await loadImage(); 
- 
-     // Step 1: Add letterhead to first page BEFORE drawing content 
-     doc.addImage(letterheadData, "JPEG", 0, 0, pageWidth, pageHeight); 
- 
-     // Step 2: Draw all content - content drawing handles its own addPage() calls 
-     drawContent(startY, endY); 
- 
-     // Step 3: NOW go back and add letterhead to pages 2+ that were created during content drawing 
-     // We do this by iterating existing pages only - NO new pages created here 
-     const totalPages = doc.getNumberOfPages(); 
-     for (let i = 2; i <= totalPages; i++) { 
-       doc.setPage(i); 
-       // Save current content by drawing letterhead behind it 
-       // We need to insert image at back - use setPage and addImage 
-       doc.addImage(letterheadData, "JPEG", 0, 0, pageWidth, pageHeight); 
-     } 
- 
-     // Step 4: Add page numbers on all pages 
-     for (let i = 1; i <= totalPages; i++) { 
-       doc.setPage(i); 
-       doc.setFontSize(7); 
-       doc.setTextColor(120, 120, 120); 
-       doc.text( 
-         `Page ${i} of ${totalPages}`, 
-         pageWidth / 2, 
-         pageHeight - 6, 
-         { align: "center" } 
-       ); 
-     } 
- 
-     doc.save(fileName); 
+
+    // Step 1: Wrap addPage to add letterhead to any new pages automatically 
+    const originalAddPage = doc.addPage.bind(doc); 
+    doc.addPage = function() { 
+      const result = originalAddPage(); 
+      doc.addImage(letterheadData, "JPEG", 0, 0, pageWidth, pageHeight); 
+      return result; 
+    }; 
+
+    // Step 2: Add letterhead to first page BEFORE drawing content 
+    doc.addImage(letterheadData, "JPEG", 0, 0, pageWidth, pageHeight); 
+
+    // Step 3: Draw all content - content drawing handles its own addPage() calls 
+    drawContent(startY, endY); 
+
+    // Step 4: Add page numbers on all pages 
+    const totalPages = doc.getNumberOfPages(); 
+    for (let i = 1; i <= totalPages; i++) { 
+      doc.setPage(i); 
+      doc.setFontSize(7); 
+      doc.setTextColor(120, 120, 120); 
+      doc.text( 
+        `Page ${i} of ${totalPages}`, 
+        pageWidth / 2, 
+        pageHeight - 6, 
+        { align: "center" } 
+      ); 
+    } 
+
+    doc.save(fileName); 
    } catch (error) { 
      console.error("Letterhead load failed:", error); 
      drawContent(startY, endY); 

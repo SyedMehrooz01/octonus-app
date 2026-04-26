@@ -429,8 +429,7 @@ const Documents = () => {
       y += cellH; 
     }); 
  
-    // Only add page if totals + terms won't fit 
-    const estimatedRemainingHeight = 60 + (document.terms ? 40 : 0); 
+    const estimatedRemainingHeight = 40 + (document.terms ? 35 : 0); 
     if (y + estimatedRemainingHeight > contentMaxY) { 
       pdf.addPage(); 
       y = startY; 
@@ -440,17 +439,26 @@ const Documents = () => {
     pdf.setLineWidth(0.5); 
     pdf.line(margin, y, pageWidth - margin, y); 
     y += 6; 
+ 
+    const srbAmount = grandTotal * 0.15; 
+    const finalTotal = grandTotal + srbAmount; 
+ 
     pdf.setFont("helvetica", "normal"); 
     pdf.setFontSize(9); 
     pdf.setTextColor(30, 30, 30); 
     pdf.text("Subtotal:", pageWidth - margin - 60, y); 
     pdf.text(`Rs ${grandTotal.toLocaleString()}`, pageWidth - margin, y, { align: "right" }); 
     y += 7; 
+ 
+    pdf.text("SRB (15%):", pageWidth - margin - 60, y); 
+    pdf.text(`Rs ${srbAmount.toLocaleString()}`, pageWidth - margin, y, { align: "right" }); 
+    y += 8; 
+ 
     pdf.setFont("helvetica", "bold"); 
     pdf.setFontSize(11); 
     pdf.setTextColor(0, 0, 0); 
     pdf.text("GRAND TOTAL:", pageWidth - margin - 60, y); 
-    pdf.text(`Rs ${grandTotal.toLocaleString()}/-`, pageWidth - margin, y, { align: "right" }); 
+    pdf.text(`Rs ${finalTotal.toLocaleString()}/-`, pageWidth - margin, y, { align: "right" }); 
     y += 4; 
     pdf.line(margin, y, pageWidth - margin, y); 
     y += 15; 
