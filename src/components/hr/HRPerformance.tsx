@@ -40,7 +40,7 @@ const HRPerformance = memo(({
 
       <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[800px]">
+          <table className="w-full border-collapse min-w-[700px]">
             <thead>
               <tr className="bg-muted/30 text-left border-b border-border">
                 <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Staff Member</th>

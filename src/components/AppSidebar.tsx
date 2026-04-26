@@ -1,9 +1,10 @@
 import { memo, useMemo } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, CalendarDays, Landmark, Package, Receipt, FileText, FolderOpen, Settings, LogOut, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, Landmark, Package, Receipt, FileText, FolderOpen, Settings, LogOut, ChevronRight, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Logo from "@/components/Logo";
+import { Button } from "@/components/ui/button";
 
 export const navItems = [
   { id: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -19,9 +20,10 @@ export const navItems = [
 
 interface AppSidebarProps {
   onLogout?: () => void;
+  onItemClick?: () => void;
 }
 
-const AppSidebar = ({ onLogout }: AppSidebarProps) => {
+const AppSidebar = ({ onLogout, onItemClick }: AppSidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, hasAccess } = useAuth();
@@ -30,19 +32,32 @@ const AppSidebar = ({ onLogout }: AppSidebarProps) => {
     logout();
     navigate("/login");
     if (onLogout) onLogout();
+    if (onItemClick) onItemClick();
   };
 
   const filteredNavItems = useMemo(() => navItems.filter(item => hasAccess(item.id)), [hasAccess]);
 
   return (
-    <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-[#0f172a] text-white z-30 shadow-2xl">
+    <div className="flex flex-col h-full bg-[#0f172a] text-white">
       {/* Brand Logo */}
-      <div className="flex h-20 items-center gap-3 px-6 border-b border-white/5 bg-[#1e293b]/20 backdrop-blur-md">
-        <Logo size="md" />
-        <div className="min-w-0">
-          <h1 className="text-lg font-black tracking-tighter text-white leading-tight">Octonus Solutions</h1>
-          <p className="text-[10px] font-bold text-blue-400/80 uppercase tracking-widest">Enterprise HRMS</p>
+      <div className="flex h-20 items-center justify-between px-6 border-b border-white/5 bg-[#1e293b]/20 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <Logo size="md" />
+          <div className="min-w-0">
+            <h1 className="text-lg font-black tracking-tighter text-white leading-tight">Octonus Solutions</h1>
+            <p className="text-[10px] font-bold text-blue-400/80 uppercase tracking-widest">Enterprise HRMS</p>
+          </div>
         </div>
+        
+        {/* Mobile Close Button */}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="lg:hidden text-white/40 hover:text-white hover:bg-white/10 rounded-xl"
+          onClick={() => onItemClick?.()}
+        >
+          <X className="h-5 w-5" />
+        </Button>
       </div>
 
       {/* User Profile Section */}
@@ -70,6 +85,7 @@ const AppSidebar = ({ onLogout }: AppSidebarProps) => {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={() => onItemClick?.()}
               className={`group flex items-center justify-between rounded-xl px-4 py-3 text-sm font-bold transition-all duration-200 ${
                 isActive
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
@@ -98,7 +114,7 @@ const AppSidebar = ({ onLogout }: AppSidebarProps) => {
           <span className="uppercase tracking-widest text-[11px]">Logout Session</span>
         </button>
       </div>
-    </aside>
+    </div>
   );
 };
 

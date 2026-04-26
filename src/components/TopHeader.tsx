@@ -149,76 +149,40 @@ const TopHeader = ({ onMenuClick, user, onLogout }: TopHeaderProps) => {
   }, []);
 
   return (
-    <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-100 bg-white/80 backdrop-blur-md px-6 shadow-sm">
-      <div className="flex items-center gap-6 flex-1">
+    <header className="sticky top-0 z-30 flex h-12 sm:h-16 w-full items-center justify-between border-b border-slate-200 bg-white/80 px-4 sm:px-8 backdrop-blur-md">
+      <div className="flex items-center gap-3 sm:gap-4">
         <button
-          onClick={() => onMenuClick()}
-          className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50 border border-slate-100 md:hidden transition-colors shadow-sm"
+          onClick={onMenuClick}
+          className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white shadow-lg transition-all hover:bg-slate-800 active:scale-95 lg:hidden"
         >
-          <Menu className="h-6 w-6" />
+          <Menu className="h-5 w-5" />
         </button>
         
-        <div className="hidden md:flex items-center gap-3">
-          <h2 className="text-xl font-black text-[#0f172a] tracking-tight">{pageTitle}</h2>
-          <div className="h-1.5 w-1.5 rounded-full bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.5)]" />
+        <div className="hidden sm:block">
+          <h2 className="text-lg font-black tracking-tight text-slate-900">{pageTitle}</h2>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            {format(new Date(), "EEEE, MMMM do")}
+          </p>
         </div>
 
-        {/* Search Bar */}
-        <div className="hidden lg:flex relative items-center max-w-md w-full group ml-4" ref={searchRef}>
-          <Search className="absolute left-4 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-          <Input 
-            placeholder="Search anything..." 
+        <div className="relative group hidden sm:flex items-center">
+          <Search className="absolute left-3 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+          <Input
+            ref={searchRef}
+            placeholder="Search everything..."
+            className="w-[200px] lg:w-[300px] pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all rounded-xl"
             value={globalSearch}
             onChange={(e) => handleGlobalSearch(e.target.value)}
-            onFocus={() => globalSearch.length >= 2 && setShowSearchDropdown(true)}
-            className="pl-11 h-11 bg-slate-50 border-slate-100 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500/20 font-medium transition-all w-full shadow-sm"
+            onFocus={() => setShowSearchDropdown(true)}
           />
-          {globalSearch && (
-            <button onClick={() => { setGlobalSearch(""); setSearchResults([]); }} className="absolute right-4 p-1 hover:bg-slate-200 rounded-full transition-colors">
-              <X className="h-3 w-3 text-slate-400" />
-            </button>
-          )}
-
-          {showSearchDropdown && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-100 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-              <div className="p-3 border-b border-slate-50 bg-slate-50/50">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Search Results</p>
-              </div>
-              <div className="max-h-[400px] overflow-y-auto p-2">
-                {isSearching ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
-                  </div>
-                ) : searchResults.length > 0 ? (
-                  searchResults.map((res, i) => (
-                    <button 
-                      key={i} 
-                      onClick={() => {
-                        navigate(res.path);
-                        setShowSearchDropdown(false);
-                        setGlobalSearch("");
-                      }}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors text-left group"
-                    >
-                      <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                        <res.icon className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-tighter mb-0.5">{res.type}</p>
-                        <p className="text-sm font-black text-[#0f172a] truncate leading-tight">{res.title}</p>
-                        <p className="text-[10px] font-bold text-slate-400 truncate mt-1">{res.sub}</p>
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No matches found</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
+
+        <button 
+          className="flex sm:hidden h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 lg:hidden"
+          onClick={() => navigate("/search")}
+        >
+          <Search className="h-5 w-5" />
+        </button>
       </div>
 
       <div className="flex items-center gap-3">

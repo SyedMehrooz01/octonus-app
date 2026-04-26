@@ -559,7 +559,7 @@ const EventBooking = () => {
 
   if (loading && (bookings ?? []).length === 0) {
     return (
-      <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+      <div className="space-y-8 pb-20 max-w-full overflow-hidden">
         <div className="h-24 w-full bg-white rounded-3xl animate-pulse" />
         <SkeletonLoading type="stats" />
         <div className="bg-white rounded-3xl border border-slate-100 p-6">
@@ -570,7 +570,7 @@ const EventBooking = () => {
   }
 
   return (
-    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
+    <div className="space-y-8 pb-20 max-w-full overflow-hidden">
       {error && (
         <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
           <AlertTriangle className="h-5 w-5" />
@@ -617,17 +617,19 @@ const EventBooking = () => {
         </div>
 
         <Tabs defaultValue="list" className="w-full">
-          <TabsList className="mb-8 flex-wrap h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
+          <div className="overflow-x-auto pb-2 scrollbar-hide">
+          <TabsList className="mb-8 flex-nowrap h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60 w-max sm:w-auto">
             {["list", "calendar", "menu", "kitchen", "thirdparty", "suppliers"].map(tab => (
               <TabsTrigger 
                 key={tab}
                 value={tab} 
-                className="rounded-xl px-6 py-3 font-black text-[11px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all"
+                className="rounded-xl px-6 py-3 font-black text-[11px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all whitespace-nowrap"
               >
                 {tab === 'list' ? 'All Bookings' : tab === 'thirdparty' ? 'Third-Party' : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </TabsTrigger>
             ))}
           </TabsList>
+        </div>
 
         <TabsContent value="list" className="space-y-6 animate-in fade-in duration-500">
           <div className="flex flex-col sm:flex-row gap-4 items-center bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
@@ -677,9 +679,9 @@ const EventBooking = () => {
                 <thead>
                   <tr className="bg-slate-50/80 text-left border-b border-slate-100">
                     <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Client Identity</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Event Type</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] hidden sm:table-cell">Event Type</th>
                     <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Schedule & Venue</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">PAX</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center hidden md:table-cell">PAX</th>
                     <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Financials</th>
                     <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
                     <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
@@ -695,7 +697,7 @@ const EventBooking = () => {
                             <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">{b.phone}</p>
                           </button>
                         </td>
-                        <td className="px-8 py-6">
+                        <td className="px-8 py-6 hidden sm:table-cell">
                           <Badge variant="outline" className="rounded-lg font-black text-[9px] uppercase tracking-widest bg-white border-slate-200 text-slate-600 px-2.5 py-1 shadow-sm">
                             {b.eventType}
                           </Badge>
@@ -706,7 +708,7 @@ const EventBooking = () => {
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{b.venue}</span>
                           </div>
                         </td>
-                        <td className="px-8 py-6 text-center">
+                        <td className="px-8 py-6 text-center hidden md:table-cell">
                           <span className="inline-flex items-center justify-center h-9 w-14 rounded-xl bg-slate-50 font-black text-[11px] text-slate-600 border border-slate-200/50 shadow-sm">
                             {b.guests}
                           </span>
@@ -800,29 +802,31 @@ const EventBooking = () => {
             </div>
 
             {calView === "month" && (
-              <div className="grid grid-cols-7 gap-2">
-                {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div key={d} className="py-3 text-center text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">{d}</div>)}
-                {Array.from({length:startDow}).map((_,i)=><div key={`e${i}`} className="bg-muted/5 rounded-xl border border-dashed border-border/20"/>)}
-                {days.map(day=>{
-                  const db = getDayB(day);
-                  const isToday = isSameDay(day, new Date());
-                  return <div key={day.toISOString()} className={`min-h-[120px] rounded-xl border p-2 transition-all ${isToday ? "border-primary bg-primary/5 shadow-sm" : db.length>0?"border-blue-100 bg-blue-50/30":"border-border/50 hover:bg-muted/30"}`}>
-                    <div className={`mb-2 text-xs font-black ${isToday ? "text-primary" : "text-muted-foreground"}`}>{format(day,"d")}</div>
-                    <div className="space-y-1">
-                      {(db ?? []).map((b,i)=>(
-                        <div key={i} className="truncate rounded-lg px-2 py-1.5 text-[9px] font-black border shadow-sm cursor-pointer hover:brightness-95 transition-all uppercase tracking-tighter" onClick={() => { setSelected((bookings ?? []).find(x => x.clientName === b.name) || null); setShowView(true); }}
-
-                          style={{
-                            backgroundColor: b.status === "confirmed" ? "#dcfce7" : b.status === "tentative" ? "#fef9c3" : b.status === "cancelled" ? "#fee2e2" : "#ffedd5",
-                            color: b.status === "confirmed" ? "#166534" : b.status === "tentative" ? "#854f0b" : b.status === "cancelled" ? "#991b1b" : "#9a3412",
-                            borderColor: b.status === "confirmed" ? "#bbf7d0" : b.status === "tentative" ? "#fef08a" : b.status === "cancelled" ? "#fecaca" : "#fed7aa"
-                          }}>
-                          {b.name}
-                        </div>
-                      ))}
-                    </div>
-                  </div>;
-                })}
+              <div className="overflow-x-auto pb-4 scrollbar-hide">
+                <div className="grid grid-cols-7 gap-2 min-w-[700px]">
+                  {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div key={d} className="py-3 text-center text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">{d}</div>)}
+                  {Array.from({length:startDow}).map((_,i)=><div key={`e${i}`} className="bg-muted/5 rounded-xl border border-dashed border-border/20"/>)}
+                  {days.map(day=>{
+                    const db = getDayB(day);
+                    const isToday = isSameDay(day, new Date());
+                    return <div key={day.toISOString()} className={`min-h-[120px] rounded-xl border p-2 transition-all ${isToday ? "border-primary bg-primary/5 shadow-sm" : db.length>0?"border-blue-100 bg-blue-50/30":"border-border/50 hover:bg-muted/30"}`}>
+                      <div className={`mb-2 text-xs font-black ${isToday ? "text-primary" : "text-muted-foreground"}`}>{format(day,"d")}</div>
+                      <div className="space-y-1">
+                        {(db ?? []).map((b,i)=>(
+                          <div key={i} className="truncate rounded-lg px-2 py-1.5 text-[9px] font-black border shadow-sm cursor-pointer hover:brightness-95 transition-all uppercase tracking-tighter" onClick={() => { setSelected((bookings ?? []).find(x => x.clientName === b.name) || null); setShowView(true); }}
+  
+                            style={{
+                              backgroundColor: b.status === "confirmed" ? "#dcfce7" : b.status === "tentative" ? "#fef9c3" : b.status === "cancelled" ? "#fee2e2" : "#ffedd5",
+                              color: b.status === "confirmed" ? "#166534" : b.status === "tentative" ? "#854f0b" : b.status === "cancelled" ? "#991b1b" : "#9a3412",
+                              borderColor: b.status === "confirmed" ? "#bbf7d0" : b.status === "tentative" ? "#fef08a" : b.status === "cancelled" ? "#fecaca" : "#fed7aa"
+                            }}>
+                            {b.name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>;
+                  })}
+                </div>
               </div>
             )}
 
@@ -949,7 +953,7 @@ const EventBooking = () => {
                   <thead>
                     <tr className="bg-slate-50/80 border-b border-slate-100">
                       <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Client</th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Event</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left hidden sm:table-cell">Event</th>
                       <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Supplier Cost</th>
                       <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Selling Rate</th>
                       <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Profit</th>
@@ -959,7 +963,7 @@ const EventBooking = () => {
                     {bookings.filter(b => b.thirdParty).map(b => (
                       <tr key={b.id} className="hover:bg-blue-50/30 transition-colors">
                         <td className="px-6 py-5 font-black text-[#0f172a]">{b.clientName}</td>
-                        <td className="px-6 py-5 font-bold text-slate-500">{b.eventType} — {b.eventDate ? format(new Date(b.eventDate), 'MMM dd, yyyy') : "N/A"}</td>
+                        <td className="px-6 py-5 font-bold text-slate-500 hidden sm:table-cell">{b.eventType} — {b.eventDate ? format(new Date(b.eventDate), 'MMM dd, yyyy') : "N/A"}</td>
                         <td className="px-6 py-5 text-right font-black text-rose-500">₨ {b.supplierCost.toLocaleString()}</td>
                         <td className="px-6 py-5 text-right font-black text-blue-600">₨ {b.sellingRate.toLocaleString()}</td>
                         <td className="px-6 py-5 text-right font-black text-emerald-600">₨ {(b.sellingRate - b.supplierCost).toLocaleString()}</td>

@@ -30,7 +30,7 @@ const HRAdvances = memo(({
       </div>
       <div className="rounded-lg border border-border bg-card">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[800px]">
+          <table className="w-full border-collapse min-w-[600px]">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <th className="px-4 py-3 text-left">Staff</th>
