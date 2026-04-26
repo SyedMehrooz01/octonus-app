@@ -47,7 +47,7 @@ const HRLeaves = memo(({
 
       <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[700px]">
+          <table className="w-full border-collapse min-w-[900px]">
             <thead>
               <tr className="bg-muted/30 text-left border-b border-border">
                 <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Staff Member</th>
@@ -141,7 +141,7 @@ const HRLeaves = memo(({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5"><Label>Start Date</Label><Input type="date" value={leaveForm.start} onChange={e => setLeaveForm({ ...leaveForm, start: e.target.value })} /></div>
               <div className="space-y-1.5"><Label>End Date</Label><Input type="date" value={leaveForm.end} onChange={e => setLeaveForm({ ...leaveForm, end: e.target.value })} /></div>
             </div>

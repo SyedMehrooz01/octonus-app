@@ -85,54 +85,55 @@ const HRAttendance = memo(({
 
       <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[700px]">
+          <table className="w-full border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-muted/30 text-left border-b border-border">
-                <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Staff Member</th>
-                <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest hidden sm:table-cell">Marked Date</th>
-                <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest text-center">Current Status</th>
-                <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest hidden md:table-cell">Time Logs (In/Out)</th>
-                <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest text-right">Edit Record</th>
+                <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Staff Member</th>
+                <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Marked Date</th>
+                <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-center">Current Status</th>
+                <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Time Logs (In/Out)</th>
+                <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-right">Edit Record</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {(attendance ?? []).map((a, idx) => (
                 <tr key={a?.id || `attendance-${idx}`} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/5'} hover:bg-primary/5 transition-colors group`}>
-                  <td className="px-4 sm:px-6 py-5">
+                  <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-[10px] sm:text-xs">
+                      <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-xs">
                         {(a?.name ?? "U")[0].toUpperCase()}
                       </div>
-                      <span className="text-xs sm:text-sm font-black text-foreground">{a?.name ?? "Unknown"}</span>
+                      <span className="text-sm font-black text-foreground">{a?.name ?? "Unknown"}</span>
                     </div>
                   </td>
-                  <td className="px-4 sm:px-6 py-5 hidden sm:table-cell">
-                    <p className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-tighter">
+                  <td className="px-6 py-5">
+                    <p className="text-sm font-bold text-muted-foreground uppercase tracking-tighter">
                       {a?.date ? format(new Date(a.date), 'MMMM dd, yyyy') : "N/A"}
                     </p>
                   </td>
-                  <td className="px-4 sm:px-6 py-5 text-center">
+                  <td className="px-6 py-5 text-center">
                     {editAttendanceId === a?.id ? (
                       <div className="flex justify-center">
                         <Select defaultValue={a?.status ?? "present"} onValueChange={(v) => handleUpdateAttendance(a?.id, v)}>
-                          <SelectTrigger className="h-8 sm:h-9 w-[100px] sm:w-[130px] rounded-xl border-border bg-white font-bold text-[10px] sm:text-xs">
+
+                          <SelectTrigger className="h-9 w-[130px] rounded-xl border-border bg-white font-bold text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
-                            <SelectItem value="present" className="font-bold text-xs">Present</SelectItem>
-                            <SelectItem value="absent" className="font-bold text-xs text-rose-500">Absent</SelectItem>
-                            <SelectItem value="late" className="font-bold text-xs text-amber-500">Late</SelectItem>
-                            <SelectItem value="half-day" className="font-bold text-xs text-blue-500">Half Day</SelectItem>
+                            <SelectItem value="present" className="font-bold">Present</SelectItem>
+                            <SelectItem value="absent" className="font-bold text-rose-500">Absent</SelectItem>
+                            <SelectItem value="late" className="font-bold text-amber-500">Late</SelectItem>
+                            <SelectItem value="half-day" className="font-bold text-blue-500">Half Day</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     ) : (
-                      <Badge className={`${statusColor(a?.status ?? "absent")} rounded-lg px-2 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-black uppercase tracking-tighter border-none`}>
+                      <Badge className={`${statusColor(a?.status ?? "absent")} rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tighter border-none`}>
                         {a?.status ?? "absent"}
                       </Badge>
                     )}
                   </td>
-                  <td className="px-4 sm:px-6 py-5 hidden md:table-cell">
+                  <td className="px-6 py-5">
                     <div className="flex items-center gap-2">
                       <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                       <span className="text-xs font-black text-foreground/70">
@@ -140,9 +141,9 @@ const HRAttendance = memo(({
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 sm:px-6 py-5 text-right">
-                    <Button variant="ghost" size="icon" className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl transition-all ${editAttendanceId === a?.id ? "bg-primary text-white" : "text-muted-foreground hover:text-primary hover:bg-primary/5"}`} onClick={() => setEditAttendanceId(editAttendanceId === a?.id ? null : a?.id)}>
-                      <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <td className="px-6 py-5 text-right">
+                    <Button variant="ghost" size="icon" className={`h-9 w-9 rounded-xl transition-all ${editAttendanceId === a?.id ? "bg-primary text-white" : "text-muted-foreground hover:text-primary hover:bg-primary/5"}`} onClick={() => setEditAttendanceId(editAttendanceId === a?.id ? null : a?.id)}>
+                      <Edit className="h-4 w-4" />
                     </Button>
                   </td>
                 </tr>
@@ -166,7 +167,7 @@ const HRAttendance = memo(({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Status</Label>
                 <Select value={attendanceForm.status} onValueChange={v => setAttendanceForm({ ...attendanceForm, status: v })}>

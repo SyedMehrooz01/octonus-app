@@ -176,7 +176,7 @@ const FileManager = () => {
   });
 
   return (
-    <div className="space-y-6 sm:space-y-8 pb-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
       {error && (
         <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
           <FolderOpen className="h-5 w-5" />
@@ -186,28 +186,28 @@ const FileManager = () => {
       )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
-          <h1 className="text-xl sm:text-3xl font-black text-[#0f172a] tracking-tight uppercase italic">File Manager</h1>
-          <p className="text-[10px] sm:text-sm font-black text-slate-400 uppercase tracking-widest mt-1">Manage all your company documents in one place.</p>
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">File Manager</h1>
+          <p className="text-slate-500 font-bold mt-1">Manage all your company documents in one place.</p>
         </div>
       </div>
 
       <div className="flex flex-col gap-6 animate-in fade-in duration-500">
         {/* Toolbar */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 sm:p-6 rounded-3xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-4 w-full md:w-auto">
             <Button 
               onClick={() => setIsUploading(true)} 
-              className="bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest gap-2 rounded-xl h-10 sm:h-12 px-4 sm:px-6 shadow-lg shadow-blue-600/20 text-[10px] sm:text-xs flex-1 sm:flex-none"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest gap-2 rounded-xl h-12 px-6 shadow-lg shadow-blue-600/20"
             >
-              <Upload className="h-4 w-4" /> UPLOAD
+              <Upload className="h-4 w-4" /> Upload
             </Button>
-            <div className="h-8 w-px bg-slate-200 mx-1 hidden sm:block" />
+            <div className="h-8 w-px bg-slate-200 mx-2 hidden md:block" />
             <div className="flex bg-slate-100 p-1 rounded-xl">
               <Button 
                 variant={viewMode === "grid" ? "secondary" : "ghost"} 
                 size="icon" 
                 onClick={() => setViewMode("grid")}
-                className={`h-8 w-8 sm:h-10 sm:w-10 rounded-lg ${viewMode === "grid" ? "bg-white shadow-sm" : ""}`}
+                className={`h-10 w-10 rounded-lg ${viewMode === "grid" ? "bg-white shadow-sm" : ""}`}
               >
                 <Grid className="h-4 w-4" />
               </Button>
@@ -215,31 +215,31 @@ const FileManager = () => {
                 variant={viewMode === "list" ? "secondary" : "ghost"} 
                 size="icon" 
                 onClick={() => setViewMode("list")}
-                className={`h-8 w-8 sm:h-10 sm:w-10 rounded-lg ${viewMode === "list" ? "bg-white shadow-sm" : ""}`}
+                className={`h-10 w-10 rounded-lg ${viewMode === "list" ? "bg-white shadow-sm" : ""}`}
               >
                 <ListIcon className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
             <div className="relative group flex-1 sm:w-64">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
               <Input 
                 placeholder="Search files..." 
                 value={fileSearch}
                 onChange={e => setFileSearch(e.target.value)}
-                className="pl-11 h-10 sm:h-12 bg-slate-50 border-none rounded-xl font-bold text-xs sm:text-sm"
+                className="pl-11 h-12 bg-slate-50 border-none rounded-xl font-bold"
               />
             </div>
             <select 
               value={fileCategory}
               onChange={e => setFileCategory(e.target.value)}
-              className="h-10 sm:h-12 px-4 bg-slate-50 border-none rounded-xl font-bold text-[10px] sm:text-sm focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer uppercase tracking-widest"
+              className="h-12 px-4 bg-slate-50 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer"
             >
-              <option value="all">ALL CATEGORIES</option>
+              <option value="all">All Categories</option>
               {categories.map(cat => (
-                <option key={cat} value={cat}>{cat.toUpperCase()}</option>
+                <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
           </div>
@@ -419,70 +419,25 @@ const FileManager = () => {
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto pb-4 scrollbar-hide">
-              <table className="w-full min-w-[800px]">
-                <thead className="bg-slate-50/80 border-b border-slate-100">
-                  <tr>
-                    <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Name</th>
-                    <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] hidden sm:table-cell">Category</th>
-                    <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] hidden md:table-cell">Size</th>
-                    <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] hidden lg:table-cell">Uploaded By</th>
-                    <th className="px-8 py-6 text-right text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {(filteredFiles ?? []).map((file) => (
-                    <tr key={file.id} className="hover:bg-blue-50/40 transition-all duration-200 group">
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-4">
-                          <div className="p-2 bg-slate-50 rounded-lg group-hover:scale-110 transition-transform">
-                            {getFileIcon(file.file_type)}
-                          </div>
-                          <div>
-                            <p className="font-black text-[#0f172a] text-sm">{file.file_name}</p>
-                            <p className="text-[10px] font-bold text-slate-400 sm:hidden uppercase tracking-widest mt-1">{file.category} • {file.file_size}</p>
-                          </div>
+          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-slate-50/80 border-b border-slate-100">
+                <tr>
+                  <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Name</th>
+                  <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Category</th>
+                  <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Size</th>
+                  <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Uploaded By</th>
+                  <th className="px-8 py-6 text-right text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {(filteredFiles ?? []).map((file) => (
+                  <tr key={file.id} className="hover:bg-blue-50/40 transition-all duration-200 group">
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-4">
+                        <div className="p-2 bg-slate-50 rounded-lg group-hover:scale-110 transition-transform">
+                          {getFileIcon(file.file_type)}
                         </div>
-                      </td>
-                      <td className="px-8 py-5 hidden sm:table-cell">
-                        <Badge className="bg-slate-100 text-slate-500 border-none text-[9px] font-black uppercase tracking-tighter px-2 py-0.5">
-                          {file.category}
-                        </Badge>
-                      </td>
-                      <td className="px-8 py-5 hidden md:table-cell">
-                        <span className="text-xs font-bold text-slate-500">{file.file_size}</span>
-                      </td>
-                      <td className="px-8 py-5 hidden lg:table-cell">
-                        <span className="text-xs font-bold text-slate-500">{file.uploaded_by}</span>
-                      </td>
-                      <td className="px-8 py-5 text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => window.open(file.file_url, '_blank')}
-                            className="h-8 w-8 rounded-lg text-blue-600 hover:bg-blue-50"
-                          >
-                            <EyeIcon className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => handleDeleteFile(file.id, file.file_url)}
-                            className="h-8 w-8 rounded-lg text-rose-500 hover:bg-rose-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
                         <span className="font-black text-[#0f172a] text-sm">{file.file_name}</span>
                       </div>
                     </td>

@@ -606,17 +606,17 @@ const Documents = () => {
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8 pb-20">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-8 pb-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="animate-in fade-in slide-in-from-left duration-500">
-          <h1 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight uppercase italic">Document Generator</h1>
-          <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mt-1">Quotations & Invoices</p>
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Documents Generator</h1>
+          <p className="text-slate-500 font-bold mt-1">Create professional Quotations and Invoices instantly.</p>
         </div>
         {editingDoc && (
           <Button 
             variant="destructive" 
             onClick={resetForm} 
-            className="h-10 sm:h-12 rounded-xl gap-2 font-black px-4 text-xs sm:text-sm"
+            className="h-12 rounded-xl gap-2 font-black"
           >
             Cancel Edit
           </Button>
@@ -628,125 +628,123 @@ const Documents = () => {
             setActiveTab(v);
           }
         }} className="w-full">
-          <div className="overflow-x-auto pb-2 scrollbar-hide">
-            <TabsList className="mb-6 sm:mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60 w-max sm:w-auto">
-              <TabsTrigger value="Quotation" className="rounded-xl px-4 sm:px-8 py-2.5 sm:py-3 font-black text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
-                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Quotation
-              </TabsTrigger>
-              <TabsTrigger value="Invoice" className="rounded-xl px-4 sm:px-8 py-2.5 sm:py-3 font-black text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
-                <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Invoice
-              </TabsTrigger>
-              <TabsTrigger value="archive" className="rounded-xl px-4 sm:px-8 py-2.5 sm:py-3 font-black text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
-                <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Archive
-              </TabsTrigger>
-            </TabsList>
-          </div>
+          <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
+            <TabsTrigger value="Quotation" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
+              <FileText className="h-4 w-4" /> Quotation
+            </TabsTrigger>
+            <TabsTrigger value="Invoice" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
+              <Receipt className="h-4 w-4" /> Invoice
+            </TabsTrigger>
+            <TabsTrigger value="archive" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all gap-2">
+              <History className="h-4 w-4" /> Archive
+            </TabsTrigger>
+          </TabsList>
 
           <TabsContent value={activeTab} className="space-y-6 animate-in fade-in duration-500">
-            <div className="rounded-2xl sm:rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
-                  <div className="p-4 sm:p-6 lg:p-8 flex items-center justify-between border-b border-slate-50">
-                    <h2 className="text-lg sm:text-xl font-black text-[#0f172a] flex items-center gap-2 sm:gap-3">
-                      <PlusCircle className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+            <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
+                  <div className="px-8 pt-8 pb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-black text-[#0f172a] flex items-center gap-3">
+                      <PlusCircle className="h-6 w-6 text-blue-600" />
                       {editingDoc ? `Edit ${editingDoc.doc_type} — ${docNo}` : `New ${activeTab} Setup`}
                     </h2>
                   </div>
-              <div className="p-4 sm:p-6 lg:p-8">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-10">
+              <div className="p-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Document Number</Label>
-                    <Input value={docNo} readOnly className="h-10 sm:h-12 rounded-xl bg-slate-50 font-black text-blue-600 border-slate-200 text-sm" />
+                    <Input value={docNo} readOnly className="h-12 rounded-xl bg-slate-50 font-black text-blue-600 border-slate-200" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest ml-1">{activeTab} Date</Label>
-                    <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-10 sm:h-12 rounded-xl font-bold text-sm" />
+                    <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-12 rounded-xl font-bold" />
                   </div>
                   {activeTab === "Quotation" ? (
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Valid Until</Label>
-                      <Input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} className="h-10 sm:h-12 rounded-xl font-bold text-sm" />
+                      <Input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} className="h-12 rounded-xl font-bold" />
                     </div>
                   ) : activeTab === "Invoice" ? (
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Event Date</Label>
-                      <Input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} className="h-10 sm:h-12 rounded-xl font-bold text-sm" />
+                      <Input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} className="h-12 rounded-xl font-bold" />
                     </div>
                   ) : null}
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Client Company Name</Label>
-                    <Input placeholder="Enter company name" value={clientCompany} onChange={e => setClientCompany(e.target.value)} className="h-10 sm:h-12 rounded-xl font-bold text-sm" />
+                    <Input placeholder="Enter company name" value={clientCompany} onChange={e => setClientCompany(e.target.value)} className="h-12 rounded-xl font-bold" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Contact Person</Label>
-                    <Input placeholder="Enter contact name" value={contactPerson} onChange={e => setContactPerson(e.target.value)} className="h-10 sm:h-12 rounded-xl font-bold text-sm" />
+                    <Input placeholder="Enter contact name" value={contactPerson} onChange={e => setContactPerson(e.target.value)} className="h-12 rounded-xl font-bold" />
                   </div>
-                  <div className="space-y-2 sm:col-span-2 lg:col-span-2">
+                  <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Event Name / Description</Label>
-                    <Input placeholder="e.g. Corporate Dinner 2024" value={eventName} onChange={e => setEventName(e.target.value)} className="h-10 sm:h-12 rounded-xl font-bold text-sm" />
+                    <Input placeholder="e.g. Corporate Dinner 2024" value={eventName} onChange={e => setEventName(e.target.value)} className="h-12 rounded-xl font-bold" />
                   </div>
-                  <div className="sm:col-span-2 lg:col-span-4 space-y-2">
+                  <div className="md:col-span-2 lg:col-span-3 space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Client Address</Label>
-                    <Input placeholder="Enter complete address" value={clientAddress} onChange={e => setClientAddress(e.target.value)} className="h-10 sm:h-12 rounded-xl font-bold text-sm" />
+                    <Input placeholder="Enter complete address" value={clientAddress} onChange={e => setClientAddress(e.target.value)} className="h-12 rounded-xl font-bold" />
                   </div>
                 </div>
 
                 {/* Items Table */}
-                <div className="space-y-4 mb-8 sm:mb-10">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-                    <h3 className="text-xs sm:text-sm font-black text-[#0f172a] uppercase tracking-widest">Line Items</h3>
-                    <Button onClick={() => handleAddItem()} variant="outline" className="w-full sm:w-auto rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 h-10 border-blue-200 text-blue-600 hover:bg-blue-50">
+                <div className="space-y-4 mb-10">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black text-[#0f172a] uppercase tracking-widest">Line Items</h3>
+                    <Button onClick={() => handleAddItem()} variant="outline" className="rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 h-10 border-blue-200 text-blue-600 hover:bg-blue-50">
                       <Plus className="h-4 w-4" /> Add Row
                     </Button>
                   </div>
-                  <div className="rounded-xl sm:rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                  <div className="rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead className="bg-slate-50 border-b border-slate-100">
                           <tr>
-                            <th className="px-3 sm:px-4 py-3 text-center font-black text-[10px] uppercase tracking-widest w-12 sm:w-16">#</th>
-                            <th className="px-3 sm:px-4 py-3 text-left font-black text-[10px] uppercase tracking-widest min-w-[300px] sm:min-w-[200px]">Description</th>
-                            <th className="px-3 sm:px-4 py-3 text-center font-black text-[10px] uppercase tracking-widest w-20 sm:w-24">Qty</th>
-                            <th className="px-3 sm:px-4 py-3 text-right font-black text-[10px] uppercase tracking-widest w-32 sm:w-40">Rate (Rs.)</th>
-                            <th className="px-3 sm:px-4 py-3 text-right font-black text-[10px] uppercase tracking-widest w-32 sm:w-40">Amount</th>
-                            <th className="px-3 sm:px-4 py-3 w-12 sm:w-16"></th>
+                            <th className="px-4 py-3 text-center font-black text-[10px] uppercase tracking-widest w-16">S.No</th>
+                            <th className="px-4 py-3 text-left font-black text-[10px] uppercase tracking-widest">Description</th>
+                            <th className="px-4 py-3 text-center font-black text-[10px] uppercase tracking-widest w-24">Qty</th>
+                            <th className="px-4 py-3 text-right font-black text-[10px] uppercase tracking-widest w-40">Rate (Rs.)</th>
+                            <th className="px-4 py-3 text-right font-black text-[10px] uppercase tracking-widest w-40">Amount</th>
+                            <th className="px-4 py-3 w-16"></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                           {(items ?? []).map((item, index) => (
                             <tr key={index} className="group hover:bg-slate-50/50">
-                              <td className="px-3 sm:px-4 py-3 text-center font-bold text-slate-400 text-xs sm:text-sm">{index + 1}</td>
-                              <td className="px-3 sm:px-4 py-3">
+                              <td className="px-4 py-3 text-center font-bold text-slate-400">{index + 1}</td>
+                              <td className="px-4 py-3">
                                 <Input 
                                   placeholder="Item description" 
                                   value={item?.description ?? ""} 
                                   onChange={e => handleItemChange(index, "description", e.target.value)}
-                                  className="border-none focus-visible:ring-0 bg-transparent font-bold text-xs sm:text-sm p-0 h-auto"
+                                  className="border-none focus-visible:ring-0 bg-transparent font-bold"
                                 />
                               </td>
-                              <td className="px-3 sm:px-4 py-3">
+                              <td className="px-4 py-3">
                                 <Input 
                                   type="number" 
                                   value={item?.qty ?? 0} 
                                   onChange={e => handleItemChange(index, "qty", e.target.value)}
-                                  className="text-center font-bold h-8 sm:h-9 rounded-lg text-xs sm:text-sm px-1"
+                                  className="text-center font-bold h-9 rounded-lg"
                                 />
                               </td>
-                              <td className="px-3 sm:px-4 py-3">
+                              <td className="px-4 py-3">
                                 <Input 
                                   type="number" 
                                   value={item?.rate ?? 0} 
                                   onChange={e => handleItemChange(index, "rate", e.target.value)}
-                                  className="text-right font-bold h-8 sm:h-9 rounded-lg text-xs sm:text-sm px-1"
+                                  className="text-right font-bold h-9 rounded-lg"
                                 />
                               </td>
-                              <td className="px-3 sm:px-4 py-3 text-right font-black text-slate-700 text-xs sm:text-sm">{(item?.amount ?? 0).toLocaleString()}</td>
-                              <td className="px-3 sm:px-4 py-3 text-center">
+                              <td className="px-4 py-3 text-right font-black text-slate-700">{(item?.amount ?? 0).toLocaleString()}</td>
+                              <td className="px-4 py-3 text-center">
                                 <Button 
                                   variant="ghost" 
                                   size="icon" 
                                   onClick={() => handleRemoveItem(index)}
-                                  className="h-8 w-8 sm:h-9 sm:w-9 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg sm:rounded-xl"
+                                  className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </td>
                             </tr>
@@ -758,37 +756,37 @@ const Documents = () => {
                 </div>
 
                 {/* Bottom Section: Terms & Totals */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 pt-8 border-t border-slate-100">
-                  <div className="space-y-3 sm:space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 pt-8 border-t border-slate-100">
+                  <div className="space-y-4">
                     <Label className="text-[10px] font-black uppercase tracking-widest ml-1">Terms & Conditions</Label>
                     <textarea 
                       value={terms} 
                       onChange={e => setTerms(e.target.value)}
-                      className="w-full h-32 sm:h-40 rounded-xl sm:rounded-2xl border-slate-200 p-3 sm:p-4 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none resize-none bg-slate-50/30"
+                      className="w-full h-40 rounded-2xl border-slate-200 p-4 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none resize-none bg-slate-50/30"
                     />
                   </div>
-                  <div className="space-y-3 sm:space-y-4 bg-slate-50/50 p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl border border-slate-100">
-                    <div className="flex justify-between items-center text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest">
+                  <div className="space-y-4 bg-slate-50/50 p-8 rounded-3xl border border-slate-100">
+                    <div className="flex justify-between items-center text-sm font-bold text-slate-500 uppercase tracking-widest">
                       <span>Total Amount</span>
                       <span>{formatCurrency(total)}</span>
                     </div>
-                    <div className="flex justify-between items-center text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest">
+                    <div className="flex justify-between items-center text-sm font-bold text-slate-500 uppercase tracking-widest">
                       <span>SRB Tax (15%)</span>
                       <span>{formatCurrency(srb)}</span>
                     </div>
-                    <div className="h-px bg-slate-200 my-2 sm:my-4" />
+                    <div className="h-px bg-slate-200 my-4" />
                     <div className="flex justify-between items-center">
-                      <span className="text-sm sm:text-lg font-black text-[#0f172a] uppercase tracking-widest">Sub Total</span>
-                      <span className="text-lg sm:text-2xl font-black text-blue-600">{formatCurrency(subTotal)}</span>
+                      <span className="text-lg font-black text-[#0f172a] uppercase tracking-widest">Sub Total</span>
+                      <span className="text-2xl font-black text-blue-600">{formatCurrency(subTotal)}</span>
                     </div>
                     
-                    <div className="flex gap-3 pt-4 sm:pt-8">
+                    <div className="flex gap-3 pt-8">
                       <Button 
                         onClick={() => handleSave()} 
                         disabled={saving}
-                        className="flex-1 h-12 sm:h-14 rounded-xl sm:rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest gap-2 sm:gap-3 shadow-xl shadow-blue-600/20 text-xs sm:text-sm"
+                        className="flex-1 h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest gap-3 shadow-xl shadow-blue-600/20"
                       >
-                        {saving ? <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" /> : <Save className="h-4 w-4 sm:h-5 sm:w-5" />}
+                        {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                         {editingDoc ? "Save Changes" : `Save ${activeTab}`}
                       </Button>
                     </div>
@@ -798,9 +796,9 @@ const Documents = () => {
             </div>
 
             {/* Previous Documents Archive for Quotation/Invoice Tab */}
-            <div className="mt-8 sm:mt-10 rounded-2xl sm:rounded-3xl border border-slate-100 bg-white shadow-lg overflow-hidden"> 
-              <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between"> 
-                <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-slate-700"> 
+            <div className="mt-10 rounded-3xl border border-slate-100 bg-white shadow-lg overflow-hidden"> 
+              <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between"> 
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-700"> 
                   Previous {activeTab}s 
                 </h3> 
               </div> 
@@ -808,11 +806,11 @@ const Documents = () => {
                 <table className="w-full"> 
                   <thead className="bg-slate-50 border-b border-slate-100">
                     <tr>
-                      <th className="px-4 sm:px-8 py-3 sm:py-5 text-left text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest">Doc No</th>
-                      <th className="px-4 sm:px-8 py-3 sm:py-5 text-left text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest">Client / Event</th>
-                      <th className="px-4 sm:px-8 py-3 sm:py-5 text-left text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest hidden sm:table-cell">Date</th>
-                      <th className="px-4 sm:px-8 py-3 sm:py-5 text-right text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
-                      <th className="px-4 sm:px-8 py-3 sm:py-5 text-right text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+                      <th className="px-8 py-5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Doc No</th>
+                      <th className="px-8 py-5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Client / Event</th>
+                      <th className="px-8 py-5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                      <th className="px-8 py-5 text-right text-[11px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
+                      <th className="px-8 py-5 text-right text-[11px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -820,42 +818,41 @@ const Documents = () => {
                       .filter(doc => doc.doc_type === activeTab)
                       .map((doc) => (
                         <tr key={doc.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-4 sm:px-8 py-3 sm:py-5 font-black text-blue-600 tracking-tight text-xs sm:text-sm">{doc.doc_number}</td>
-                          <td className="px-4 sm:px-8 py-3 sm:py-5">
-                            <p className="text-xs sm:text-sm font-black text-slate-900 leading-none">{doc.client_company}</p>
-                            <p className="text-[9px] sm:text-[11px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{doc.event_name}</p>
-                            <p className="text-[9px] font-bold text-slate-400 mt-0.5 sm:hidden">{doc.invoice_date ? format(new Date(doc.invoice_date), 'MMM dd, yyyy') : "-"}</p>
+                          <td className="px-8 py-5 font-black text-blue-600 tracking-tight">{doc.doc_number}</td>
+                          <td className="px-8 py-5">
+                            <p className="text-sm font-black text-slate-900 leading-none">{doc.client_company}</p>
+                            <p className="text-[11px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{doc.event_name}</p>
                           </td>
-                          <td className="px-4 sm:px-8 py-3 sm:py-5 text-xs sm:text-sm font-black text-slate-500 hidden sm:table-cell">{doc.invoice_date ? format(new Date(doc.invoice_date), 'MMM dd, yyyy') : "-"}</td>
-                          <td className="px-4 sm:px-8 py-3 sm:py-5 text-right font-black text-slate-900 text-xs sm:text-sm">{formatCurrency(doc.sub_total)}</td>
-                          <td className="px-4 sm:px-8 py-3 sm:py-5 text-right">
-                            <div className="flex justify-end gap-1 sm:gap-2">
+                          <td className="px-8 py-5 text-sm font-black text-slate-500">{doc.invoice_date ? format(new Date(doc.invoice_date), 'MMM dd, yyyy') : "-"}</td>
+                          <td className="px-8 py-5 text-right font-black text-slate-900">{formatCurrency(doc.sub_total)}</td>
+                          <td className="px-8 py-5 text-right">
+                            <div className="flex justify-end gap-2">
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => handleDownloadPDF(doc)}
-                                className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                                className="h-9 w-9 rounded-xl text-blue-500 hover:text-blue-700 hover:bg-blue-50"
                                 title="Download PDF"
                               >
-                                <FileDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                <FileDown className="h-4 w-4" />
                               </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => generateExcel(doc)}
-                                className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50"
+                                className="h-9 w-9 rounded-xl text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50"
                                 title="Download Excel"
                               >
-                                <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                <Download className="h-4 w-4" />
                               </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => doc.id && handleDelete(doc.id)}
-                                className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl text-rose-400 hover:text-rose-600 hover:bg-rose-50"
+                                className="h-9 w-9 rounded-xl text-rose-400 hover:text-rose-600 hover:bg-rose-50"
                                 title="Delete Document"
                               >
-                                <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </td>
@@ -864,7 +861,7 @@ const Documents = () => {
                     {(documents ?? []).filter(doc => doc.doc_type === activeTab).length === 0 && (
                       <tr>
                         <td colSpan={5} className="py-10 text-center">
-                          <p className="text-[10px] sm:text-sm font-black text-slate-400 uppercase tracking-widest">No {activeTab}s saved yet</p>
+                          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No {activeTab}s saved yet</p>
                         </td>
                       </tr>
                     )}
@@ -877,30 +874,30 @@ const Documents = () => {
           <TabsContent value="archive" className="space-y-6">
             {/* Saved Documents Table */}
             <div className="space-y-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
-                <h2 className="text-lg sm:text-xl font-black text-[#0f172a] uppercase tracking-tight">Saved Documents Archive</h2>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                <h2 className="text-xl font-black text-[#0f172a] uppercase tracking-tight">Saved Documents Archive</h2>
                 <div className="relative w-full sm:max-w-xs group">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
                   <Input 
                     placeholder="Search archive..." 
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    className="pl-11 h-10 sm:h-12 bg-slate-50 border-none rounded-xl font-bold transition-all text-sm"
+                    className="pl-11 h-12 bg-slate-50 border-none rounded-xl font-bold transition-all"
                   />
                 </div>
               </div>
 
-              <div className="rounded-2xl sm:rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
+              <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-slate-50/80 border-b border-slate-100">
                       <tr>
-                        <th className="px-4 sm:px-8 py-4 sm:py-6 text-left text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Doc No</th>
-                        <th className="px-4 sm:px-8 py-4 sm:py-6 text-left text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] hidden sm:table-cell">Type</th>
-                        <th className="px-4 sm:px-8 py-4 sm:py-6 text-left text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Client / Event</th>
-                        <th className="px-4 sm:px-8 py-4 sm:py-6 text-left text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] hidden lg:table-cell">Date</th>
-                        <th className="px-4 sm:px-8 py-4 sm:py-6 text-right text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Amount</th>
-                        <th className="px-4 sm:px-8 py-4 sm:py-6 text-right text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Actions</th>
+                        <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Doc No</th>
+                        <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Type</th>
+                        <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Client / Event</th>
+                        <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
+                        <th className="px-8 py-6 text-right text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Amount</th>
+                        <th className="px-8 py-6 text-right text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">

@@ -381,24 +381,24 @@ const Expenses = () => {
   );
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-8 pb-20 max-w-7xl mx-auto">
+    <div className="p-6 space-y-8 max-w-7xl mx-auto">
       {/* Header Section */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-        <div className="animate-in fade-in slide-in-from-left duration-500">
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight uppercase flex items-center gap-3 italic">
-            <Receipt className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase flex items-center gap-3">
+            <Receipt className="h-8 w-8 text-red-600" />
             Expense Tracking
           </h1>
-          <p className="text-slate-500 font-bold mt-1 text-xs sm:text-sm uppercase tracking-wider">Monitor all business spending</p>
+          <p className="text-slate-500 font-medium mt-1">Monitor all business spending</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <div className="bg-slate-100 p-1 rounded-xl flex w-full sm:w-auto">
+        <div className="flex items-center gap-3">
+          <div className="bg-slate-100 p-1 rounded-xl flex">
             <Button 
               variant={viewType === "monthly" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewType("monthly")}
-              className={viewType === "monthly" ? "flex-1 sm:flex-none bg-white text-slate-900 shadow-sm hover:bg-white rounded-lg px-4 sm:px-6 font-black text-[10px] sm:text-xs uppercase tracking-widest" : "flex-1 sm:flex-none text-slate-500 rounded-lg px-4 sm:px-6 font-black text-[10px] sm:text-xs uppercase tracking-widest"}
+              className={viewType === "monthly" ? "bg-white text-slate-900 shadow-sm hover:bg-white rounded-lg px-6" : "text-slate-500 rounded-lg px-6"}
             >
               MONTHLY
             </Button>
@@ -406,100 +406,96 @@ const Expenses = () => {
               variant={viewType === "yearly" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewType("yearly")}
-              className={viewType === "yearly" ? "flex-1 sm:flex-none bg-white text-slate-900 shadow-sm hover:bg-white rounded-lg px-4 sm:px-6 font-black text-[10px] sm:text-xs uppercase tracking-widest" : "flex-1 sm:flex-none text-slate-500 rounded-lg px-4 sm:px-6 font-black text-[10px] sm:text-xs uppercase tracking-widest"}
+              className={viewType === "yearly" ? "bg-white text-slate-900 shadow-sm hover:bg-white rounded-lg px-6" : "text-slate-500 rounded-lg px-6"}
             >
               YEARLY
             </Button>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button 
-              variant="outline"
-              onClick={handleExportExcel}
-              className="flex-1 sm:flex-none border-slate-200 hover:bg-slate-50 text-slate-600 font-black rounded-xl px-4 sm:px-6 h-10 sm:h-12 gap-2 text-[10px] sm:text-xs uppercase tracking-widest shadow-sm"
-            >
-              <Download className="h-4 w-4" /> <span className="hidden sm:inline">EXPORT EXCEL</span><span className="sm:hidden">EXPORT</span>
-            </Button>
-            
-            <Button 
-              onClick={() => setShowAddModal(true)}
-              className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white font-black rounded-xl px-4 sm:px-6 h-10 sm:h-12 shadow-lg shadow-red-600/20 gap-2 text-[10px] sm:text-xs uppercase tracking-widest"
-            >
-              <Plus className="h-4 w-4" /> <span className="hidden sm:inline">ADD EXPENSE</span><span className="sm:hidden">ADD</span>
-            </Button>
-          </div>
+          <Button 
+            variant="outline"
+            onClick={handleExportExcel}
+            className="border-slate-200 hover:bg-slate-50 text-slate-600 font-black rounded-xl px-6 h-12 gap-2"
+          >
+            <Download className="h-5 w-5" /> EXPORT EXCEL
+          </Button>
+          
+          <Button 
+            onClick={() => setShowAddModal(true)}
+            className="bg-red-600 hover:bg-red-700 text-white font-black rounded-xl px-6 h-12 shadow-lg shadow-red-600/20 gap-2"
+          >
+            <Plus className="h-5 w-5" /> ADD EXPENSE
+          </Button>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Card 1: Today's Burn */}
-        <div className="bg-gradient-to-br from-rose-500 to-pink-600 rounded-2xl sm:rounded-[2rem] p-6 sm:p-8 text-white shadow-xl shadow-rose-500/20 relative overflow-hidden group transition-all duration-300 hover:scale-[1.02]">
-          <div className="relative z-10 flex flex-col gap-2 sm:gap-4">
-            <div className="flex items-center gap-2 text-rose-100 font-black text-[10px] sm:text-xs uppercase tracking-[0.2em]">
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4" /> TODAY'S BURN RATE
+        <div className="bg-gradient-to-br from-rose-500 to-pink-600 rounded-[2rem] p-8 text-white shadow-xl shadow-rose-500/20 relative overflow-hidden group transition-transform hover:scale-[1.02]">
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 text-rose-100 font-black text-xs uppercase tracking-[0.2em] mb-4">
+              <Clock className="h-4 w-4" /> TODAY'S BURN RATE
             </div>
-            <div className="text-2xl sm:text-4xl font-black tracking-tighter">
+            <div className="text-4xl font-black mb-2 tracking-tighter">
               Rs {todayTotal.toLocaleString()}
             </div>
-            <div className="text-rose-100/80 text-[10px] sm:text-sm font-bold flex items-center gap-2">
-              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" /> {format(new Date(), "MMMM do, yyyy")}
+            <div className="text-rose-100/80 text-sm font-bold flex items-center gap-2">
+              <Calendar className="h-4 w-4" /> {format(new Date(), "MMMM do, yyyy")}
             </div>
           </div>
-          <TrendingDown className="absolute -right-4 -bottom-4 h-24 w-24 sm:h-32 sm:w-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform" />
+          <TrendingDown className="absolute -right-4 -bottom-4 h-32 w-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform" />
         </div>
 
         {/* Card 2: Monthly Burn */}
-        <div className="bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl sm:rounded-[2rem] p-6 sm:p-8 text-white shadow-xl shadow-orange-500/20 relative overflow-hidden group transition-all duration-300 hover:scale-[1.02]">
-          <div className="relative z-10 flex flex-col gap-2 sm:gap-4">
-            <div className="flex items-center gap-2 text-orange-100 font-black text-[10px] sm:text-xs uppercase tracking-[0.2em]">
-              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" /> CURRENT MONTH BURN
+        <div className="bg-gradient-to-br from-orange-400 to-orange-600 rounded-[2rem] p-8 text-white shadow-xl shadow-orange-500/20 relative overflow-hidden group transition-transform hover:scale-[1.02]">
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 text-orange-100 font-black text-xs uppercase tracking-[0.2em] mb-4">
+              <BarChart3 className="h-4 w-4" /> CURRENT MONTH BURN
             </div>
-            <div className="text-2xl sm:text-4xl font-black tracking-tighter">
+            <div className="text-4xl font-black mb-2 tracking-tighter">
               Rs {monthTotal.toLocaleString()}
             </div>
-            <div className="text-orange-100/80 text-[10px] sm:text-sm font-bold flex items-center gap-2">
-              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" /> {format(new Date(), "MMMM yyyy")}
+            <div className="text-orange-100/80 text-sm font-bold flex items-center gap-2">
+              <Calendar className="h-4 w-4" /> {format(new Date(), "MMMM yyyy")}
             </div>
           </div>
-          <TrendingDown className="absolute -right-4 -bottom-4 h-24 w-24 sm:h-32 sm:w-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform" />
+          <TrendingDown className="absolute -right-4 -bottom-4 h-32 w-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform" />
         </div>
 
         {/* Card 3: Aggregate Burn */}
-        <div className="bg-gradient-to-br from-blue-500 to-indigo-700 rounded-2xl sm:rounded-[2rem] p-6 sm:p-8 text-white shadow-xl shadow-blue-500/20 relative overflow-hidden group transition-all duration-300 hover:scale-[1.02] sm:col-span-2 lg:col-span-1">
-          <div className="relative z-10 flex flex-col gap-2 sm:gap-4">
-            <div className="flex items-center gap-2 text-blue-100 font-black text-[10px] sm:text-xs uppercase tracking-[0.2em]">
-              <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4" /> AGGREGATE BURN
+        <div className="bg-gradient-to-br from-blue-500 to-indigo-700 rounded-[2rem] p-8 text-white shadow-xl shadow-blue-500/20 relative overflow-hidden group transition-transform hover:scale-[1.02]">
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 text-blue-100 font-black text-xs uppercase tracking-[0.2em] mb-4">
+              <TrendingDown className="h-4 w-4" /> AGGREGATE BURN
             </div>
-            <div className="text-2xl sm:text-4xl font-black tracking-tighter">
+            <div className="text-4xl font-black mb-2 tracking-tighter">
               Rs {allTimeTotal.toLocaleString()}
             </div>
-            <div className="text-blue-100/80 text-[10px] sm:text-xs font-black uppercase tracking-widest">
+            <div className="text-blue-100/80 text-sm font-bold uppercase tracking-widest">
               ALL TIME RECORDS
             </div>
           </div>
-          <TrendingDown className="absolute -right-4 -bottom-4 h-24 w-24 sm:h-32 sm:w-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform" />
+          <TrendingDown className="absolute -right-4 -bottom-4 h-32 w-32 text-white/10 rotate-12 group-hover:scale-110 transition-transform" />
         </div>
       </div>
 
       {/* Main Content Area */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <div className="overflow-x-auto pb-2 scrollbar-hide">
-          <TabsList className="bg-slate-100 p-1 rounded-xl sm:rounded-2xl h-auto flex w-max sm:w-auto gap-1 sm:gap-2">
-            <TabsTrigger value="monthly" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm font-black text-[10px] sm:text-xs tracking-widest uppercase flex items-center gap-2 whitespace-nowrap">
-              <Calendar className="h-3.5 w-3.5" /> MONTHLY LOG
-            </TabsTrigger>
-            <TabsTrigger value="ledger" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm font-black text-[10px] sm:text-xs tracking-widest uppercase flex items-center gap-2 whitespace-nowrap">
-              <LayoutDashboard className="h-3.5 w-3.5" /> DETAILED LEDGER
-            </TabsTrigger>
-            <TabsTrigger value="insights" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm font-black text-[10px] sm:text-xs tracking-widest uppercase flex items-center gap-2 whitespace-nowrap">
-              <PieChart className="h-3.5 w-3.5" /> CATEGORY INSIGHTS
-            </TabsTrigger>
-            <TabsTrigger value="annual" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm font-black text-[10px] sm:text-xs tracking-widest uppercase flex items-center gap-2 whitespace-nowrap">
-              <BarChart3 className="h-3.5 w-3.5" /> ANNUAL ANALYTICS
-            </TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList className="bg-slate-100 p-1 rounded-2xl w-full sm:w-auto h-auto flex-wrap">
+          <TabsTrigger value="monthly" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm font-black text-xs tracking-widest uppercase flex items-center gap-2">
+            <Calendar className="h-4 w-4" /> MONTHLY LOG
+          </TabsTrigger>
+          <TabsTrigger value="ledger" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm font-black text-xs tracking-widest uppercase flex items-center gap-2">
+            <LayoutDashboard className="h-4 w-4" /> DETAILED LEDGER
+          </TabsTrigger>
+          <TabsTrigger value="insights" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm font-black text-xs tracking-widest uppercase flex items-center gap-2">
+            <PieChart className="h-4 w-4" /> CATEGORY INSIGHTS
+          </TabsTrigger>
+          <TabsTrigger value="annual" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm font-black text-xs tracking-widest uppercase flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" /> ANNUAL ANALYTICS
+          </TabsTrigger>
+        </TabsList>
 
         {/* MONTHLY LOG TAB */}
         <TabsContent value="monthly" className="space-y-6">
@@ -542,16 +538,16 @@ const Expenses = () => {
 
           {/* Expenses Table */}
           <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-            <div className="overflow-x-auto pb-4 scrollbar-hide">
-              <table className="w-full text-left border-collapse min-w-[1000px]">
+            <div className="w-full">
+              <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                   <tr className="bg-slate-50/50 border-none">
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pl-8 w-[120px]">DATE</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pl-8 w-[100px]">DATE</th>
                     <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-auto">DESCRIPTION</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[140px] hidden sm:table-cell">CATEGORY</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[140px] hidden md:table-cell">PAYMENT MODE</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[110px]">STATUS</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[130px] text-right">AMOUNT</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[120px]">CATEGORY</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[120px]">PAYMENT MODE</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[100px]">STATUS</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[110px] text-right">AMOUNT</th>
                     <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pr-8 text-right w-[160px]">ACTIONS</th>
                   </tr>
                 </thead>
@@ -571,12 +567,12 @@ const Expenses = () => {
                         <td className="py-5 break-words whitespace-normal max-w-[200px]">
                           <div className="font-black text-slate-900">{e.description}</div>
                         </td>
-                        <td className="py-5 hidden sm:table-cell">
+                        <td className="py-5">
                           <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 border-none rounded-lg px-3 py-1 font-bold">
                             {e.category}
                           </Badge>
                         </td>
-                        <td className="py-5 font-bold text-slate-600 hidden md:table-cell">
+                        <td className="py-5 font-bold text-slate-600">
                           {e.payment_mode}
                         </td>
                         <td className="py-5">
@@ -685,16 +681,16 @@ const Expenses = () => {
 
           {/* Expenses Table */}
           <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-            <div className="overflow-x-auto pb-4 scrollbar-hide">
-              <table className="w-full text-left border-collapse min-w-[1000px]">
+            <div className="w-full">
+              <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                   <tr className="bg-slate-50/50 border-none">
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pl-8 w-[120px]">DATE</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pl-8 w-[100px]">DATE</th>
                     <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-auto">DESCRIPTION</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[140px] hidden sm:table-cell">CATEGORY</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[140px] hidden md:table-cell">PAYMENT MODE</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[110px]">STATUS</th>
-                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[130px] text-right">AMOUNT</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[120px]">CATEGORY</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[120px]">PAYMENT MODE</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[100px]">STATUS</th>
+                    <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 w-[110px] text-right">AMOUNT</th>
                     <th className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 py-6 pr-8 text-right w-[160px]">ACTIONS</th>
                   </tr>
                 </thead>
@@ -714,12 +710,12 @@ const Expenses = () => {
                         <td className="py-5 break-words whitespace-normal max-w-[200px]">
                           <div className="font-black text-slate-900">{e.description}</div>
                         </td>
-                        <td className="py-5 hidden sm:table-cell">
+                        <td className="py-5">
                           <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 border-none rounded-lg px-3 py-1 font-bold">
                             {e.category}
                           </Badge>
                         </td>
-                        <td className="py-5 font-bold text-slate-600 hidden md:table-cell">
+                        <td className="py-5 font-bold text-slate-600">
                           {e.payment_mode}
                         </td>
                         <td className="py-5">

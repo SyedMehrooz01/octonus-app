@@ -297,7 +297,7 @@ const Inventory = () => {
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8 pb-24 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {error && (
         <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
           <RotateCcw className="h-5 w-5 animate-spin-slow" />
@@ -306,52 +306,52 @@ const Inventory = () => {
         </div>
       )}
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div>
-          <h1 className="text-xl sm:text-3xl font-black text-[#0f172a] tracking-tight uppercase italic">Inventory Management</h1>
-          <p className="text-[10px] sm:text-sm font-black text-slate-400 uppercase tracking-widest mt-1 flex items-center gap-2">
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight uppercase">Inventory Management</h1>
+          <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1 flex items-center gap-2">
             <Clock className="h-3 w-3" /> Real-time Stock Tracking
           </p>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-3">
           <Button 
             variant="outline" 
             size="icon" 
             onClick={() => fetchData()}
-            className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl border-slate-200 hover:bg-slate-50 text-slate-500"
+            className="h-12 w-12 rounded-xl border-slate-200 hover:bg-slate-50 text-slate-500"
           >
-            <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
+            <RotateCcw className="h-5 w-5" />
           </Button>
           {canDo("add") && (
             <Button 
               onClick={() => setShowAddModal(true)} 
-              className="bg-primary hover:bg-primary/90 text-white font-black rounded-xl shadow-lg shadow-primary/20 h-10 sm:h-12 px-4 sm:px-8 gap-2 transition-all hover:-translate-y-0.5 flex-1 sm:flex-none text-[10px] sm:text-xs"
+              className="bg-primary hover:bg-primary/90 text-white font-black rounded-xl shadow-lg shadow-primary/20 h-12 px-8 gap-2 transition-all hover:-translate-y-0.5"
             >
-              <Plus className="h-4 w-4 sm:h-5 sm:w-5" /> NEW ITEM
+              <Plus className="h-5 w-5" /> NEW ITEM
             </Button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Total Asset Types", value: (items ?? []).length, icon: Package, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20" },
           { label: "Low Stock Alerts", value: (lowStock ?? []).length, icon: AlertTriangle, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20" },
           { label: "Est. Stock Value", value: `₨ ${(totalValue ?? 0).toLocaleString()}`, icon: Wallet, color: "from-emerald-500 to-emerald-700", shadow: "shadow-emerald-500/20" },
           { label: "Active Categories", value: categoryCount, icon: Landmark, color: "from-violet-500 to-violet-700", shadow: "shadow-violet-500/20" },
         ].map((card, i) => (
-          <div key={card.label} className={`group relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br ${card.color} p-4 sm:p-6 text-white shadow-xl ${card.shadow} transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
-            <div className="relative z-10 flex flex-col gap-2 sm:gap-4">
-              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
-                <card.icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+          <div key={card.label} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.color} p-6 text-white shadow-xl ${card.shadow} transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
+            <div className="relative z-10 flex flex-col gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+                <card.icon className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest opacity-80">{card.label}</p>
-                <p className="text-lg sm:text-2xl font-black truncate tracking-tight">{card.value}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{card.label}</p>
+                <p className="text-2xl font-black truncate tracking-tight">{card.value}</p>
               </div>
             </div>
-            <div className="absolute -right-4 -bottom-4 sm:-right-6 sm:-bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
-              <card.icon size={80} className="sm:w-[140px] sm:h-[140px] text-white" />
+            <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
+              <card.icon size={140} className="text-white" />
             </div>
           </div>
         ))}
@@ -377,12 +377,10 @@ const Inventory = () => {
       )}
 
       <Tabs defaultValue="stock" className="w-full">
-        <div className="overflow-x-auto pb-2 scrollbar-hide">
-          <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60 w-max sm:w-auto">
-            <TabsTrigger value="stock" className="rounded-xl px-4 sm:px-8 py-3 font-black text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all whitespace-nowrap">Inventory List</TabsTrigger>
-            <TabsTrigger value="history" className="rounded-xl px-4 sm:px-8 py-3 font-black text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all whitespace-nowrap">Movement History</TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
+          <TabsTrigger value="stock" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Inventory List</TabsTrigger>
+          <TabsTrigger value="history" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Movement History</TabsTrigger>
+        </TabsList>
 
         <TabsContent value="stock" className="space-y-6 animate-in fade-in duration-500">
           <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
@@ -392,15 +390,15 @@ const Inventory = () => {
                 <Input placeholder="Search inventory items..." className="pl-11 h-12 bg-white border-slate-200 rounded-xl font-bold shadow-sm focus-visible:ring-blue-500/20" value={search} onChange={e => setSearch(e.target.value)} />
               </div>
             </div>
-            <div className="overflow-x-auto pb-4 scrollbar-hide">
-              <table className="w-full min-w-[1000px]">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px]">
                 <thead>
                   <tr className="bg-slate-50/80 text-left border-b border-slate-100">
                     <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Item Details</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] hidden sm:table-cell">Type</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] hidden md:table-cell">Category</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Type</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Category</th>
                     <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Stock Level</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right hidden sm:table-cell">Asset Value</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Asset Value</th>
                     <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
                   </tr>
                 </thead>
@@ -420,37 +418,32 @@ const Inventory = () => {
                             <p className="text-sm font-black text-[#0f172a] leading-none group-hover:text-blue-600 transition-colors">{item?.name}</p>
                             <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-tighter flex items-center gap-2">
                               <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
-                              {item?.supplier || "No Supplier"}
+                              Supplier: {item?.supplier}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-6 hidden sm:table-cell">
-                        <Badge variant="outline" className={`rounded-lg px-2 py-0 text-[10px] font-black uppercase tracking-tighter ${
-                          item?.type === 'consumable' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'
-                        }`}>
+                      <td className="px-6 py-6">
+                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${item?.type === 'consumable' ? 'bg-blue-500 text-white' : 'bg-violet-500 text-white'}`}>
                           {item?.type}
                         </Badge>
                       </td>
-                      <td className="px-6 py-6 hidden md:table-cell">
-                        <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 border-none rounded-lg px-3 py-1 font-bold">
+                      <td className="px-6 py-6">
+                        <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm">
                           {item?.category}
                         </Badge>
                       </td>
-                      <td className="px-6 py-6 text-center">
-                        <div className="inline-flex flex-col items-center">
-                          <span className={`text-sm font-black ${(item?.current_stock ?? 0) <= (item?.min_stock_level ?? 0) ? 'text-rose-500' : 'text-slate-700'}`}>
-                            {item?.current_stock}
+                      <td className="px-6 py-6">
+                        <div className="flex flex-col items-center gap-2">
+                          <span className={`text-sm font-black tracking-tight ${(item?.current_stock ?? 0) <= (item?.min_stock_level ?? 0) ? "text-rose-600" : "text-slate-700"}`}>
+                            {item?.current_stock} {item?.unit}
                           </span>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{item?.unit}</span>
+                          <div className="h-1.5 w-20 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                            <div className={`h-full transition-all duration-500 ${(item?.current_stock ?? 0) <= (item?.min_stock_level ?? 0) ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"}`} style={{ width: `${Math.min(100, ((item?.current_stock ?? 0) / (item?.min_stock_level || 1)) * 50)}%` }} />
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-6 text-right hidden sm:table-cell">
-                        <div className="font-black text-slate-900">
-                          ₨ {((item?.current_stock ?? 0) * (item?.purchase_price ?? 0)).toLocaleString()}
-                        </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">₨ {item?.purchase_price}/unit</p>
-                      </td>
+                      <td className="px-6 py-6 text-sm font-black text-right text-slate-700 tracking-tight">₨ {((item?.current_stock ?? 0) * (item?.purchase_price ?? 0)).toLocaleString()}</td>
                       <td className="px-6 py-6 text-right">
                         {canDo("edit") && (
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0">
@@ -472,68 +465,64 @@ const Inventory = () => {
         </TabsContent>
 
         {/* History */}
-        <TabsContent value="history" className="space-y-6 animate-in fade-in duration-500">
-          <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
-            <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex flex-col md:flex-row gap-4">
-              <div className="relative flex-1 group">
-                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                <Input placeholder="Search movements..." className="pl-11 h-12 bg-white border-slate-200 rounded-xl font-bold shadow-sm focus-visible:ring-blue-500/20" value={historySearch} onChange={e => setHistorySearch(e.target.value)} />
+        <TabsContent value="history">
+          <div className="rounded-lg border border-border bg-card">
+            <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input placeholder="Search item history..." className="pl-9" value={historySearch} onChange={e => setHistorySearch(e.target.value)} />
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Input type="date" className="h-12 bg-white border-slate-200 rounded-xl font-bold w-auto flex-1 sm:flex-none" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-                <Input type="date" className="h-12 bg-white border-slate-200 rounded-xl font-bold w-auto flex-1 sm:flex-none" value={toDate} onChange={e => setToDate(e.target.value)} />
-                {canDo("export") && (
-                  <Button variant="outline" onClick={() => exportHistory()} className="h-12 bg-white border-slate-200 rounded-xl font-bold gap-2 hover:bg-slate-50 flex-1 sm:flex-none">
-                    <Download className="h-4 w-4" /> EXPORT
-                  </Button>
-                )}
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-40"><SelectValue placeholder="All Categories" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="consumable">Consumable</SelectItem>
+                  <SelectItem value="non-consumable">Non-Consumable</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-2">
+                <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-36 text-xs h-9" />
+                <span className="text-muted-foreground">to</span>
+                <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-36 text-xs h-9" />
               </div>
+              {canDo("export") && (
+                <Button variant="outline" size="sm" onClick={() => exportHistory()} className="h-9">
+                  <Download className="h-4 w-4 mr-2" /> Export Excel
+                </Button>
+              )}
             </div>
-            <div className="overflow-x-auto pb-4 scrollbar-hide">
-              <table className="w-full min-w-[1000px]">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px]">
                 <thead>
-                  <tr className="bg-slate-50/80 text-left border-b border-slate-100">
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Item</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Type</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Qty</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] hidden md:table-cell">Note</th>
-                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Action</th>
+                  <tr className="border-b border-border bg-muted/40">
+                    {["Date", "Item", "Type", "Qty", "Note", "Action"].map(h => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody>
                   {loading ? (
-                    Array(5).fill(0).map((_, i) => (
-                      <tr key={i}><td colSpan={6} className="px-6 py-8"><div className="h-12 w-full animate-pulse rounded-2xl bg-slate-100" /></td></tr>
-                    ))
+                    <tr><td colSpan={6} className="px-4 py-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" /></td></tr>
                   ) : (filteredHistory ?? []).map(h => {
                     const item = (items ?? []).find(i => i.id === h.item_id);
                     return (
-                      <tr key={h?.id} className="hover:bg-blue-50/40 transition-all duration-200 group">
-                        <td className="px-6 py-6 text-sm font-bold text-slate-500">{h?.date}</td>
-                        <td className="px-6 py-6">
-                          <div>
-                            <p className="text-sm font-black text-[#0f172a]">{h?.item_name}</p>
-                            <Badge className="mt-1 bg-slate-100 text-slate-600 hover:bg-slate-100 border-none rounded-lg px-2 py-0 text-[9px] font-bold">
-                              {item?.category ?? "Other"}
-                            </Badge>
-                          </div>
+                      <tr key={h?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{h?.date}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-card-foreground">
+                          {h?.item_name}
+                          <span className="ml-2 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase border bg-muted/50">
+                            {item?.category ?? "Other"}
+                          </span>
                         </td>
-                        <td className="px-6 py-6">
-                          <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-tighter border ${
-                            h?.movement_type === "in" || h?.movement_type === "purchase" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : 
-                            h?.movement_type === "return" ? "bg-blue-50 text-blue-600 border-blue-100" : 
-                            "bg-rose-50 text-rose-600 border-rose-100"
-                          }`}>
-                            {h?.movement_type === "in" || h?.movement_type === "purchase" ? <ArrowUp className="h-3 w-3" /> : 
-                             h?.movement_type === "return" ? <RotateCcw className="h-3 w-3" /> : 
-                             <ArrowDown className="h-3 w-3" />}
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${h?.movement_type === "in" ? "bg-success/10 text-success border-success/20" : h?.movement_type === "return" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-destructive/10 text-destructive border-destructive/20"}`}>
+                            {h?.movement_type === "in" ? <ArrowUp className="h-3 w-3" /> : h?.movement_type === "return" ? <RotateCcw className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
                             {h?.movement_type}
                           </span>
                         </td>
-                        <td className="px-6 py-6 text-center text-sm font-black text-slate-700">{h?.quantity}</td>
-                        <td className="px-6 py-6 text-sm font-bold text-slate-400 hidden md:table-cell">{h?.notes}</td>
-                        <td className="px-6 py-6 text-right">
+                        <td className="px-4 py-3 text-sm font-bold text-card-foreground">{h?.quantity}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{h?.notes}</td>
+                        <td className="px-4 py-3">
                           {canDo("edit") && h?.movement_type === "out" && item?.type === "non-consumable" && (
                             <Button variant="ghost" size="sm" onClick={() => {
                               if (item) {
@@ -542,15 +531,19 @@ const Inventory = () => {
                                 setReturnForm({ qty: String(h?.quantity ?? 0), returned_by: "", note: "" });
                                 setShowReturnModal(true);
                               }
-                            }} className="h-8 px-3 text-[10px] font-black uppercase tracking-widest gap-2 hover:bg-blue-50 hover:text-blue-600 transition-all rounded-lg">
-                              <RotateCcw className="h-3.5 w-3.5" /> Return
+                            }} className="h-7 px-2 text-[10px] gap-1">
+                              <RotateCcw className="h-3 w-3" /> Return
                             </Button>
                           )}
                         </td>
                       </tr>
                     );
                   })}
+                  {!loading && (filteredHistory ?? []).length === 0 && (
+                    <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No stock movements found.</td></tr>
+                  )}
                 </tbody>
+
               </table>
             </div>
           </div>

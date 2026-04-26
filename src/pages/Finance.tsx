@@ -421,7 +421,7 @@ const Finance = () => {
 
   if (loading) {
     return (
-      <div className="space-y-8 pb-20 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="space-y-8 pb-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
           <div className="h-12 w-64 bg-slate-100 rounded-xl animate-pulse" />
           <div className="h-12 w-40 bg-slate-100 rounded-xl animate-pulse" />
@@ -435,7 +435,7 @@ const Finance = () => {
   }
 
   return (
-    <div className="space-y-8 pb-20 max-w-full overflow-hidden">
+    <div className="space-y-8 pb-10 max-w-full overflow-hidden">
       {error && (
         <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
           <RefreshCcw className="h-5 w-5 animate-spin-slow" />
@@ -443,125 +443,122 @@ const Finance = () => {
           <Button variant="ghost" size="sm" onClick={() => fetchFinanceData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
         </div>
       )}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-[2rem] shadow-sm border border-slate-100">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div className="animate-in fade-in slide-in-from-left duration-500">
-          <h1 className="text-xl sm:text-3xl font-black text-[#0f172a] tracking-tight uppercase italic">Finance & Accounts</h1>
-          <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Manage general ledger, event finance, and profit reports.</p>
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Finance & Accounts</h1>
+          <p className="text-slate-500 font-bold mt-1">Manage general ledger, event finance, and profit reports.</p>
         </div>
         {canDo("add") && (
-          <Button onClick={()=>setShowAdd(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-600/20 h-10 sm:h-12 px-4 sm:px-8 gap-2 transition-all hover:-translate-y-0.5 animate-in fade-in slide-in-from-right duration-500 text-xs sm:text-sm">
-            <Plus className="h-4 w-4 sm:h-5 sm:w-5"/> ADD LEDGER ENTRY
+          <Button onClick={()=>setShowAdd(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-600/20 h-12 px-8 gap-2 transition-all hover:-translate-y-0.5 animate-in fade-in slide-in-from-right duration-500">
+            <Plus className="h-5 w-5"/> ADD LEDGER ENTRY
           </Button>
         )}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {l:"Total Revenue",v:`₨ ${(totalRevenue ?? 0).toLocaleString()}`,c:"from-emerald-500 to-emerald-700",shadow:"shadow-emerald-500/20",icon:TrendingUp},
           {l:"Total Expenses",v:`₨ ${(totalCredit ?? 0).toLocaleString()}`,c:"from-rose-500 to-rose-700",shadow:"shadow-rose-500/20",icon:TrendingDown},
-          {l:"Net Balance",v:`₨ ${(netBalance ?? 0).toLocaleString()}`,c:"from-blue-500 to-blue-700",shadow:"shadow-blue-500/20",icon:Landmark},
-          {l:"Pending",v:`₨ ${(totalPending ?? 0).toLocaleString()}`,c:"from-amber-500 to-amber-700",shadow:"shadow-amber-500/20",icon:Wallet}
+          {l:"Net Cash Balance",v:`₨ ${(netBalance ?? 0).toLocaleString()}`,c:"from-blue-500 to-blue-700",shadow:"shadow-blue-500/20",icon:Landmark},
+          {l:"Pending Receivables",v:`₨ ${(totalPending ?? 0).toLocaleString()}`,c:"from-amber-500 to-amber-700",shadow:"shadow-amber-500/20",icon:Wallet}
         ].map((c, i)=>(
-          <div key={c.l} className={`group relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br ${c.c} p-4 sm:p-6 text-white shadow-lg ${c.shadow} transition-all duration-300 hover:scale-[1.02] animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
-            <div className="relative z-10 flex flex-col gap-2 sm:gap-4">
-              <div className="flex h-8 w-8 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
-                <c.icon className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
+          <div key={c.l} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${c.c} p-6 text-white shadow-xl ${c.shadow} transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl animate-in fade-in zoom-in duration-500 delay-${i * 100}`}>
+            <div className="relative z-10 flex flex-col gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+                <c.icon className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest opacity-80">{c.l}</p>
-                <p className="text-sm sm:text-2xl font-black truncate tracking-tight">{c.v}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{c.l}</p>
+                <p className="text-2xl font-black truncate tracking-tight">{c.v}</p>
               </div>
             </div>
-            <div className="absolute -right-4 -bottom-4 sm:-right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
-              <c.icon size={80} className="text-white sm:hidden" />
-              <c.icon size={140} className="text-white hidden sm:block" />
+            <div className="absolute -right-6 -bottom-6 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
+              <c.icon size={140} className="text-white" />
             </div>
           </div>
         ))}
       </div>
 
       <Tabs defaultValue="ledger" className="w-full">
-        <div className="overflow-x-auto pb-2 scrollbar-hide">
-          <TabsList className="mb-4 sm:mb-8 h-auto flex w-max sm:w-auto gap-1 sm:gap-2 bg-slate-100/50 p-1 rounded-xl sm:rounded-2xl border border-slate-200/60">
-            <TabsTrigger value="ledger" className="rounded-lg sm:rounded-xl px-4 sm:px-8 py-2 sm:py-3 font-black text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all whitespace-nowrap">General Ledger</TabsTrigger>
-            <TabsTrigger value="event" className="rounded-lg sm:rounded-xl px-4 sm:px-8 py-2 sm:py-3 font-black text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all whitespace-nowrap">Event Finance</TabsTrigger>
-            <TabsTrigger value="advances" className="rounded-lg sm:rounded-xl px-4 sm:px-8 py-2 sm:py-3 font-black text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all whitespace-nowrap">Advances</TabsTrigger>
-            <TabsTrigger value="vendors" className="rounded-lg sm:rounded-xl px-4 sm:px-8 py-2 sm:py-3 font-black text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all whitespace-nowrap">Vendor Ledger</TabsTrigger>
-            <TabsTrigger value="pnl" className="rounded-lg sm:rounded-xl px-4 sm:px-8 py-2 sm:py-3 font-black text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all whitespace-nowrap">Profit & Loss</TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList className="mb-8 h-auto gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/60">
+          <TabsTrigger value="ledger" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">General Ledger</TabsTrigger>
+          <TabsTrigger value="event" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Event Finance</TabsTrigger>
+          <TabsTrigger value="advances" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Advances</TabsTrigger>
+          <TabsTrigger value="vendors" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Vendor Ledger</TabsTrigger>
+          <TabsTrigger value="pnl" className="rounded-xl px-8 py-3 font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg transition-all">Profit & Loss</TabsTrigger>
+        </TabsList>
 
         <TabsContent value="ledger" className="space-y-6 animate-in fade-in duration-500">
-          <div className="rounded-2xl sm:rounded-3xl border border-slate-100 bg-white shadow-xl shadow-slate-200/40 overflow-hidden">
-            <div className="p-4 sm:p-6 border-b border-slate-50 flex flex-col xl:flex-row gap-4 xl:items-center bg-slate-50/30">
+          <div className="rounded-3xl border border-slate-100 bg-white shadow-2xl shadow-slate-200/40 overflow-hidden">
+            <div className="p-6 border-b border-slate-50 flex flex-col xl:flex-row gap-4 xl:items-center bg-slate-50/30">
               <div className="relative flex-1 group">
                 <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                <Input placeholder="Search transactions..." className="pl-11 h-10 sm:h-12 bg-white border-slate-200 rounded-xl font-bold shadow-sm focus-visible:ring-blue-500/20 text-xs sm:text-sm" value={search} onChange={e=>setSearch(e.target.value)}/>
+                <Input placeholder="Search transactions..." className="pl-11 h-12 bg-white border-slate-200 rounded-xl font-bold shadow-sm focus-visible:ring-blue-500/20" value={search} onChange={e=>setSearch(e.target.value)}/>
               </div>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <Select value={accountFilter} onValueChange={setAccountFilter}>
-                  <SelectTrigger className="w-full sm:w-40 h-10 sm:h-12 rounded-xl border-slate-200 bg-white font-black text-[10px] sm:text-sm shadow-sm focus:ring-blue-500/20"><SelectValue placeholder="All Accounts"/></SelectTrigger>
+                  <SelectTrigger className="w-40 h-12 rounded-xl border-slate-200 bg-white font-black text-sm shadow-sm focus:ring-blue-500/20"><SelectValue placeholder="All Accounts"/></SelectTrigger>
                   <SelectContent className="rounded-xl">
                     <SelectItem value="all">All Accounts</SelectItem>
                     {ACCOUNTS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <div className="flex flex-1 items-center gap-1 sm:gap-2 bg-white border border-slate-200 rounded-xl px-2 sm:px-4 h-10 sm:h-12 shadow-sm">
-                  <Input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} className="w-full sm:w-36 border-none bg-transparent h-full text-[10px] sm:text-xs font-black focus-visible:ring-0 p-0 sm:p-1" />
-                  <span className="text-slate-300 font-black text-[10px] sm:text-xs">—</span>
-                  <Input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} className="w-full sm:w-36 border-none bg-transparent h-full text-[10px] sm:text-xs font-black focus-visible:ring-0 p-0 sm:p-1" />
+                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 h-12 shadow-sm">
+                  <Input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} className="w-36 border-none bg-transparent h-full text-xs font-black focus-visible:ring-0" />
+                  <span className="text-slate-300 font-black text-xs">—</span>
+                  <Input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} className="w-36 border-none bg-transparent h-full text-xs font-black focus-visible:ring-0" />
                 </div>
                 {canDo("export") && (
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <Button variant="outline" size="sm" onClick={() => exportStatement('pdf')} className="flex-1 sm:flex-none h-10 sm:h-12 rounded-xl font-black border-slate-200 bg-white gap-2 px-3 sm:px-6 shadow-sm hover:bg-slate-50 text-[10px] sm:text-xs">
-                      <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-rose-500"/> <span className="hidden sm:inline">PDF</span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => exportStatement('pdf')} className="h-12 rounded-xl font-black border-slate-200 bg-white gap-2 px-6 shadow-sm hover:bg-slate-50">
+                      <FileText className="h-4 w-4 text-rose-500"/> PDF
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => exportStatement('excel')} className="flex-1 sm:flex-none h-10 sm:h-12 rounded-xl font-black border-slate-200 bg-white gap-2 px-3 sm:px-6 shadow-sm hover:bg-slate-50 text-[10px] sm:text-xs">
-                      <Download className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-500"/> <span className="hidden sm:inline">EXCEL</span>
+                    <Button variant="outline" size="sm" onClick={() => exportStatement('excel')} className="h-12 rounded-xl font-black border-slate-200 bg-white gap-2 px-6 shadow-sm hover:bg-slate-50">
+                      <Download className="h-4 w-4 text-emerald-500"/> EXCEL
                     </Button>
                   </div>
                 )}
               </div>
             </div>
-            <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
-              <table className="w-full min-w-[700px] lg:min-w-full">
+            <div className="w-full">
+              <table className="w-full table-fixed">
                 <thead>
                   <tr className="bg-slate-50/80 text-left border-b border-slate-100">
-                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[100px]">Date</th>
-                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-auto">Description</th>
-                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[100px] hidden sm:table-cell">Account</th>
-                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center w-[80px] hidden md:table-cell">Type</th>
-                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right w-[120px]">Amount</th>
-                    <th className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right w-[120px]">Balance</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[100px]">Date</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-auto">Description</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[100px]">Account</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-center w-[80px]">Type</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right w-[120px]">Amount</th>
+                    <th className="px-6 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right w-[120px]">Balance</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filtered.map((l, idx)=>(
                     <tr key={l.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-blue-50/40 transition-all duration-200 group`}>
-                      <td className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] sm:text-sm font-black text-slate-500 whitespace-nowrap tracking-tight">{format(new Date(l.date), 'MMM d, yyyy')}</td>
-                      <td className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] sm:text-sm font-black text-[#0f172a] leading-tight tracking-tight break-words whitespace-normal max-w-[200px]">{l.description}</td>
-                      <td className="px-3 sm:px-6 py-4 sm:py-6 hidden sm:table-cell">
-                        <Badge variant="outline" className="rounded-lg font-black text-[8px] sm:text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-2 sm:px-3 py-1 shadow-sm">
+                      <td className="px-6 py-6 text-sm font-black text-slate-500 whitespace-nowrap tracking-tight">{format(new Date(l.date), 'MMM d, yyyy')}</td>
+                      <td className="px-6 py-6 text-sm font-black text-[#0f172a] leading-tight tracking-tight break-words whitespace-normal max-w-[200px]">{l.description}</td>
+                      <td className="px-6 py-6">
+                        <Badge variant="outline" className="rounded-lg font-black text-[10px] uppercase tracking-tighter bg-white border-slate-200 px-3 py-1 shadow-sm">
                           {l.account}
                         </Badge>
                       </td>
-                      <td className="px-3 sm:px-6 py-4 sm:py-6 text-center hidden md:table-cell">
-                        <Badge className={`rounded-lg px-2 sm:px-3 py-1 text-[8px] sm:text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${l?.type==="debit"?"bg-emerald-500 text-white":"bg-rose-500 text-white"}`}>
+                      <td className="px-6 py-6 text-center">
+                        <Badge className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-none shadow-sm ${l?.type==="debit"?"bg-emerald-500 text-white":"bg-rose-500 text-white"}`}>
                           {l.type}
                         </Badge>
                       </td>
-                      <td className={`px-3 sm:px-6 py-4 sm:py-6 text-[10px] sm:text-sm font-black text-right tracking-tight ${l?.type==="debit"?"text-emerald-600":"text-rose-600"}`}>
+                      <td className={`px-6 py-6 text-sm font-black text-right tracking-tight ${l?.type==="debit"?"text-emerald-600":"text-rose-600"}`}>
                         {l?.type==="debit"?"+":"-"} ₨ {(l?.amount ?? 0).toLocaleString()}
                       </td>
-                      <td className="px-3 sm:px-6 py-4 sm:py-6 text-[10px] sm:text-sm font-black text-right text-[#0f172a] tracking-tight">₨ {(l?.balance ?? 0).toLocaleString()}</td>
+                      <td className="px-6 py-6 text-sm font-black text-right text-[#0f172a] tracking-tight">₨ {(l?.balance ?? 0).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-slate-50/80 border-t border-slate-200">
                   <tr>
-                    <td colSpan={4} className="px-3 sm:px-6 py-4 sm:py-8 text-[9px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Aggregate Cash Position</td>
-                    <td colSpan={2} className={`px-3 sm:px-6 py-4 sm:py-8 text-right`}>
-                      <span className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl sm:rounded-2xl font-black text-sm sm:text-xl shadow-xl ${netBalance>=0?"bg-emerald-500 text-white shadow-emerald-500/20":"bg-rose-500 text-white shadow-rose-500/20"}`}>
+                    <td colSpan={4} className="px-6 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Aggregate Cash Position</td>
+                    <td colSpan={2} className={`px-6 py-8 text-right`}>
+                      <span className={`px-8 py-3 rounded-2xl font-black text-xl shadow-xl ${netBalance>=0?"bg-emerald-500 text-white shadow-emerald-500/20":"bg-rose-500 text-white shadow-rose-500/20"}`}>
                         ₨ {(netBalance ?? 0).toLocaleString()}
                       </span>
                     </td>
@@ -574,42 +571,43 @@ const Finance = () => {
 
         <TabsContent value="event" className="space-y-6">
           <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
-            <div className="p-4 sm:p-8 border-b border-border bg-muted/5">
-              <h3 className="text-lg sm:text-xl font-black text-foreground uppercase italic">Event-Based Financial Tracking</h3>
-              <p className="text-[10px] sm:text-sm text-muted-foreground font-bold uppercase tracking-wider mt-1">Detailed breakdown of revenue, costs and profit per event</p>
+            <div className="p-8 border-b border-border bg-muted/5">
+              <h3 className="text-xl font-black text-foreground">Event-Based Financial Tracking</h3>
+              <p className="text-sm text-muted-foreground font-medium mt-1">Detailed breakdown of revenue, costs and profit per event</p>
             </div>
-            <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
-              <table className="w-full min-w-[700px] lg:min-w-full">
+            <div className="w-full">
+              <table className="w-full table-fixed">
                 <thead>
                   <tr className="bg-muted/30 text-left border-b border-border">
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Event Detail</th>
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest hidden sm:table-cell">Date</th>
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Revenue</th>
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest hidden md:table-cell">Advance</th>
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Pending</th>
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest text-center">Profit</th>
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest text-right hidden lg:table-cell">Status</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Event Detail</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Date</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Revenue</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Advance</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Pending</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-center">Profit</th>
+                    <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest text-right">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {(eventFinance ?? []).map((e, idx)=>(
                     <tr key={e?.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-muted/10'} hover:bg-primary/5 transition-colors`}>
-                      <td className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-black text-foreground break-words whitespace-normal max-w-[150px]">{e?.event}</td>
-                      <td className="px-3 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-tighter hidden sm:table-cell">{e?.date ? format(new Date(e.date), 'MMM d, yyyy') : "N/A"}</td>
-                      <td className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-black text-foreground whitespace-nowrap">₨ {(e?.totalAmount ?? 0).toLocaleString()}</td>
-                      <td className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-bold text-emerald-600 whitespace-nowrap hidden md:table-cell">₨ {(e?.advance ?? 0).toLocaleString()}</td>
-                      <td className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-bold text-rose-500 whitespace-nowrap">₨ {(e?.balance ?? 0).toLocaleString()}</td>
-                      <td className="px-3 sm:px-6 py-4 text-center">
-                        <span className="inline-flex px-2 sm:px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-black text-[10px] sm:text-sm whitespace-nowrap">₨ {(e?.profit ?? 0).toLocaleString()}</span>
+                      <td className="px-6 py-5 text-sm font-black text-foreground break-words whitespace-normal">{e?.event}</td>
+                      <td className="px-6 py-5 text-xs font-bold text-muted-foreground uppercase tracking-tighter">{e?.date ? format(new Date(e.date), 'MMM d, yyyy') : "N/A"}</td>
+                      <td className="px-6 py-5 text-sm font-black text-foreground">₨ {(e?.totalAmount ?? 0).toLocaleString()}</td>
+                      <td className="px-6 py-5 text-sm font-bold text-emerald-600">₨ {(e?.advance ?? 0).toLocaleString()}</td>
+                      <td className="px-6 py-5 text-sm font-bold text-rose-500">₨ {(e?.balance ?? 0).toLocaleString()}</td>
+                      <td className="px-6 py-5 text-center">
+                        <span className="inline-flex px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-black text-sm">₨ {(e?.profit ?? 0).toLocaleString()}</span>
                       </td>
-                      <td className="px-3 sm:px-6 py-4 text-right hidden lg:table-cell">
-                        <Badge className={`${e?.status === 'confirmed' ? 'bg-emerald-500' : 'bg-amber-500'} text-white border-none rounded-lg px-2 sm:px-2.5 py-1 text-[8px] sm:text-[10px] font-black uppercase tracking-tighter`}>
+                      <td className="px-6 py-5 text-right">
+                        <Badge className={`${e?.status === 'confirmed' ? 'bg-emerald-500' : 'bg-amber-500'} text-white border-none rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tighter`}>
                           {e?.status}
                         </Badge>
                       </td>
                     </tr>
                   ))}
                 </tbody>
+
               </table>
             </div>
           </div>
@@ -617,110 +615,78 @@ const Finance = () => {
 
         {/* ADVANCE TRACKING */}
         <TabsContent value="advances">
-          <div className="rounded-2xl border border-border bg-card p-4 sm:p-8">
-            <h3 className="mb-6 text-lg sm:text-xl font-black text-card-foreground uppercase italic">Advance Tracking — Live Summary</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
-              <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4 sm:p-6 text-center">
-                <p className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Total Advances</p>
-                <p className="text-sm sm:text-2xl font-black text-primary tracking-tight">₨{(totalAdvances ?? 0).toLocaleString()}</p>
-              </div>
-              <div className="rounded-2xl bg-emerald-50/5 border border-emerald-500/20 p-4 sm:p-6 text-center">
-                <p className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Total Revenue</p>
-                <p className="text-sm sm:text-2xl font-black text-emerald-600 tracking-tight">₨{(totalRevenue ?? 0).toLocaleString()}</p>
-              </div>
-              <div className="rounded-2xl bg-rose-50/5 border border-rose-500/20 p-4 sm:p-6 text-center">
-                <p className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Pending Balance</p>
-                <p className="text-sm sm:text-2xl font-black text-rose-600 tracking-tight">₨{(totalPending ?? 0).toLocaleString()}</p>
-              </div>
-              <div className="rounded-2xl bg-amber-50/5 border border-amber-500/20 p-4 sm:p-6 text-center">
-                <p className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Profit</p>
-                <p className="text-sm sm:text-2xl font-black text-amber-600 tracking-tight">₨{(totalProfit ?? 0).toLocaleString()}</p>
-              </div>
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h3 className="mb-4 text-base font-semibold text-card-foreground">Advance Tracking — Live Summary</h3>
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Total Advances Received</p><p className="text-xl font-bold text-primary">₨{(totalAdvances ?? 0).toLocaleString()}</p></div>
+              <div className="rounded-lg bg-emerald-50/5 border border-emerald-500/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Total Revenue</p><p className="text-xl font-bold text-emerald-600">₨{(totalRevenue ?? 0).toLocaleString()}</p></div>
+              <div className="rounded-lg bg-rose-50/5 border border-rose-500/20 p-4 text-center"><p className="text-xs text-muted-foreground mb-1">Pending Balance</p><p className="text-xl font-bold text-rose-600">₨{(totalPending ?? 0).toLocaleString()}</p></div>
             </div>
-            <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
-              <table className="w-full min-w-[700px] lg:min-w-full">
-                <thead>
-                  <tr className="border-b border-border bg-muted/40">
-                    <th className="px-3 sm:px-6 py-4 text-left text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Event</th>
-                    <th className="px-3 sm:px-6 py-4 text-left text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Total</th>
-                    <th className="px-3 sm:px-6 py-4 text-left text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Advance</th>
-                    <th className="px-3 sm:px-6 py-4 text-left text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Balance</th>
-                    <th className="px-3 sm:px-6 py-4 text-left text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest hidden sm:table-cell">% Paid</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(eventFinance ?? []).map(e=>{
-                    const pct = Math.round(((e?.advance ?? 0)/(e?.totalAmount ?? 1))*100);
-                    return <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                      <td className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-black text-card-foreground break-words whitespace-normal max-w-[150px]">{e?.event}</td>
-                      <td className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-bold text-card-foreground">₨{(e?.totalAmount ?? 0).toLocaleString()}</td>
-                      <td className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-bold text-emerald-600">₨{(e?.advance ?? 0).toLocaleString()}</td>
-                      <td className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-bold text-rose-600">₨{(e?.balance ?? 0).toLocaleString()}</td>
-                      <td className="px-3 sm:px-6 py-4 hidden sm:table-cell">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-16 sm:w-24 overflow-hidden rounded-full bg-muted shadow-inner">
-                            <div className={`h-full rounded-full transition-all duration-500 ${pct>=100?"bg-emerald-500":pct>=50?"bg-blue-500":"bg-amber-400"}`} style={{width:`${pct}%`}}/>
-                          </div>
-                          <span className="text-[9px] sm:text-xs font-black text-muted-foreground">{pct}%</span>
-                        </div>
-                      </td>
-                    </tr>;
-                  })}
-                </tbody>
-              </table>
+            <div className="w-full">
+              <table className="w-full table-fixed">
+              <thead><tr className="border-b border-border bg-muted/40">{["Event","Total","Advance","Balance","% Paid"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
+              <tbody>
+                {(eventFinance ?? []).map(e=>{
+                  const pct = Math.round(((e?.advance ?? 0)/(e?.totalAmount ?? 1))*100);
+                  return <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                    <td className="px-4 py-3 text-sm font-medium text-card-foreground break-words whitespace-normal">{e?.event}</td>
+                    <td className="px-4 py-3 text-sm text-card-foreground">₨{(e?.totalAmount ?? 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm text-emerald-600">₨{(e?.advance ?? 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm text-rose-600">₨{(e?.balance ?? 0).toLocaleString()}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-24 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${pct>=100?"bg-emerald-500":pct>=50?"bg-blue-500":"bg-amber-400"}`} style={{width:`${pct}%`}}/></div>
+                        <span className="text-xs text-muted-foreground">{pct}%</span>
+                      </div>
+                    </td>
+                  </tr>;
+                })}
+              </tbody>
+
+            </table>
             </div>
           </div>
         </TabsContent>
 
         {/* VENDOR LEDGER */}
         <TabsContent value="vendors">
-          <div className="rounded-2xl border border-border bg-card overflow-hidden">
-            <div className="border-b border-border p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-muted/5">
+          <div className="rounded-lg border border-border bg-card">
+            <div className="border-b border-border p-4 flex justify-between items-center">
               <div>
-                <h3 className="text-lg sm:text-xl font-black text-card-foreground uppercase italic">Vendor Ledger</h3>
-                <p className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider mt-1">Full transaction history and payment tracking</p>
+                <h3 className="text-sm font-semibold text-card-foreground">Vendor Ledger</h3>
+                <p className="text-xs text-muted-foreground mt-1">Full transaction history and payment tracking</p>
               </div>
               <Button 
                 size="sm" 
                 variant="outline" 
                 onClick={() => handleRefreshVendors()}
                 disabled={isRefreshing}
-                className="h-10 sm:h-11 px-4 sm:px-6 rounded-xl border-slate-200 font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm gap-2 text-xs"
               >
-                {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4"/>}
-                REFRESH LEDGER
+                {isRefreshing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <History className="h-4 w-4 mr-1"/>}
+                Refresh
               </Button>
             </div>
-            <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
-              <table className="w-full min-w-[700px] lg:min-w-full">
-                <thead>
-                  <tr className="bg-muted/30 text-left border-b border-border">
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Vendor</th>
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest hidden sm:table-cell">Service</th>
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Opening Bal</th>
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest hidden md:table-cell">Paid</th>
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Outstanding</th>
-                    <th className="px-3 sm:px-6 py-4 text-[9px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Action</th>
-                  </tr>
-                </thead>
+            <div className="w-full">
+              <table className="w-full table-fixed">
+                <thead><tr className="border-b border-border bg-muted/40">{["Vendor","Service","Opening Bal","Paid","Outstanding","Action"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                 <tbody>
                   {(vendors ?? []).map(v=>(
-                    <tr key={v?.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                      <td className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-black text-card-foreground flex items-center gap-2">
-                        <Users className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400"/>
+                    <tr key={v?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-3 text-sm font-medium text-card-foreground flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground"/>
                         {v?.name}
                       </td>
-                      <td className="px-3 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-tight hidden sm:table-cell">{v?.category}</td>
-                      <td className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-bold text-slate-600">₨{(v?.total_bills ?? 0).toLocaleString()}</td>
-                      <td className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-bold text-emerald-600 hidden md:table-cell">₨{(v?.paid ?? 0).toLocaleString()}</td>
-                      <td className={`px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-black ${(v?.balance ?? 0)>0?"text-rose-600":"text-emerald-600"}`}>₨{(v?.balance ?? 0).toLocaleString()}</td>
-                      <td className="px-3 sm:px-6 py-4 flex gap-1 sm:gap-2">
-                        <Button size="sm" variant="outline" onClick={() => { setSelectedVendor(v); setShowVendorHistory(true); }} className="h-7 w-7 sm:h-8 sm:w-8 p-0 rounded-lg"><FileText className="h-4 w-4"/></Button>
-                        {(v?.balance ?? 0) > 0 && <Button size="sm" onClick={() => { setSelectedVendor(v); setVendorPayForm({ amount: "", method: "Cash", date: format(new Date(), "yyyy-MM-dd"), notes: "" }); setShowPayVendor(true); }} className="h-7 sm:h-8 px-2 sm:px-3 rounded-lg text-[9px] sm:text-[10px] font-black uppercase">Pay</Button>}
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{v?.category}</td>
+                      <td className="px-4 py-3 text-sm">₨{(v?.total_bills ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-emerald-600">₨{(v?.paid ?? 0).toLocaleString()}</td>
+                      <td className={`px-4 py-3 text-sm font-bold ${(v?.balance ?? 0)>0?"text-destructive":"text-emerald-600"}`}>₨{(v?.balance ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 flex gap-2">
+                        <Button size="sm" variant="ghost" onClick={() => { setSelectedVendor(v); setShowVendorHistory(true); }} className="h-8 px-2"><FileText className="h-4 w-4"/></Button>
+                        {(v?.balance ?? 0) > 0 && <Button size="sm" onClick={() => { setSelectedVendor(v); setVendorPayForm({ amount: "", method: "Cash", date: format(new Date(), "yyyy-MM-dd"), notes: "" }); setShowPayVendor(true); }} className="h-8 px-2">Pay</Button>}
                       </td>
                     </tr>
                   ))}
-                  {(vendors ?? []).length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-widest">No vendors found. Add them in Event Booking.</td></tr>}
+                  {(vendors ?? []).length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No vendors found. Add them in Event Booking - Supplier Ledger.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -729,87 +695,67 @@ const Finance = () => {
 
         {/* P&L */}
         <TabsContent value="pnl">
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-border bg-card p-4 sm:p-8">
-              <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-8">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full xl:w-auto">
-                  <h3 className="text-lg sm:text-xl font-black text-card-foreground uppercase italic">Profit & Loss Report</h3>
-                  <div className="flex bg-muted p-1 rounded-xl w-full sm:w-auto">
+          <div className="space-y-4">
+            {/* Event-wise P&L */}
+            <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-4">
+                  <h3 className="text-base font-semibold text-card-foreground">Profit & Loss Report</h3>
+                  <div className="flex bg-muted p-1 rounded-lg">
                     {(["monthly", "yearly"] as const).map(v => (
                       <button 
                         key={v} 
                         onClick={() => setPlView(v)} 
-                        className={`flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${plView === v ? "bg-white text-blue-600 shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${plView === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                       >
-                        {v}
+                        {v.charAt(0).toUpperCase() + v.slice(1)}
                       </button>
                     ))}
                   </div>
                   {plView === "yearly" && (
                     <Select value={selectedYear} onValueChange={setSelectedYear}>
-                      <SelectTrigger className="w-full sm:w-28 h-10 rounded-xl border-slate-200 bg-white font-black text-xs uppercase tracking-widest"><SelectValue /></SelectTrigger>
-                      <SelectContent className="rounded-xl">
+                      <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
                         {["2024", "2025", "2026"].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   )}
                 </div>
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <Button variant="outline" size="sm" onClick={() => exportPL('pdf')} className="flex-1 sm:flex-none h-11 rounded-xl font-black border-slate-200 bg-white gap-2 px-6 shadow-sm hover:bg-slate-50 text-xs">
-                    <FileText className="h-4 w-4 text-rose-500"/> PDF
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => exportPL('excel')} className="flex-1 sm:flex-none h-11 rounded-xl font-black border-slate-200 bg-white gap-2 px-6 shadow-sm hover:bg-slate-50 text-xs">
-                    <Download className="h-4 w-4 text-emerald-500"/> EXCEL
-                  </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => exportPL('pdf')}><FileText className="h-4 w-4 mr-2"/>PDF</Button>
+                  <Button variant="outline" size="sm" onClick={() => exportPL('excel')}><Download className="h-4 w-4 mr-2"/>Excel</Button>
                 </div>
               </div>
 
               {plView === "monthly" ? (
-                <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
-                  <table className="w-full min-w-[800px]">
-                    <thead>
-                      <tr className="bg-muted/30 text-left border-b border-border">
-                        <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Event</th>
-                        <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Revenue</th>
-                        <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest hidden sm:table-cell">Expenses</th>
-                        <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Net Profit</th>
-                        <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest hidden md:table-cell">Margin</th>
-                      </tr>
-                    </thead>
+                <div className="w-full">
+                  <table className="w-full table-fixed">
+                    <thead><tr className="border-b border-border bg-muted/40">{["Event","Revenue","Expenses","Net Profit","Margin"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                     <tbody>
                       {(eventFinance ?? []).map(e=>{
                         const margin = Math.round(((e?.profit ?? 0)/(e?.totalAmount ?? 1))*100);
-                        return <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                          <td className="px-4 sm:px-6 py-4 text-sm font-black text-card-foreground break-words whitespace-normal">{e?.event}</td>
-                          <td className="px-4 sm:px-6 py-4 text-sm font-bold text-emerald-600">₨{(e?.totalAmount ?? 0).toLocaleString()}</td>
-                          <td className="px-4 sm:px-6 py-4 text-sm font-bold text-rose-600 hidden sm:table-cell">{(e?.expenses ?? 0)>0?`₨${(e?.expenses ?? 0).toLocaleString()}`:"-"}</td>
-                          <td className="px-4 sm:px-6 py-4 text-sm font-black text-emerald-600">₨{(e?.profit ?? 0).toLocaleString()}</td>
-                          <td className="px-4 sm:px-6 py-4 hidden md:table-cell"><span className={`inline-flex rounded-lg border px-3 py-1 text-[10px] font-black uppercase tracking-tighter ${margin>=50?"bg-emerald-500/10 text-emerald-600 border-emerald-500/20":margin>=30?"bg-amber-500/10 text-amber-600 border-amber-500/20":"bg-rose-500/10 text-rose-600 border-rose-500/20"}`}>{margin}%</span></td>
+                        return <tr key={e?.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                          <td className="px-4 py-3 text-sm font-medium text-card-foreground break-words whitespace-normal">{e?.event}</td>
+                          <td className="px-4 py-3 text-sm text-emerald-600">₨{(e?.totalAmount ?? 0).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sm text-rose-600">{(e?.expenses ?? 0)>0?`₨${(e?.expenses ?? 0).toLocaleString()}`:"-"}</td>
+                          <td className="px-4 py-3 text-sm font-bold text-emerald-600">₨{(e?.profit ?? 0).toLocaleString()}</td>
+                          <td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${margin>=50?"bg-emerald-500/10 text-emerald-600 border-emerald-500/20":margin>=30?"bg-amber-500/10 text-amber-600 border-amber-500/20":"bg-rose-500/10 text-rose-600 border-rose-500/20"}`}>{margin}%</span></td>
                         </tr>;
                       })}
                     </tbody>
-                    <tfoot>
-                      <tr className="bg-muted/40 font-black">
-                        <td className="px-4 sm:px-6 py-4 text-sm uppercase italic">Monthly Total</td>
-                        <td className="px-4 sm:px-6 py-4 text-sm text-emerald-600">₨{(totalRevenue ?? 0).toLocaleString()}</td>
-                        <td className="px-4 sm:px-6 py-4 text-sm text-rose-600 hidden sm:table-cell">₨{(eventFinance ?? []).reduce((s,e)=>s+(e?.expenses ?? 0),0).toLocaleString()}</td>
-                        <td className="px-4 sm:px-6 py-4 text-sm text-emerald-600">₨{(totalProfit ?? 0).toLocaleString()}</td>
-                        <td className="hidden md:table-cell"/>
-                      </tr>
-                    </tfoot>
+                    <tfoot><tr className="bg-muted/40">
+                      <td className="px-4 py-3 text-sm font-semibold">Monthly Total</td>
+                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">₨{(totalRevenue ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-rose-600">₨{(eventFinance ?? []).reduce((s,e)=>s+(e?.expenses ?? 0),0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">₨{(totalProfit ?? 0).toLocaleString()}</td>
+                      <td/>
+                    </tr></tfoot>
                   </table>
                 </div>
               ) : (
-                <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
-                  <table className="w-full min-w-[800px]">
-                    <thead>
-                      <tr className="bg-muted/30 text-left border-b border-border">
-                        <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Month</th>
-                        <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Total Income</th>
-                        <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest hidden sm:table-cell">Total Expenses</th>
-                        <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest">Net Profit/Loss</th>
-                      </tr>
-                    </thead>
+                <div className="w-full">
+                  <table className="w-full table-fixed">
+                    <thead><tr className="border-b border-border bg-muted/40">{["Month","Total Income","Total Expenses","Net Profit/Loss"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>)}</tr></thead>
                     <tbody>
                       {yearlyMonths.map(month => {
                         const monthStr = format(month, "MM");
@@ -818,27 +764,24 @@ const Finance = () => {
                         const mExpenses = monthEvents.reduce((s, e) => s + (e?.expenses ?? 0), 0);
                         const mProfit = mIncome - mExpenses;
                         return (
-                          <tr key={month.toISOString()} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                            <td className="px-4 sm:px-6 py-4 text-sm font-black text-card-foreground">{format(month, "MMMM")}</td>
-                            <td className="px-4 sm:px-6 py-4 text-sm text-emerald-600 font-bold">₨{(mIncome ?? 0).toLocaleString()}</td>
-                            <td className="px-4 sm:px-6 py-4 text-sm text-rose-600 font-bold hidden sm:table-cell">₨{(mExpenses ?? 0).toLocaleString()}</td>
-                            <td className={`px-4 sm:px-6 py-4 text-sm font-black ${mProfit >= 0 ? "text-blue-600" : "text-rose-600"}`}>₨{(mProfit ?? 0).toLocaleString()}</td>
+                          <tr key={month.toISOString()} className="border-b border-border last:border-0 hover:bg-muted/20">
+                            <td className="px-4 py-3 text-sm font-medium text-card-foreground">{format(month, "MMMM")}</td>
+                            <td className="px-4 py-3 text-sm text-emerald-600 font-bold">₨{(mIncome ?? 0).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-sm text-rose-600 font-bold">₨{(mExpenses ?? 0).toLocaleString()}</td>
+                            <td className={`px-4 py-3 text-sm font-black ${mProfit >= 0 ? "text-primary" : "text-rose-600"}`}>₨{(mProfit ?? 0).toLocaleString()}</td>
                           </tr>
                         );
                       })}
                     </tbody>
-                    <tfoot>
-                      <tr className="bg-muted/40">
-                        <td className="px-4 sm:px-6 py-6 text-sm sm:text-lg font-black uppercase italic tracking-widest">Yearly Totals</td>
-                        <td className="px-4 sm:px-6 py-6 text-sm sm:text-lg font-black text-emerald-600">₨{(totalRevenue ?? 0).toLocaleString()}</td>
-                        <td className="px-4 sm:px-6 py-6 text-sm sm:text-lg font-black text-rose-600 hidden sm:table-cell">₨{(eventFinance ?? []).reduce((s,e)=>s+(e?.expenses ?? 0),0).toLocaleString()}</td>
-                        <td className="px-4 sm:px-6 py-6 text-sm sm:text-xl font-black text-blue-600">₨{(totalProfit ?? 0).toLocaleString()}</td>
-                      </tr>
-                    </tfoot>
+                    <tfoot><tr className="bg-muted/40">
+                      <td className="px-4 py-3 text-lg font-bold uppercase tracking-widest">Yearly Totals</td>
+                      <td className="px-4 py-3 text-lg font-black text-emerald-600">₨{(totalRevenue ?? 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-lg font-black text-rose-600">₨{(eventFinance ?? []).reduce((s,e)=>s+(e?.expenses ?? 0),0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-xl font-black text-primary">₨{(totalProfit ?? 0).toLocaleString()}</td>
+                    </tr></tfoot>
                   </table>
                 </div>
               )}
-            </div>
 
 
             </div>

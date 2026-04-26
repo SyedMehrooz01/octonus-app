@@ -186,7 +186,7 @@ const HROutsideWorkers = memo(({
               </h4>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[700px]">
+              <table className="w-full border-collapse min-w-[900px]">
                 <thead>
                   <tr className="bg-muted/30 text-left border-b border-border">
                     <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Worker Member</th>
@@ -251,7 +251,7 @@ const HROutsideWorkers = memo(({
               </h4>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[700px]">
+              <table className="w-full border-collapse min-w-[800px]">
                 <thead>
                   <tr className="bg-muted/30 text-left border-b border-border">
                     <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-widest">Payment Date</th>

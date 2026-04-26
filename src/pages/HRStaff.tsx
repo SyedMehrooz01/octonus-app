@@ -884,32 +884,29 @@ const HRStaff = () => {
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8 pb-24 max-w-full overflow-hidden">
+    <div className="space-y-4 sm:space-y-6 pb-10 max-w-full overflow-hidden">
       {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
-          <XCircle className="h-5 w-5 shrink-0" />
-          <p className="font-bold text-xs sm:text-sm">{error}</p>
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-6 py-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+          <XCircle className="h-5 w-5" />
+          <p className="font-bold">{error}</p>
           <Button variant="ghost" size="sm" onClick={() => fetchHRData(true)} className="ml-auto text-rose-600 hover:bg-rose-100 font-black uppercase text-[10px] tracking-widest">Retry</Button>
         </div>
       )}
-      
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-[2rem] shadow-sm border border-slate-100">
-        <div className="animate-in fade-in slide-in-from-left duration-500">
-          <h1 className="text-xl sm:text-3xl font-black text-[#0f172a] tracking-tight uppercase italic">Workforce Management</h1>
-          <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Human Resources Portal</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">Workforce Management</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground text-balance">Comprehensive HR portal for staff, attendance, and payroll</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <Button onClick={() => setShowTotalLedgerModal(true)} variant="outline" className="h-9 sm:h-11 px-3 sm:px-5 rounded-xl border-slate-200 font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm gap-2 text-xs sm:text-sm">
-            <BarChart3 className="h-4 w-4" /> <span className="hidden sm:inline">Total Ledger</span>
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <Button onClick={() => setShowTotalLedgerModal(true)} variant="outline" className="gap-2 flex-shrink-0 border-primary/20 hover:bg-primary/5 text-primary">
+            <BarChart3 className="h-4 w-4" /> Total Ledger
           </Button>
-          <Button onClick={() => setShowAnnounceModal(true)} variant="outline" className="h-9 sm:h-11 px-3 sm:px-5 rounded-xl border-slate-200 font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm gap-2 text-xs sm:text-sm">
-            <Bell className="h-4 w-4" /> <span className="hidden sm:inline">Announce</span>
+          <Button onClick={() => setShowAnnounceModal(true)} variant="outline" className="gap-2 flex-shrink-0">
+            <Bell className="h-4 w-4" /> Announce
           </Button>
-          {canDo("add") && (
-            <Button onClick={() => setShowAddModal(true)} className="h-9 sm:h-11 px-4 sm:px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all shadow-lg shadow-blue-500/20 gap-2 text-xs sm:text-sm">
-              <UserPlus className="h-4 w-4" /> Add Staff
-            </Button>
-          )}
+          <Button onClick={() => setShowAddModal(true)} className="gap-2 flex-shrink-0">
+            <UserPlus className="h-4 w-4" /> Add Staff
+          </Button>
         </div>
       </div>
 
@@ -925,43 +922,43 @@ const HRStaff = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
           {[
             { label: "Active Workforce", value: (staff ?? []).filter(s => s.status === 'active').length.toString(), icon: Users, color: "from-blue-500 to-blue-700", shadow: "shadow-blue-500/20", sub: "Registered Staff" },
             { label: "Present Today", value: presentCount.toString(), icon: Clock, color: "from-emerald-500 to-emerald-700", shadow: "shadow-emerald-500/20", sub: "Attendance Recorded" },
             { label: "Monthly Payroll", value: `₨ ${monthlyPayrollTotal.toLocaleString()}`, icon: Wallet, color: "from-rose-500 to-rose-700", shadow: "shadow-rose-500/20", sub: "Estimated Total" },
             { label: "Leave Requests", value: leaveRequestsCount.toString(), icon: FileText, color: "from-amber-500 to-amber-700", shadow: "shadow-amber-500/20", sub: "Pending Approval" },
           ].map((card, i) => (
-            <div key={card.label} className={`group relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br ${card.color} p-4 sm:p-6 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]`}>
-              <div className="relative z-10 flex flex-col gap-2 sm:gap-3">
-                <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
-                  <card.icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            <div key={card.label} className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.color} p-5 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]`}>
+              <div className="relative z-10 flex flex-col gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20 shadow-inner">
+                  <card.icon className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest opacity-80 truncate">{card.label}</p>
-                  <p className="text-base sm:text-2xl font-black truncate tracking-tight">{card.value}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{card.label}</p>
+                  <p className="text-2xl font-black truncate tracking-tight">{card.value}</p>
                 </div>
               </div>
               <div className="absolute -right-4 -bottom-4 opacity-10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
-                <card.icon size={80} className="text-white sm:size-[120px]" />
+                <card.icon size={120} className="text-white" />
               </div>
             </div>
           ))}
         </div>
 
-        <Tabs defaultValue="profiles" className="w-full space-y-6 sm:space-y-8">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 w-full">
-              <TabsList className="inline-flex h-12 sm:h-14 items-center justify-start rounded-xl sm:rounded-2xl bg-white p-1.5 shadow-sm border border-slate-200 min-w-max">
-                <TabsTrigger value="profiles" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all duration-300">Profiles</TabsTrigger>
-                <TabsTrigger value="attendance" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all duration-300">Attendance</TabsTrigger>
-                <TabsTrigger value="payroll" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all duration-300">Payroll</TabsTrigger>
-                <TabsTrigger value="advances" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all duration-300">Advances</TabsTrigger>
-                <TabsTrigger value="overtime" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all duration-300">Overtime</TabsTrigger>
-                <TabsTrigger value="outside" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all duration-300">Outside</TabsTrigger>
-                <TabsTrigger value="leaves" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all duration-300">Leaves</TabsTrigger>
-                <TabsTrigger value="performance" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all duration-300">Ratings</TabsTrigger>
-                <TabsTrigger value="reports" className="rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all duration-300">Reports</TabsTrigger>
+        <Tabs defaultValue="profiles" className="w-full">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-4">
+            <div className="overflow-x-auto pb-1 w-full sm:w-auto">
+              <TabsList className="w-full justify-start sm:w-auto inline-flex">
+                <TabsTrigger value="profiles" className="text-xs sm:text-sm">Profiles</TabsTrigger>
+                <TabsTrigger value="attendance" className="text-xs sm:text-sm">Attendance</TabsTrigger>
+                <TabsTrigger value="payroll" className="text-xs sm:text-sm">Payroll</TabsTrigger>
+                <TabsTrigger value="advances" className="text-xs sm:text-sm">Advances</TabsTrigger>
+                <TabsTrigger value="overtime" className="text-xs sm:text-sm">Overtime</TabsTrigger>
+                <TabsTrigger value="outside" className="text-xs sm:text-sm">Outside Workers</TabsTrigger>
+                <TabsTrigger value="leaves" className="text-xs sm:text-sm">Leaves</TabsTrigger>
+                <TabsTrigger value="performance" className="text-xs sm:text-sm">Performance</TabsTrigger>
+                <TabsTrigger value="reports" className="text-xs sm:text-sm">Reports</TabsTrigger>
               </TabsList>
             </div>
           </div>
